@@ -63,7 +63,7 @@ export function ScoreCircle({
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className={cn("font-bold tracking-tight", fontSize, scoreColor)}>
+          <span className={cn("font-heading font-medium tracking-tight", fontSize, scoreColor)}>
             {score}%
           </span>
         </div>

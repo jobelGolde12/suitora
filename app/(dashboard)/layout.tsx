@@ -8,8 +8,10 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
-      <div className="md:pl-60 transition-all duration-300">
-        {children}
+      <div className="md:pl-60 transition-[padding] duration-300">
+        <main id="main-content" className="min-h-screen">
+          {children}
+        </main>
       </div>
     </div>
   );

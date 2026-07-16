@@ -2,26 +2,30 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { motion, type Easing } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   Search,
   Shirt,
   Clock,
   Heart,
   Trash2,
-  ArrowRight,
   BarChart3,
   Filter,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { Card, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/ui/Toast";
+import {
+  PageContainer,
+  PageHeader,
+  EmptyState,
+  fadeInUp,
+} from "@/components/dashboard";
 import { cn } from "@/lib/utils/cn";
 import { formatRelativeTime, formatScore, getScoreColor } from "@/lib/utils/format";
 import type { Analysis } from "@/types";
 
-// Mock data
 const mockHistory: (Analysis & { isFavorite: boolean })[] = [
   { id: "1", userId: "1", userImage: "", productImage: "", overallScore: 85, bodyScore: 82, styleScore: 88, colorScore: 79, createdAt: new Date(Date.now() - 3600000).toISOString(), isFavorite: true },
   { id: "2", userId: "1", userImage: "", productImage: "", overallScore: 62, bodyScore: 65, styleScore: 58, colorScore: 70, createdAt: new Date(Date.now() - 86400000 * 2).toISOString(), isFavorite: false },
@@ -30,17 +34,6 @@ const mockHistory: (Analysis & { isFavorite: boolean })[] = [
   { id: "5", userId: "1", userImage: "", productImage: "", overallScore: 55, bodyScore: 60, styleScore: 50, colorScore: 45, createdAt: new Date(Date.now() - 86400000 * 12).toISOString(), isFavorite: false },
   { id: "6", userId: "1", userImage: "", productImage: "", overallScore: 88, bodyScore: 85, styleScore: 90, colorScore: 82, createdAt: new Date(Date.now() - 86400000 * 15).toISOString(), isFavorite: true },
 ];
-
-const easeInOutQuad: Easing = [0.21, 0.47, 0.32, 0.98];
-
-const fadeInUp = {
-  hidden: { opacity: 0, y: 20 },
-  visible: (i = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.5, delay: i * 0.05, ease: easeInOutQuad },
-  }),
-};
 
 export default function HistoryPage() {
   const { addToast } = useToast();
@@ -77,165 +70,165 @@ export default function HistoryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8"
-        >
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">History</h1>
-            <p className="text-sm text-muted mt-1">
-              Browse all your past analyses ({analyses.length} total)
-            </p>
-          </div>
+    <PageContainer>
+      <PageHeader
+        label="Archive"
+        title="History"
+        description={`Browse all your past analyses (${analyses.length} total).`}
+        action={
           <Link href="/upload">
-            <Button>New Analysis</Button>
+            <Button variant="editorial" className="rounded-full px-6">
+              <Plus className="h-4 w-4" strokeWidth={1.5} />
+              New Analysis
+            </Button>
           </Link>
-        </motion.div>
+        }
+      />
 
-        {/* Search & Filter */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6"
-        >
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
-            <input
-              type="text"
-              placeholder="Search analyses..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-10 w-full rounded-xl border border-border bg-card pl-10 pr-3.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary transition-all"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted" />
-            {(["newest", "highest", "lowest"] as const).map((sort) => (
-              <button
-                key={sort}
-                onClick={() => setSortBy(sort)}
-                className={cn(
-                  "px-3 py-1.5 text-xs font-medium rounded-lg transition-all",
-                  sortBy === sort
-                    ? "bg-primary text-white"
-                    : "bg-surface text-muted hover:text-foreground"
-                )}
-              >
-                {sort === "newest" ? "Newest" : sort === "highest" ? "Highest Score" : "Lowest Score"}
-              </button>
-            ))}
-          </div>
-        </motion.div>
+      {/* Search & Filter */}
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={fadeInUp}
+        custom={1}
+        className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-10"
+      >
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" strokeWidth={1.5} />
+          <input
+            type="text"
+            placeholder="Search analyses..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-11 w-full rounded-full border border-border bg-card pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
+          />
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Filter className="h-4 w-4 text-muted shrink-0" strokeWidth={1.5} />
+          {(["newest", "highest", "lowest"] as const).map((sort) => (
+            <button
+              key={sort}
+              onClick={() => setSortBy(sort)}
+              className={cn(
+                "px-3.5 py-1.5 text-xs font-medium rounded-full transition-all duration-200",
+                "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                sortBy === sort
+                  ? "bg-foreground text-background"
+                  : "bg-surface text-muted hover:text-foreground border border-border"
+              )}
+            >
+              {sort === "newest" ? "Newest" : sort === "highest" ? "Highest" : "Lowest"}
+            </button>
+          ))}
+        </div>
+      </motion.div>
 
-        {/* Empty State */}
-        {filtered.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <Card>
-              <CardContent>
-                <div className="text-center py-16">
-                  <Clock className="h-16 w-16 text-muted mx-auto mb-4" />
-                  <p className="font-semibold text-lg">No analyses found</p>
-                  <p className="text-sm text-muted mt-1">
-                    {searchQuery ? "Try a different search term" : "Your analysis history will appear here"}
-                  </p>
-                  {!searchQuery && (
-                    <Link href="/upload">
-                      <Button variant="secondary" className="mt-6">
-                        Start Your First Analysis
-                      </Button>
-                    </Link>
-                  )}
+      {filtered.length === 0 && (
+        <EmptyState
+          icon={Clock}
+          title="No analyses found"
+          description={
+            searchQuery
+              ? "Try a different search term"
+              : "Your analysis history will appear here"
+          }
+          action={
+            !searchQuery ? (
+              <Link href="/upload">
+                <Button variant="editorial" className="rounded-full px-6">
+                  Start Your First Analysis
+                </Button>
+              </Link>
+            ) : undefined
+          }
+        />
+      )}
+
+      {filtered.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {filtered.map((analysis, i) => (
+            <motion.div
+              key={analysis.id}
+              initial="hidden"
+              animate="visible"
+              variants={fadeInUp}
+              custom={i + 2}
+              className="group rounded-2xl border border-border bg-card shadow-card editorial-card-hover overflow-hidden"
+            >
+              <div className="h-36 bg-surface relative overflow-hidden">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Shirt className="h-10 w-10 text-muted/40" strokeWidth={1.25} />
                 </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-
-        {/* Grid */}
-        {filtered.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtered.map((analysis, i) => (
-              <motion.div
-                key={analysis.id}
-                initial="hidden"
-                animate="visible"
-                variants={fadeInUp}
-                custom={i}
-                className="group rounded-2xl border border-border bg-card shadow-card hover:shadow-elevated transition-all duration-300 overflow-hidden"
-              >
-                {/* Image Preview */}
-                <div className="h-36 bg-surface relative overflow-hidden">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Shirt className="h-10 w-10 text-muted/50" />
-                  </div>
-                  {/* Score Badge */}
-                  <div className="absolute top-3 left-3">
-                    <div className={cn(
-                      "h-10 w-10 rounded-xl flex items-center justify-center text-sm font-bold shadow-lg",
-                      getScoreColor(analysis.overallScore).replace("text-", "bg-").replace("success", "success/90").replace("warning", "warning/90").replace("error", "error/90"),
-                      "text-white"
-                    )}>
+                <div className="absolute top-3 left-3">
+                  <div
+                    className={cn(
+                      "h-11 w-11 rounded-2xl flex items-center justify-center border border-border bg-card shadow-soft",
+                      getScoreColor(analysis.overallScore)
+                    )}
+                  >
+                    <span className="font-heading text-sm font-medium tabular-nums">
                       {formatScore(analysis.overallScore)}
-                    </div>
-                  </div>
-                  {/* Actions */}
-                  <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={(e) => { e.preventDefault(); toggleFavorite(analysis.id); }}
-                      className="h-8 w-8 rounded-lg bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
-                    >
-                      <Heart className={cn("h-4 w-4", analysis.isFavorite && "fill-white")} />
-                    </button>
-                    <button
-                      onClick={(e) => { e.preventDefault(); handleDelete(analysis.id); }}
-                      className="h-8 w-8 rounded-lg bg-black/50 text-white flex items-center justify-center hover:bg-error/80 transition-colors"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    </span>
                   </div>
                 </div>
+                <div className="absolute top-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      toggleFavorite(analysis.id);
+                    }}
+                    className="h-9 w-9 rounded-full bg-card/90 border border-border text-foreground flex items-center justify-center hover:bg-surface transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-label={analysis.isFavorite ? "Remove from favorites" : "Add to favorites"}
+                  >
+                    <Heart
+                      className={cn("h-4 w-4", analysis.isFavorite && "fill-accent text-accent")}
+                      strokeWidth={1.5}
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleDelete(analysis.id);
+                    }}
+                    className="h-9 w-9 rounded-full bg-card/90 border border-border text-foreground flex items-center justify-center hover:bg-error/10 hover:text-error transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-label="Delete analysis"
+                  >
+                    <Trash2 className="h-4 w-4" strokeWidth={1.5} />
+                  </button>
+                </div>
+              </div>
 
-                {/* Details */}
-                <Link href={`/results/${analysis.id}`}>
-                  <div className="p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge
-                        variant={analysis.overallScore >= 70 ? "success" : "warning"}
-                      >
-                        {analysis.overallScore >= 70 ? "Good Match" : "Average"}
-                      </Badge>
-                      {analysis.isFavorite && (
-                        <Heart className="h-3 w-3 text-rose-500 fill-rose-500" />
-                      )}
-                    </div>
-                    <div className="flex items-center gap-4 text-[10px] text-muted">
-                      <span className="flex items-center gap-1">
-                        <BarChart3 className="h-3 w-3" />
-                        Body {formatScore(analysis.bodyScore ?? 0)}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <BarChart3 className="h-3 w-3" />
-                        Style {formatScore(analysis.styleScore ?? 0)}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {formatRelativeTime(analysis.createdAt)}
-                    </p>
+              <Link href={`/results/${analysis.id}`}>
+                <div className="p-5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge variant={analysis.overallScore >= 70 ? "success" : "warning"}>
+                      {analysis.overallScore >= 70 ? "Good Match" : "Average"}
+                    </Badge>
+                    {analysis.isFavorite && (
+                      <Heart className="h-3 w-3 text-accent fill-accent" />
+                    )}
                   </div>
-                </Link>
-              </motion.div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+                  <div className="flex items-center gap-4 text-xs text-muted font-light">
+                    <span className="flex items-center gap-1">
+                      <BarChart3 className="h-3 w-3" strokeWidth={1.5} />
+                      Body {formatScore(analysis.bodyScore ?? 0)}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <BarChart3 className="h-3 w-3" strokeWidth={1.5} />
+                      Style {formatScore(analysis.styleScore ?? 0)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2.5 font-light">
+                    {formatRelativeTime(analysis.createdAt)}
+                  </p>
+                </div>
+              </Link>
+            </motion.div>
+          ))}
+        </div>
+      )}
+    </PageContainer>
   );
 }

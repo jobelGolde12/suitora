@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion, type Easing } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   Sparkles,
   Heart,
@@ -11,7 +11,6 @@ import {
   Share2,
   ArrowLeft,
   ArrowRight,
-  Shirt,
   Palette,
   User as UserIcon,
   Star,
@@ -21,6 +20,12 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { ScoreCircle } from "@/components/ui/ScoreCircle";
 import { useToast } from "@/components/ui/Toast";
+import {
+  PageContainer,
+  PageHeader,
+  ScoreBar,
+  fadeInUp,
+} from "@/components/dashboard";
 import { cn } from "@/lib/utils/cn";
 import type {
   BodyShape,
@@ -88,17 +93,6 @@ const styleTypeLabels: Record<StyleType, string> = {
   "business-casual": "Business Casual",
 };
 
-const easeOut: Easing = [0.21, 0.47, 0.32, 0.98];
-
-const fadeInUp = {
-  hidden: { opacity: 0, y: 20 },
-  visible: (i = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.5, delay: i * 0.08, ease: easeOut },
-  }),
-};
-
 export default function ResultsPage() {
   const router = useRouter();
   const { addToast } = useToast();
@@ -122,241 +116,253 @@ export default function ResultsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="mb-6"
+    <PageContainer>
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={fadeInUp}
+        className="mb-6"
+      >
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-foreground transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg"
         >
-          <button
-            onClick={() => router.back()}
-            className="inline-flex items-center gap-1 text-sm text-muted hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </button>
-        </motion.div>
+          <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
+          Back
+        </button>
+      </motion.div>
 
-        <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={fadeInUp}
-          className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8"
-        >
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Analysis Results</h1>
-            <p className="text-sm text-muted mt-1">
-              Here&apos;s how this item works with your style profile.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={handleShare}>
-              <Share2 className="h-4 w-4" />
+      <PageHeader
+        label="Results"
+        title="Analysis Results"
+        description="Here's how this item works with your style profile."
+        action={
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="ghost" size="sm" onClick={handleShare} className="rounded-full">
+              <Share2 className="h-4 w-4" strokeWidth={1.5} />
               Share
             </Button>
-            <Button variant="ghost" size="sm" onClick={handleDownload}>
-              <Download className="h-4 w-4" />
+            <Button variant="ghost" size="sm" onClick={handleDownload} className="rounded-full">
+              <Download className="h-4 w-4" strokeWidth={1.5} />
               Download
             </Button>
             <Button
-              variant={isFavorited ? "primary" : "secondary"}
+              variant={isFavorited ? "accent" : "editorial"}
               size="sm"
               onClick={handleFavorite}
+              className="rounded-full"
             >
-              <Heart className={cn("h-4 w-4", isFavorited && "fill-white")} />
+              <Heart className={cn("h-4 w-4", isFavorited && "fill-white")} strokeWidth={1.5} />
               {isFavorited ? "Saved" : "Save"}
             </Button>
           </div>
-        </motion.div>
+        }
+      />
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-          <div className="lg:col-span-3 space-y-6">
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={fadeInUp}
-              custom={1}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  {["tryon", "original"].map((view) => (
-                    <button
-                      key={view}
-                      onClick={() => setSelectedView(view as typeof selectedView)}
-                      className={cn(
-                        "px-3 py-1.5 text-xs font-medium rounded-lg transition-all",
-                        selectedView === view
-                          ? "bg-primary text-white"
-                          : "bg-surface text-muted hover:text-foreground"
-                      )}
-                    >
-                      {view === "tryon" ? "Virtual Try-On" : "Original Item"}
-                    </button>
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 lg:gap-10">
+        <div className="lg:col-span-3 space-y-8">
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={fadeInUp}
+            custom={1}
+          >
+            <div className="flex items-center gap-2 mb-4">
+              {(["tryon", "original"] as const).map((view) => (
+                <button
+                  key={view}
+                  type="button"
+                  onClick={() => setSelectedView(view)}
+                  className={cn(
+                    "px-3.5 py-1.5 text-xs font-medium rounded-full transition-all duration-200",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    selectedView === view
+                      ? "bg-foreground text-background"
+                      : "bg-surface text-muted hover:text-foreground border border-border"
+                  )}
+                >
+                  {view === "tryon" ? "Virtual Try-On" : "Original Item"}
+                </button>
+              ))}
+            </div>
+            <div className="rounded-2xl border border-border bg-card overflow-hidden aspect-[4/5] relative shadow-card">
+              <div className="absolute inset-0 flex items-center justify-center bg-surface">
+                <div className="text-center px-6">
+                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-card">
+                    <Sparkles className="h-5 w-5 text-muted" strokeWidth={1.5} />
+                  </div>
+                  <p className="text-sm text-muted font-light">Generated try-on preview</p>
+                  <p className="text-xs text-muted-foreground mt-1.5 font-light">
+                    Mock preview — real AI integration coming soon
+                  </p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={fadeInUp}
+            custom={2}
+          >
+            <Card>
+              <CardHeader>
+                <CardTitle>Compatibility Scores</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-8">
+                <div className="flex flex-wrap items-center justify-center gap-8 py-2">
+                  <ScoreCircle score={mockResult.overallScore} size="lg" label="Overall" />
+                  <ScoreCircle score={mockResult.bodyScore} size="md" label="Body Fit" />
+                  <ScoreCircle score={mockResult.styleScore} size="md" label="Style Match" />
+                  <ScoreCircle score={mockResult.colorScore} size="md" label="Color Harmony" />
+                </div>
+                <div className="space-y-4 max-w-md mx-auto">
+                  <ScoreBar label="Body fit" score={mockResult.bodyScore} />
+                  <ScoreBar label="Style match" score={mockResult.styleScore} />
+                  <ScoreBar label="Color harmony" score={mockResult.colorScore} />
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+
+        <div className="lg:col-span-2 space-y-6">
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={fadeInUp}
+            custom={3}
+          >
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <UserIcon className="h-4 w-4 text-muted" strokeWidth={1.5} />
+                  Your Style Profile
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  {(
+                    [
+                      ["Body Shape", bodyShapeLabels[mockResult.bodyShape]],
+                      ["Skin Tone", skinToneLabels[mockResult.skinTone]],
+                      ["Face Shape", faceShapeLabels[mockResult.faceShape]],
+                      ["Style Type", styleTypeLabels[mockResult.styleType]],
+                    ] as const
+                  ).map(([label, value]) => (
+                    <div key={label} className="rounded-2xl bg-surface p-3.5 border border-border/60">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-[0.15em] font-medium">
+                        {label}
+                      </p>
+                      <p className="text-sm font-medium mt-1">{value}</p>
+                    </div>
                   ))}
                 </div>
-              </div>
-              <div className="rounded-2xl border border-border bg-card overflow-hidden aspect-[4/5] relative">
-                <div className="absolute inset-0 flex items-center justify-center bg-surface">
-                  <div className="text-center">
-                    <Sparkles className="h-12 w-12 text-muted mx-auto mb-3" />
-                    <p className="text-xs text-muted">Generated try-on preview</p>
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      (Mock preview - real AI integration coming soon)
-                    </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={fadeInUp}
+            custom={4}
+          >
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Palette className="h-4 w-4 text-muted" strokeWidth={1.5} />
+                  Color Analysis
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div>
+                  <p className="text-xs font-medium text-muted mb-2.5">Primary Colors</p>
+                  <div className="flex flex-wrap gap-3">
+                    {mockResult.colorAnalysis.primaryColors.map((color, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <div
+                          className="h-7 w-7 rounded-full border border-border shadow-soft"
+                          style={{ backgroundColor: color }}
+                        />
+                        <span className="text-[11px] text-muted font-light tabular-nums">
+                          {color}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={fadeInUp}
-              custom={2}
-            >
-              <Card>
-                <CardHeader>
-                  <CardTitle>Compatibility Scores</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap items-center justify-center gap-8 py-4">
-                    <ScoreCircle score={mockResult.overallScore} size="lg" label="Overall" />
-                    <ScoreCircle score={mockResult.bodyScore} size="md" label="Body Fit" />
-                    <ScoreCircle score={mockResult.styleScore} size="md" label="Style Match" />
-                    <ScoreCircle score={mockResult.colorScore} size="md" label="Color Harmony" />
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </div>
-
-          <div className="lg:col-span-2 space-y-6">
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={fadeInUp}
-              custom={3}
-            >
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <UserIcon className="h-4 w-4 text-primary" />
-                    Your Style Profile
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-xl bg-surface p-3">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Body Shape</p>
-                      <p className="text-sm font-medium mt-0.5">{bodyShapeLabels[mockResult.bodyShape]}</p>
-                    </div>
-                    <div className="rounded-xl bg-surface p-3">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Skin Tone</p>
-                      <p className="text-sm font-medium mt-0.5">{skinToneLabels[mockResult.skinTone]}</p>
-                    </div>
-                    <div className="rounded-xl bg-surface p-3">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Face Shape</p>
-                      <p className="text-sm font-medium mt-0.5">{faceShapeLabels[mockResult.faceShape]}</p>
-                    </div>
-                    <div className="rounded-xl bg-surface p-3">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Style Type</p>
-                      <p className="text-sm font-medium mt-0.5">{styleTypeLabels[mockResult.styleType]}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={fadeInUp}
-              custom={4}
-            >
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Palette className="h-4 w-4 text-accent" />
-                    Color Analysis
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <p className="text-xs font-medium text-muted mb-2">Primary Colors</p>
-                    <div className="flex gap-2">
-                      {mockResult.colorAnalysis.primaryColors.map((color, i) => (
-                        <div key={i} className="flex items-center gap-1.5">
-                          <div className="h-6 w-6 rounded-lg border border-border" style={{ backgroundColor: color }} />
-                          <span className="text-[10px] text-muted">{color}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-success mb-2">Recommended Colors</p>
-                    <div className="flex flex-wrap gap-2">
-                      {mockResult.colorAnalysis.recommendedColors.map((color, i) => (
-                        <Badge key={i} variant="success">{color}</Badge>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-error mb-2">Avoid Colors</p>
-                    <div className="flex flex-wrap gap-2">
-                      {mockResult.colorAnalysis.avoidColors.map((color, i) => (
-                        <Badge key={i} variant="error">{color}</Badge>
-                      ))}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={fadeInUp}
-              custom={5}
-            >
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Star className="h-4 w-4 text-warning" />
-                    Recommendations
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-3">
-                    {mockResult.recommendations.map((rec, i) => (
-                      <li key={i} className="flex items-start gap-3">
-                        <div className="flex-shrink-0 h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center mt-0.5">
-                          <span className="text-[10px] font-bold text-primary">{i + 1}</span>
-                        </div>
-                        <p className="text-sm text-muted leading-relaxed">{rec}</p>
-                      </li>
+                <div>
+                  <p className="text-xs font-medium text-muted mb-2.5">Recommended</p>
+                  <div className="flex flex-wrap gap-2">
+                    {mockResult.colorAnalysis.recommendedColors.map((color, i) => (
+                      <Badge key={i} variant="success">
+                        {color}
+                      </Badge>
                     ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            </motion.div>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted mb-2.5">Avoid</p>
+                  <div className="flex flex-wrap gap-2">
+                    {mockResult.colorAnalysis.avoidColors.map((color, i) => (
+                      <Badge key={i} variant="error">
+                        {color}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={fadeInUp}
-              custom={6}
-            >
-              <Link href="/upload">
-                <Button className="w-full" size="lg">
-                  Try Another Item
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
-            </motion.div>
-          </div>
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={fadeInUp}
+            custom={5}
+          >
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Star className="h-4 w-4 text-muted" strokeWidth={1.5} />
+                  Recommendations
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-4">
+                  {mockResult.recommendations.map((rec, i) => (
+                    <li key={i} className="flex items-start gap-3">
+                      <div className="flex-shrink-0 h-6 w-6 rounded-full border border-border bg-surface flex items-center justify-center mt-0.5">
+                        <span className="text-[10px] font-medium text-muted tabular-nums">
+                          {i + 1}
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted font-light leading-relaxed">{rec}</p>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={fadeInUp}
+            custom={6}
+          >
+            <Link href="/upload">
+              <Button variant="editorial" className="w-full rounded-full" size="lg">
+                Try Another Item
+                <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
+              </Button>
+            </Link>
+          </motion.div>
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 }

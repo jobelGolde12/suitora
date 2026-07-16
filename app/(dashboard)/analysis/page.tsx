@@ -4,8 +4,11 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 import { analyzeFashion } from "@/lib/ai/mock-analysis";
 import type { AnalysisProgress } from "@/types";
+import { cn } from "@/lib/utils/cn";
+import { fadeInUp } from "@/components/dashboard";
 
 const stageMessages: Record<string, string> = {
   detecting: "Detecting person in image...",
@@ -14,6 +17,8 @@ const stageMessages: Record<string, string> = {
   scoring: "Calculating compatibility scores...",
   complete: "Analysis complete!",
 };
+
+const stages = ["detecting", "analyzing", "try-on", "scoring", "complete"] as const;
 
 export default function AnalysisPage() {
   const router = useRouter();
@@ -45,7 +50,7 @@ export default function AnalysisPage() {
 
         await new Promise((resolve) => setTimeout(resolve, 800));
         router.push(`/results/mock_result_${Date.now()}`);
-      } catch (err) {
+      } catch {
         setError("Something went wrong during analysis. Please try again.");
       }
     };
@@ -53,10 +58,8 @@ export default function AnalysisPage() {
     runAnalysis();
   }, [router, handleProgress]);
 
-  const getStageIndex = (stage: string): number => {
-    const stages = ["detecting", "analyzing", "try-on", "scoring", "complete"] as const;
-    return stages.indexOf(stage as typeof stages[number]);
-  };
+  const getStageIndex = (stage: string): number =>
+    stages.indexOf(stage as (typeof stages)[number]);
 
   const getStageStatus = (stageName: string): "completed" | "active" | "pending" => {
     const current = getStageIndex(progress.stage);
@@ -67,115 +70,105 @@ export default function AnalysisPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <div className="w-full max-w-lg">
+    <div className="min-h-screen bg-background flex items-center justify-center px-5 py-16">
+      <div className="w-full max-w-md">
         {error ? (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center"
+            initial="hidden"
+            animate="visible"
+            variants={fadeInUp}
+            className="text-center rounded-2xl border border-border bg-card p-10 shadow-card"
           >
             <div className="flex justify-center mb-6">
-              <div className="h-16 w-16 rounded-2xl bg-error/10 flex items-center justify-center">
-                <Sparkles className="h-8 w-8 text-error" />
+              <div className="h-14 w-14 rounded-full border border-error/20 bg-error/5 flex items-center justify-center">
+                <Sparkles className="h-6 w-6 text-error" strokeWidth={1.5} />
               </div>
             </div>
-            <h2 className="text-xl font-bold mb-2">Analysis Failed</h2>
-            <p className="text-sm text-muted mb-6">{error}</p>
-            <button
+            <h2 className="font-heading text-2xl font-light tracking-tight mb-2">
+              Analysis Failed
+            </h2>
+            <p className="text-sm text-muted font-light mb-8">{error}</p>
+            <Button
+              variant="editorial"
+              className="rounded-full px-6"
               onClick={() => router.push("/upload")}
-              className="text-sm text-primary hover:text-primary-light font-medium transition-colors"
             >
               Try Again
-            </button>
+            </Button>
           </motion.div>
         ) : (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4 }}
+            initial="hidden"
+            animate="visible"
+            variants={fadeInUp}
             className="text-center"
           >
-            <motion.div
-              animate={{
-                scale: [1, 1.1, 1],
-                rotate: [0, 5, -5, 0],
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
-              className="flex justify-center mb-8"
-            >
-              <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/25">
-                <Sparkles className="h-10 w-10 text-white" />
+            <div className="flex justify-center mb-10">
+              <div className="h-16 w-16 rounded-full border border-accent/30 bg-accent/10 flex items-center justify-center">
+                <Sparkles className="h-7 w-7 text-accent" strokeWidth={1.5} />
               </div>
-            </motion.div>
-
-            <div className="mb-8">
-              <div className="h-2 rounded-full bg-surface overflow-hidden">
-                <motion.div
-                  className="h-full rounded-full bg-gradient-to-r from-primary to-accent"
-                  initial={{ width: "0%" }}
-                  animate={{ width: `${progress.progress}%` }}
-                  transition={{ duration: 0.5, ease: "easeOut" }}
-                />
-              </div>
-              <p className="text-xs text-muted mt-2">{Math.round(progress.progress)}%</p>
             </div>
 
-            <div className="space-y-4">
+            <p className="editorial-label mb-3">Analyzing</p>
+            <h2 className="font-heading text-2xl sm:text-3xl font-light tracking-tight mb-8">
+              Working on your fit
+            </h2>
+
+            {/* Soft progress bar — skeleton-like, no spinner */}
+            <div className="mb-10">
+              <div className="h-1.5 rounded-full bg-surface overflow-hidden">
+                <motion.div
+                  className="h-full rounded-full bg-accent/80"
+                  initial={{ width: "0%" }}
+                  animate={{ width: `${progress.progress}%` }}
+                  transition={{ duration: 0.35, ease: "easeOut" }}
+                />
+              </div>
+              <p className="text-xs text-muted mt-3 font-light tabular-nums">
+                {Math.round(progress.progress)}%
+              </p>
+            </div>
+
+            <div className="space-y-2 text-left">
               {Object.entries(stageMessages).map(([stage, message]) => {
                 const status = getStageStatus(stage);
                 return (
                   <div
                     key={stage}
-                    className={`
-                      flex items-center gap-3 p-3 rounded-xl transition-all duration-300
-                      ${status === "active" ? "bg-primary/5 border border-primary/20" : ""}
-                      ${status === "completed" ? "bg-success/5" : ""}
-                      ${status === "pending" ? "opacity-40" : ""}
-                    `}
+                    className={cn(
+                      "flex items-center gap-3 p-3.5 rounded-2xl border transition-all duration-200",
+                      status === "active" && "bg-surface border-border",
+                      status === "completed" && "bg-card border-transparent",
+                      status === "pending" && "bg-transparent border-transparent opacity-40"
+                    )}
                   >
                     <div
-                      className={`
-                        flex-shrink-0 h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300
-                        ${status === "completed" ? "bg-success text-white" : ""}
-                        ${status === "active" ? "bg-primary text-white" : ""}
-                        ${status === "pending" ? "bg-surface text-muted border border-border" : ""}
-                      `}
+                      className={cn(
+                        "flex-shrink-0 h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-medium transition-all duration-200 border",
+                        status === "completed" && "bg-success/10 border-success/20 text-success",
+                        status === "active" && "bg-accent/10 border-accent/30 text-accent",
+                        status === "pending" && "bg-surface border-border text-muted"
+                      )}
                     >
-                      {status === "completed" ? "✓" : status === "active" ? "●" : String(getStageIndex(stage) + 1)}
+                      {status === "completed"
+                        ? "✓"
+                        : status === "active"
+                          ? "·"
+                          : String(getStageIndex(stage) + 1)}
                     </div>
                     <p
-                      className={`
-                        text-sm transition-all duration-300
-                        ${status === "active" ? "text-foreground font-medium" : ""}
-                        ${status === "completed" ? "text-muted line-through" : ""}
-                        ${status === "pending" ? "text-muted-foreground" : ""}
-                      `}
+                      className={cn(
+                        "text-sm font-light transition-all duration-200",
+                        status === "active" && "text-foreground font-medium",
+                        status === "completed" && "text-muted",
+                        status === "pending" && "text-muted-foreground"
+                      )}
                     >
                       {message}
                     </p>
                   </div>
                 );
               })}
-            </div>
-
-            <div className="flex justify-center gap-1 mt-8">
-              {[1, 2, 3].map((i) => (
-                <motion.div
-                  key={i}
-                  animate={{ opacity: [0.3, 1, 0.3] }}
-                  transition={{
-                    duration: 1.2,
-                    repeat: Infinity,
-                    delay: i * 0.2,
-                  }}
-                  className="h-2 w-2 rounded-full bg-primary"
-                />
-              ))}
             </div>
           </motion.div>
         )}

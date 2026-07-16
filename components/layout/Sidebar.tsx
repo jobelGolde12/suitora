@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -24,126 +24,170 @@ const sidebarLinks = [
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
+function BrandMark({ collapsed }: { collapsed?: boolean }) {
+  return (
+    <Link
+      href="/dashboard"
+      className={cn("flex items-center gap-2.5 group", collapsed && "justify-center")}
+    >
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-accent/30 bg-accent/10 transition-colors group-hover:border-accent/50">
+        <Sparkles className="h-4 w-4 text-accent" strokeWidth={1.5} />
+      </div>
+      {!collapsed && (
+        <span className="font-heading text-xl font-medium tracking-tight">Suitora</span>
+      )}
+    </Link>
+  );
+}
+
+function NavLinks({
+  pathname,
+  collapsed,
+  onNavigate,
+}: {
+  pathname: string;
+  collapsed?: boolean;
+  onNavigate?: () => void;
+}) {
+  return (
+    <nav className="flex-1 space-y-1 p-3" aria-label="Main">
+      {sidebarLinks.map((link) => {
+        const Icon = link.icon;
+        const isActive =
+          pathname === link.href || pathname.startsWith(link.href + "/");
+
+        return (
+          <Link
+            key={link.href}
+            href={link.href}
+            onClick={onNavigate}
+            className={cn(
+              "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+              isActive
+                ? "bg-surface text-foreground"
+                : "text-muted hover:text-foreground hover:bg-surface/70",
+              collapsed && "justify-center px-0"
+            )}
+            title={collapsed ? link.label : undefined}
+            aria-current={isActive ? "page" : undefined}
+          >
+            <Icon
+              className={cn("h-5 w-5 shrink-0", isActive ? "text-accent" : "")}
+              strokeWidth={1.5}
+            />
+            {!collapsed && <span>{link.label}</span>}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Lock body scroll when mobile drawer is open
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobileOpen]);
+
+  const closeMobile = () => setMobileOpen(false);
 
   return (
     <>
       {/* Mobile overlay */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-40 bg-foreground/20 backdrop-blur-sm md:hidden"
           onClick={() => setMobileOpen(false)}
+          aria-hidden
         />
       )}
 
-      {/* Mobile menu button */}
+      {/* Mobile menu toggle — opens and closes */}
       <button
-        onClick={() => setMobileOpen(true)}
-        className="fixed bottom-6 left-6 z-30 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-white shadow-lg shadow-primary/25 md:hidden"
-        aria-label="Open menu"
+        onClick={() => setMobileOpen((open) => !open)}
+        className={cn(
+          "fixed bottom-6 left-6 z-[60] flex h-12 w-12 items-center justify-center rounded-full",
+          "border border-border bg-card text-foreground shadow-elevated md:hidden",
+          "transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]",
+          "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        )}
+        aria-label={mobileOpen ? "Close menu" : "Open menu"}
+        aria-expanded={mobileOpen}
+        aria-controls="mobile-sidebar"
       >
-        <Menu className="h-5 w-5" />
+        {mobileOpen ? <X className="h-5 w-5" strokeWidth={1.5} /> : <Menu className="h-5 w-5" strokeWidth={1.5} />}
       </button>
 
-      {/* Sidebar */}
+      {/* Desktop sidebar */}
       <aside
         className={cn(
-          "fixed left-0 top-0 z-50 flex h-full flex-col border-r border-border bg-card transition-all duration-300",
-          collapsed ? "w-16" : "w-60",
-          "hidden md:flex"
+          "fixed left-0 top-0 z-50 hidden h-full flex-col border-r border-border bg-card transition-all duration-300 md:flex",
+          collapsed ? "w-16" : "w-60"
         )}
+        data-collapsed={collapsed}
+        aria-label="Sidebar"
       >
-        {/* Logo */}
-        <div className={cn("flex h-16 items-center border-b border-border px-4", collapsed && "justify-center")}>
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent">
-              <Sparkles className="h-4 w-4 text-white" />
-            </div>
-            {!collapsed && <span className="text-lg font-semibold tracking-tight">Suitora</span>}
-          </Link>
+        <div
+          className={cn(
+            "flex h-16 items-center border-b border-border px-4",
+            collapsed && "justify-center px-2"
+          )}
+        >
+          <BrandMark collapsed={collapsed} />
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 space-y-1 p-3">
-          {sidebarLinks.map((link) => {
-            const Icon = link.icon;
-            const isActive = pathname === link.href || pathname.startsWith(link.href + "/");
+        <NavLinks pathname={pathname} collapsed={collapsed} />
 
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                  isActive
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted hover:text-foreground hover:bg-surface",
-                  collapsed && "justify-center px-0"
-                )}
-                title={collapsed ? link.label : undefined}
-              >
-                <Icon className={cn("h-5 w-5 shrink-0", isActive && "text-primary")} />
-                {!collapsed && <span>{link.label}</span>}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Collapse button */}
         <div className="border-t border-border p-3">
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="flex items-center justify-center w-full rounded-xl px-3 py-2 text-xs text-muted hover:text-foreground hover:bg-surface transition-all"
+            className={cn(
+              "flex w-full items-center justify-center rounded-xl px-3 py-2 text-xs text-muted",
+              "hover:text-foreground hover:bg-surface transition-all duration-200",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            )}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            <ChevronLeft className={cn("h-4 w-4 transition-transform", collapsed && "rotate-180")} />
+            <ChevronLeft
+              className={cn("h-4 w-4 transition-transform duration-200", collapsed && "rotate-180")}
+              strokeWidth={1.5}
+            />
             {!collapsed && <span className="ml-2">Collapse</span>}
           </button>
         </div>
       </aside>
 
-      {/* Mobile sidebar */}
+      {/* Mobile sidebar drawer */}
       <aside
+        id="mobile-sidebar"
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-border bg-card transition-transform duration-300 md:hidden",
+          "fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-card transition-transform duration-300 md:hidden",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
+        aria-hidden={!mobileOpen}
       >
         <div className="flex h-16 items-center justify-between border-b border-border px-4">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent">
-              <Sparkles className="h-4 w-4 text-white" />
-            </div>
-            <span className="text-lg font-semibold tracking-tight">Suitora</span>
-          </Link>
-          <button onClick={() => setMobileOpen(false)} className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-surface">
-            <X className="h-4 w-4" />
+          <BrandMark />
+          <button
+            onClick={() => setMobileOpen(false)}
+            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-surface transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Close menu"
+          >
+            <X className="h-4 w-4" strokeWidth={1.5} />
           </button>
         </div>
 
-        <nav className="flex-1 space-y-1 p-3">
-          {sidebarLinks.map((link) => {
-            const Icon = link.icon;
-            const isActive = pathname === link.href || pathname.startsWith(link.href + "/");
-
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setMobileOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
-                  isActive ? "bg-primary/10 text-primary" : "text-muted hover:text-foreground hover:bg-surface"
-                )}
-              >
-                <Icon className="h-5 w-5" />
-                {link.label}
-              </Link>
-            );
-          })}
-        </nav>
+        <NavLinks pathname={pathname} onNavigate={closeMobile} />
       </aside>
     </>
   );
