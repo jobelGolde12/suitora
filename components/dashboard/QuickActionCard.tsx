@@ -30,6 +30,9 @@ export function QuickActionCard({
       animate="visible"
       variants={fadeInUp}
       custom={delay}
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ type: "spring", stiffness: 210, damping: 20 }}
     >
       <Link
         href={href}

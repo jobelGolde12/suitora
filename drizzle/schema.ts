@@ -102,3 +102,48 @@ export const favorites = sqliteTable("favorites", {
     .notNull()
     .default(sql`CURRENT_TIMESTAMP`),
 });
+
+export const products = sqliteTable("products", {
+  id: text("id").primaryKey(),
+  sourceUrl: text("source_url").unique(),
+  title: text("title"),
+  brand: text("brand"),
+  priceCents: integer("price_cents"),
+  currency: text("currency"),
+  imageUrl: text("image_url"),
+  metadata: text("metadata"),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const uploads = sqliteTable("uploads", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+  kind: text("kind"),
+  url: text("url").notNull(),
+  width: integer("width"),
+  height: integer("height"),
+  mimeType: text("mime_type"),
+  sizeBytes: integer("size_bytes"),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const settings = sqliteTable("settings", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  preferences: text("preferences"),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const auditLogs = sqliteTable("audit_logs", {
+  id: text("id").primaryKey(),
+  userId: text("user_id"),
+  action: text("action").notNull(),
+  details: text("details"),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const meta = sqliteTable("meta", {
+  key: text("key").primaryKey(),
+  value: text("value"),
+});
