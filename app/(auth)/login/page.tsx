@@ -2,17 +2,21 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { motion } from "framer-motion";
-import { Eye, EyeOff, ArrowRight } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Eye, EyeOff, ArrowRight, CheckCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { loginSchema, type LoginFormData } from "@/lib/utils/validation";
+import { loginAction } from "@/lib/auth/actions";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const router = useRouter();
 
   const {
     register,
@@ -24,10 +28,24 @@ export default function LoginPage() {
 
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
-    // TODO: Implement actual authentication
-    console.log("Login data:", data);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setIsLoading(false);
+    setMessage(null);
+
+    try {
+      const result = await loginAction(data);
+
+      if (result.success) {
+        setMessage({ type: "success", text: "Welcome back! Redirecting..." });
+        setTimeout(() => {
+          router.push("/dashboard");
+        }, 1000);
+      } else {
+        setMessage({ type: "error", text: result.error || "Something went wrong." });
+      }
+    } catch {
+      setMessage({ type: "error", text: "Network error. Please check your connection and try again." });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -42,6 +60,32 @@ export default function LoginPage() {
           Sign in to your Suitora account
         </p>
       </div>
+
+      <AnimatePresence mode="wait">
+        {message && (
+          <motion.div
+            initial={{ opacity: 0, y: -10, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: "auto" }}
+            exit={{ opacity: 0, y: -10, height: 0 }}
+            className="mb-6"
+          >
+            <div
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm ${
+                message.type === "success"
+                  ? "bg-success/10 text-success border border-success/20"
+                  : "bg-error/10 text-error border border-error/20"
+              }`}
+            >
+              {message.type === "success" ? (
+                <CheckCircle className="h-4 w-4 shrink-0" />
+              ) : (
+                <AlertCircle className="h-4 w-4 shrink-0" />
+              )}
+              <span>{message.text}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <Input
