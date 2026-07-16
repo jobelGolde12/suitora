@@ -7,6 +7,7 @@ export const users = sqliteTable("users", {
   email: text("email").notNull().unique(),
   emailVerified: integer("email_verified", { mode: "boolean" }).default(false),
   image: text("image"),
+  selfImageUrl: text("self_image_url"),
   createdAt: text("created_at")
     .notNull()
     .default(sql`CURRENT_TIMESTAMP`),
@@ -72,6 +73,7 @@ export const analyses = sqliteTable("analyses", {
   userId: text("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
+  productId: text("product_id").references(() => products.id, { onDelete: "set null" }),
   userImage: text("user_image").notNull(),
   productImage: text("product_image").notNull(),
   generatedImage: text("generated_image"),
@@ -85,7 +87,16 @@ export const analyses = sqliteTable("analyses", {
   styleType: text("style_type"),
   recommendations: text("recommendations"),
   colorAnalysis: text("color_analysis"),
+  status: text("status").notNull().default("completed"),
+  height: real("height"),
+  heightConfidence: real("height_confidence"),
+  weight: real("weight"),
+  weightConfidence: real("weight_confidence"),
+  compatibilityMetadata: text("compatibility_metadata"),
   createdAt: text("created_at")
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at")
     .notNull()
     .default(sql`CURRENT_TIMESTAMP`),
 });

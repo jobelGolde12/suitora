@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -26,20 +26,31 @@ import { cn } from "@/lib/utils/cn";
 import { formatRelativeTime, formatScore, getScoreColor } from "@/lib/utils/format";
 import type { Analysis } from "@/types";
 
-const mockHistory: (Analysis & { isFavorite: boolean })[] = [
-  { id: "1", userId: "1", userImage: "", productImage: "", overallScore: 85, bodyScore: 82, styleScore: 88, colorScore: 79, createdAt: new Date(Date.now() - 3600000).toISOString(), isFavorite: true },
-  { id: "2", userId: "1", userImage: "", productImage: "", overallScore: 62, bodyScore: 65, styleScore: 58, colorScore: 70, createdAt: new Date(Date.now() - 86400000 * 2).toISOString(), isFavorite: false },
-  { id: "3", userId: "1", userImage: "", productImage: "", overallScore: 91, bodyScore: 93, styleScore: 90, colorScore: 88, createdAt: new Date(Date.now() - 86400000 * 5).toISOString(), isFavorite: true },
-  { id: "4", userId: "1", userImage: "", productImage: "", overallScore: 74, bodyScore: 70, styleScore: 76, colorScore: 78, createdAt: new Date(Date.now() - 86400000 * 8).toISOString(), isFavorite: false },
-  { id: "5", userId: "1", userImage: "", productImage: "", overallScore: 55, bodyScore: 60, styleScore: 50, colorScore: 45, createdAt: new Date(Date.now() - 86400000 * 12).toISOString(), isFavorite: false },
-  { id: "6", userId: "1", userImage: "", productImage: "", overallScore: 88, bodyScore: 85, styleScore: 90, colorScore: 82, createdAt: new Date(Date.now() - 86400000 * 15).toISOString(), isFavorite: true },
-];
-
 export default function HistoryPage() {
   const { addToast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"newest" | "highest" | "lowest">("newest");
-  const [analyses, setAnalyses] = useState(mockHistory);
+  const [analyses, setAnalyses] = useState<(Analysis & { isFavorite: boolean })[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchHistory = async () => {
+    try {
+      const res = await fetch("/api/analysis");
+      if (res.ok) {
+        const data = await res.json();
+        setAnalyses(data.analyses || []);
+      }
+    } catch (err) {
+      console.error("Failed to load analysis history:", err);
+      addToast("Failed to load analysis history", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchHistory();
+  }, []);
 
   const filtered = analyses
     .filter(
@@ -53,21 +64,73 @@ export default function HistoryPage() {
       return a.overallScore - b.overallScore;
     });
 
-  const handleDelete = (id: string) => {
-    setAnalyses((prev) => prev.filter((a) => a.id !== id));
-    addToast("Analysis removed", "success");
+  const handleDelete = async (id: string) => {
+    try {
+      const res = await fetch(`/api/analysis?id=${id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setAnalyses((prev) => prev.filter((a) => a.id !== id));
+        addToast("Analysis removed", "success");
+      } else {
+        throw new Error("Failed to delete analysis");
+      }
+    } catch (err) {
+      console.error(err);
+      addToast("Failed to delete analysis", "error");
+    }
   };
 
-  const toggleFavorite = (id: string) => {
-    setAnalyses((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, isFavorite: !a.isFavorite } : a))
-    );
+  const toggleFavorite = async (id: string) => {
     const analysis = analyses.find((a) => a.id === id);
-    addToast(
-      analysis?.isFavorite ? "Removed from favorites" : "Added to favorites",
-      "success"
-    );
+    if (!analysis) return;
+
+    try {
+      if (analysis.isFavorite) {
+        const res = await fetch(`/api/favorites?analysisId=${id}`, {
+          method: "DELETE",
+        });
+        if (res.ok) {
+          setAnalyses((prev) =>
+            prev.map((a) => (a.id === id ? { ...a, isFavorite: false } : a))
+          );
+          addToast("Removed from favorites", "success");
+        } else {
+          throw new Error("Failed to remove favorite");
+        }
+      } else {
+        const res = await fetch("/api/favorites", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ analysisId: id }),
+        });
+        if (res.ok) {
+          setAnalyses((prev) =>
+            prev.map((a) => (a.id === id ? { ...a, isFavorite: true } : a))
+          );
+          addToast("Added to favorites", "success");
+        } else {
+          throw new Error("Failed to add favorite");
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      addToast("Failed to update favorite status", "error");
+    }
   };
+
+  if (isLoading) {
+    return (
+      <PageContainer>
+        <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+          <p className="text-sm text-muted font-light">Loading archive...</p>
+        </div>
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer>
@@ -110,11 +173,11 @@ export default function HistoryPage() {
               key={sort}
               onClick={() => setSortBy(sort)}
               className={cn(
-                "px-3.5 py-1.5 text-xs font-medium rounded-full transition-all duration-200",
+                "border px-3.5 py-1.5 text-xs font-medium rounded-full transition-all duration-200",
                 "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 sortBy === sort
-                  ? "bg-foreground text-background"
-                  : "bg-surface text-muted hover:text-foreground border border-border"
+                  ? "bg-foreground text-background border-transparent"
+                  : "bg-surface text-muted hover:text-foreground border-border"
               )}
             >
               {sort === "newest" ? "Newest" : sort === "highest" ? "Highest" : "Lowest"}
@@ -157,7 +220,16 @@ export default function HistoryPage() {
             >
               <div className="h-36 bg-surface relative overflow-hidden">
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <Shirt className="h-10 w-10 text-muted/40" strokeWidth={1.25} />
+                  {analysis.productImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={analysis.productImage}
+                      alt="Clothing item"
+                      className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-300"
+                    />
+                  ) : (
+                    <Shirt className="h-10 w-10 text-muted/40" strokeWidth={1.25} />
+                  )}
                 </div>
                 <div className="absolute top-3 left-3">
                   <div

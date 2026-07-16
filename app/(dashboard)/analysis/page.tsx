@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { analyzeFashion } from "@/lib/ai/mock-analysis";
 import type { AnalysisProgress } from "@/types";
 import { cn } from "@/lib/utils/cn";
 import { fadeInUp } from "@/components/dashboard";
@@ -20,8 +19,11 @@ const stageMessages: Record<string, string> = {
 
 const stages = ["detecting", "analyzing", "try-on", "scoring", "complete"] as const;
 
-export default function AnalysisPage() {
+function AnalysisPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
   const [progress, setProgress] = useState<AnalysisProgress>({
     stage: "detecting",
     progress: 0,
@@ -29,34 +31,66 @@ export default function AnalysisPage() {
   });
   const [error, setError] = useState<string | null>(null);
 
-  const handleProgress = useCallback((stage: string, pct: number, message: string) => {
-    setProgress({
-      stage: stage as AnalysisProgress["stage"],
-      progress: pct,
-      message,
-    });
-  }, []);
-
   useEffect(() => {
-    const runAnalysis = async () => {
-      try {
-        await analyzeFashion(
-          {
-            userImageUrl: "/placeholder.svg",
-            clothingImageUrl: "/placeholder.svg",
-          },
-          handleProgress
-        );
+    if (!id) {
+      setError("No analysis ID provided.");
+      return;
+    }
 
-        await new Promise((resolve) => setTimeout(resolve, 800));
-        router.push(`/results/mock_result_${Date.now()}`);
-      } catch {
-        setError("Something went wrong during analysis. Please try again.");
+    let intervalId: NodeJS.Timeout;
+
+    const pollAnalysis = async () => {
+      try {
+        const res = await fetch(`/api/analysis?id=${id}`);
+        if (!res.ok) {
+          throw new Error("Failed to fetch analysis state");
+        }
+        
+        const data = await res.json();
+        
+        if (data.error) {
+          setError(data.error);
+          clearInterval(intervalId);
+          return;
+        }
+
+        const currentStatus = data.analysis?.status || data.status;
+
+        if (currentStatus === "completed") {
+          setProgress({
+            stage: "complete",
+            progress: 100,
+            message: stageMessages.complete,
+          });
+          clearInterval(intervalId);
+          // Redirect to results page
+          setTimeout(() => {
+            router.push(`/results/${id}`);
+          }, 800);
+        } else if (currentStatus === "failed") {
+          setError("Analysis pipeline failed. Please check your photos and try again.");
+          clearInterval(intervalId);
+        } else {
+          // Update progress state based on polling response
+          setProgress({
+            stage: (data.stage || "detecting") as AnalysisProgress["stage"],
+            progress: data.progress || 10,
+            message: data.message || stageMessages.detecting,
+          });
+        }
+      } catch (err: any) {
+        console.error(err);
+        setError("Network error. Unable to poll analysis state.");
+        clearInterval(intervalId);
       }
     };
 
-    runAnalysis();
-  }, [router, handleProgress]);
+    // Run first check immediately, then poll
+    pollAnalysis();
+    intervalId = setInterval(pollAnalysis, 1500);
+
+    return () => clearInterval(intervalId);
+  }, [id, router]);
 
   const getStageIndex = (stage: string): number =>
     stages.indexOf(stage as (typeof stages)[number]);
@@ -174,5 +208,17 @@ export default function AnalysisPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function AnalysisPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+      </div>
+    }>
+      <AnalysisPageContent />
+    </Suspense>
   );
 }

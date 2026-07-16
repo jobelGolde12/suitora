@@ -26,8 +26,16 @@ export async function uploadImage(
   // Return a mock URL (in production, this would be the Cloudinary URL)
   const mockId = `mock_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
+  // Convert the file to a base64 Data URL to make it persistent in the database
+  const base64 = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
+
   return {
-    url: URL.createObjectURL(file),
+    url: base64,
     publicId: mockId,
   };
 }

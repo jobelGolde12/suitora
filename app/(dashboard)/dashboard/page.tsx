@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -26,55 +27,51 @@ import {
 } from "@/components/dashboard";
 import type { Analysis, DashboardStats } from "@/types";
 
-const mockStats: DashboardStats = {
-  totalAnalyses: 12,
-  averageScore: 78,
-  favoriteCount: 5,
-  recentActivity: 3,
-};
-
-const mockRecentAnalyses: (Analysis & { isFavorite?: boolean })[] = [
-  {
-    id: "1",
-    userId: "1",
-    userImage: "/placeholder.svg",
-    productImage: "/placeholder.svg",
-    overallScore: 85,
-    bodyScore: 82,
-    styleScore: 88,
-    colorScore: 79,
-    createdAt: new Date(Date.now() - 3600000).toISOString(),
-    isFavorite: true,
-  },
-  {
-    id: "2",
-    userId: "1",
-    userImage: "/placeholder.svg",
-    productImage: "/placeholder.svg",
-    overallScore: 62,
-    bodyScore: 65,
-    styleScore: 58,
-    colorScore: 70,
-    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-    isFavorite: false,
-  },
-  {
-    id: "3",
-    userId: "1",
-    userImage: "/placeholder.svg",
-    productImage: "/placeholder.svg",
-    overallScore: 91,
-    bodyScore: 93,
-    styleScore: 90,
-    colorScore: 88,
-    createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
-    isFavorite: true,
-  },
-];
-
-const scoreTrend = [72, 68, 75, 80, 78, 85, 82, 91];
-
 export default function DashboardPage() {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [recentAnalyses, setRecentAnalyses] = useState<(Analysis & { isFavorite?: boolean })[]>([]);
+  const [scoreTrend, setScoreTrend] = useState<number[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadStats() {
+      try {
+        const res = await fetch("/api/dashboard/stats");
+        if (res.ok) {
+          const data = await res.json();
+          setStats(data.stats);
+          setRecentAnalyses(data.recentAnalyses || []);
+          setScoreTrend(data.scoreTrend || []);
+        }
+      } catch (err) {
+        console.error("Error loading dashboard stats:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadStats();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <PageContainer>
+        <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+          <p className="text-sm text-muted font-light">Loading dashboard metrics...</p>
+        </div>
+      </PageContainer>
+    );
+  }
+
+  const activeStats = stats || {
+    totalAnalyses: 0,
+    averageScore: 0,
+    favoriteCount: 0,
+    recentActivity: 0,
+  };
+
+  const activeScoreTrend = scoreTrend.length > 0 ? scoreTrend : [0];
+
   return (
     <PageContainer>
       <PageHeader
@@ -113,14 +110,14 @@ export default function DashboardPage() {
           <div className="mt-10 grid gap-4 sm:grid-cols-2">
             <div className="rounded-3xl border border-border bg-surface p-6">
               <p className="text-xs text-muted uppercase tracking-[0.3em] mb-3">Average score</p>
-              <p className="font-heading text-5xl font-light tracking-tight tabular-nums">{mockStats.averageScore}%</p>
+              <p className="font-heading text-5xl font-light tracking-tight tabular-nums">{activeStats.averageScore}%</p>
               <p className="mt-3 text-sm text-muted font-light leading-relaxed">
                 The average compatibility rating from your recent analyses.
               </p>
             </div>
             <div className="rounded-3xl border border-border bg-surface p-6">
               <p className="text-xs text-muted uppercase tracking-[0.3em] mb-3">Favorites</p>
-              <p className="font-heading text-5xl font-light tracking-tight tabular-nums">{mockStats.favoriteCount}</p>
+              <p className="font-heading text-5xl font-light tracking-tight tabular-nums">{activeStats.favoriteCount}</p>
               <p className="mt-3 text-sm text-muted font-light leading-relaxed">
                 Items you marked as the most flattering and worth saving.
               </p>
@@ -155,27 +152,27 @@ export default function DashboardPage() {
         <MetricCard
           icon={BarChart3}
           label="Total Analyses"
-          value={mockStats.totalAnalyses}
+          value={activeStats.totalAnalyses}
           delay={3}
-          sparklineData={[4, 6, 5, 8, 9, 10, 12]}
+          sparklineData={activeScoreTrend}
         />
         <MetricCard
           icon={TrendingUp}
           label="Avg. Score"
-          value={`${mockStats.averageScore}%`}
+          value={`${activeStats.averageScore}%`}
           delay={4}
-          sparklineData={scoreTrend}
+          sparklineData={activeScoreTrend}
         />
         <MetricCard
           icon={Heart}
           label="Favorites"
-          value={mockStats.favoriteCount}
+          value={activeStats.favoriteCount}
           delay={5}
         />
         <MetricCard
           icon={Clock}
           label="This Week"
-          value={mockStats.recentActivity}
+          value={activeStats.recentActivity}
           delay={6}
         />
       </div>
@@ -194,14 +191,14 @@ export default function DashboardPage() {
               <div>
                 <p className="editorial-label mb-2">Compatibility</p>
                 <p className="font-heading text-4xl font-light tracking-tight tabular-nums">
-                  {mockStats.averageScore}%
+                  {activeStats.averageScore}%
                 </p>
                 <p className="text-sm text-muted font-light mt-2 max-w-sm leading-relaxed">
                   Average fit score across your recent analyses — higher is a stronger match.
                 </p>
               </div>
               <div className="w-full sm:w-64 h-16 text-accent">
-                <Sparkline data={scoreTrend} className="w-full h-full" />
+                <Sparkline data={activeScoreTrend} className="w-full h-full" />
               </div>
             </div>
           </div>
@@ -246,7 +243,7 @@ export default function DashboardPage() {
       <section>
         <SectionTitle title="Recent analyses" href="/history" />
 
-        {mockRecentAnalyses.length === 0 ? (
+        {recentAnalyses.length === 0 ? (
           <EmptyState
             icon={Camera}
             title="No analyses yet"
@@ -262,7 +259,7 @@ export default function DashboardPage() {
           />
         ) : (
           <div className="space-y-3">
-            {mockRecentAnalyses.map((analysis, i) => (
+            {recentAnalyses.map((analysis, i) => (
               <AnalysisListItem
                 key={analysis.id}
                 id={analysis.id}

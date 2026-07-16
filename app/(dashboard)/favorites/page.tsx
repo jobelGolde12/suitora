@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Heart, Shirt, Trash2, BarChart3 } from "lucide-react";
@@ -17,20 +17,60 @@ import { cn } from "@/lib/utils/cn";
 import { formatRelativeTime, formatScore, getScoreColor } from "@/lib/utils/format";
 import type { Analysis } from "@/types";
 
-const mockFavorites: (Analysis & { isFavorite: boolean })[] = [
-  { id: "1", userId: "1", userImage: "", productImage: "", overallScore: 85, bodyScore: 82, styleScore: 88, colorScore: 79, createdAt: new Date(Date.now() - 3600000).toISOString(), isFavorite: true },
-  { id: "3", userId: "1", userImage: "", productImage: "", overallScore: 91, bodyScore: 93, styleScore: 90, colorScore: 88, createdAt: new Date(Date.now() - 86400000 * 5).toISOString(), isFavorite: true },
-  { id: "6", userId: "1", userImage: "", productImage: "", overallScore: 88, bodyScore: 85, styleScore: 90, colorScore: 82, createdAt: new Date(Date.now() - 86400000 * 15).toISOString(), isFavorite: true },
-];
-
 export default function FavoritesPage() {
   const { addToast } = useToast();
-  const [favorites, setFavorites] = useState(mockFavorites);
+  const [favorites, setFavorites] = useState<(Analysis & { isFavorite: boolean })[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleRemove = (id: string) => {
-    setFavorites((prev) => prev.filter((f) => f.id !== id));
-    addToast("Removed from favorites", "success");
+  const fetchFavorites = async () => {
+    try {
+      const res = await fetch("/api/analysis");
+      if (res.ok) {
+        const data = await res.json();
+        const allAnalyses = data.analyses || [];
+        // Filter to only favorited analyses
+        const favorited = allAnalyses.filter((a: Analysis & { isFavorite: boolean }) => a.isFavorite);
+        setFavorites(favorited);
+      }
+    } catch (err) {
+      console.error("Failed to load favorites:", err);
+      addToast("Failed to load favorites", "error");
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  useEffect(() => {
+    fetchFavorites();
+  }, []);
+
+  const handleRemove = async (id: string) => {
+    try {
+      const res = await fetch(`/api/favorites?analysisId=${id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setFavorites((prev) => prev.filter((f) => f.id !== id));
+        addToast("Removed from favorites", "success");
+      } else {
+        throw new Error("Failed to remove favorite");
+      }
+    } catch (err) {
+      console.error(err);
+      addToast("Failed to remove favorite", "error");
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <PageContainer>
+        <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+          <p className="text-sm text-muted font-light">Loading favorites...</p>
+        </div>
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer>
