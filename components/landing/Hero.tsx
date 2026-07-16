@@ -26,7 +26,7 @@ const stagger = {
 
 export function Hero() {
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden px-6">
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden px-6 pt-24">
       <div className="relative z-10 mx-auto max-w-5xl text-center">
         <motion.div
           initial="hidden"
@@ -34,13 +34,6 @@ export function Hero() {
           variants={stagger}
           className="space-y-10"
         >
-          {/* Eyebrow */}
-          <motion.div variants={fadeInUp}>
-            <span className="inline-block text-xs font-medium tracking-[0.2em] uppercase text-accent">
-              AI-Powered Fashion
-            </span>
-          </motion.div>
-
           {/* Heading */}
           <motion.h1
             variants={fadeInUp}
