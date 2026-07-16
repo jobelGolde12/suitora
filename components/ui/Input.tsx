@@ -27,9 +27,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           ref={ref}
           id={inputId}
           className={cn(
-            "h-10 w-full rounded-xl border bg-card px-3.5 text-sm text-foreground placeholder:text-muted-foreground transition-all duration-200",
-            "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 focus:border-primary",
-            "hover:border-border/80",
+            "h-12 w-full rounded-lg border bg-background px-4 text-sm text-foreground placeholder:text-muted transition-all duration-200",
+            "focus:outline-none focus:ring-1 focus:ring-accent/40 focus:border-accent",
+            "hover:border-muted",
             error
               ? "border-error focus:ring-error/30 focus:border-error"
               : "border-border",

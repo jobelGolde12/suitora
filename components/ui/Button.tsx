@@ -14,6 +14,10 @@ const variants = {
     "border border-border text-foreground hover:bg-surface active:scale-[0.98]",
   danger:
     "bg-error text-white hover:bg-error/90 shadow-soft active:scale-[0.98]",
+  editorial:
+    "border border-foreground/20 text-foreground hover:bg-foreground hover:text-background transition-colors duration-300",
+  accent:
+    "bg-accent text-white hover:bg-accent/90 shadow-soft hover:shadow-elevated active:scale-[0.98]",
 } as const;
 
 const sizes = {

@@ -32,18 +32,18 @@ const footerLinks = [
 
 export function Footer() {
   return (
-    <footer className="border-t border-border bg-card">
-      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
+    <footer className="border-t border-border/40 bg-surface/30">
+      <div className="mx-auto max-w-7xl px-6 py-20 sm:px-8 lg:px-12">
+        <div className="grid grid-cols-2 gap-12 md:grid-cols-4">
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
-            <Link href="/" className="flex items-center gap-2 mb-4">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent">
-                <Sparkles className="h-4 w-4 text-white" />
+            <Link href="/" className="flex items-center gap-2.5 mb-5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-accent/30 bg-accent/10">
+                <Sparkles className="h-4 w-4 text-accent" strokeWidth={1.5} />
               </div>
-              <span className="text-lg font-semibold tracking-tight">Suitora</span>
+              <span className="font-heading text-xl font-medium tracking-tight">Suitora</span>
             </Link>
-            <p className="text-sm text-muted leading-relaxed max-w-xs">
+            <p className="text-sm text-muted leading-relaxed max-w-xs font-light">
               AI-powered fashion compatibility platform. Know if it suits you before you buy.
             </p>
           </div>
@@ -51,13 +51,13 @@ export function Footer() {
           {/* Links */}
           {footerLinks.map((group) => (
             <div key={group.title}>
-              <h3 className="text-sm font-semibold mb-3 text-foreground">{group.title}</h3>
-              <ul className="space-y-2.5">
+              <h3 className="text-xs font-medium tracking-[0.15em] uppercase text-foreground mb-5">{group.title}</h3>
+              <ul className="space-y-3">
                 {group.links.map((link) => (
                   <li key={link.label}>
                     <Link
                       href={link.href}
-                      className="text-sm text-muted hover:text-foreground transition-colors duration-200"
+                      className="text-sm text-muted hover:text-foreground transition-colors duration-300 font-light"
                     >
                       {link.label}
                     </Link>
@@ -68,11 +68,11 @@ export function Footer() {
           ))}
         </div>
 
-        <div className="mt-12 pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-muted">
+        <div className="mt-16 pt-8 border-t border-border/40 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-xs text-muted font-light">
             &copy; {new Date().getFullYear()} Suitora. All rights reserved.
           </p>
-          <p className="text-xs text-muted">
+          <p className="text-xs text-muted font-light">
             Built with care for fashion lovers
           </p>
         </div>

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
 import { Button } from "@/components/ui/Button";
-import { Sparkles, Menu, X, ChevronRight } from "lucide-react";
+import { Sparkles, Menu, X } from "lucide-react";
 
 const navLinks = [
   { label: "Features", href: "/#features" },
@@ -32,47 +32,47 @@ export function Navbar() {
   return (
     <header
       className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+        "fixed top-0 left-0 right-0 z-50 transition-all duration-500",
         scrolled || !isLanding
-          ? "glass-strong"
+          ? "bg-background/90 backdrop-blur-md border-b border-border/40"
           : "bg-transparent"
       )}
     >
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 sm:px-8 lg:px-12">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 group">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent">
-            <Sparkles className="h-4 w-4 text-white" />
+        <Link href="/" className="flex items-center gap-2.5 group">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-accent/30 bg-accent/10">
+            <Sparkles className="h-4 w-4 text-accent" strokeWidth={1.5} />
           </div>
-          <span className="text-lg font-semibold tracking-tight">
+          <span className="font-heading text-xl font-medium tracking-tight">
             Suitora
           </span>
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-8">
+        <nav className="hidden md:flex items-center gap-10">
           {isLanding && navLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className="text-sm text-muted hover:text-foreground transition-colors duration-200"
+              className="text-sm text-muted hover:text-foreground transition-colors duration-300 relative group"
             >
               {link.label}
+              <span className="absolute -bottom-1 left-0 w-0 h-px bg-accent transition-all duration-300 group-hover:w-full" />
             </Link>
           ))}
         </nav>
 
         {/* Desktop Actions */}
-        <div className="hidden md:flex items-center gap-3">
+        <div className="hidden md:flex items-center gap-4">
           <Link href="/login">
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" className="rounded-full">
               Sign In
             </Button>
           </Link>
           <Link href="/register">
-            <Button size="sm">
+            <Button variant="editorial" size="sm" className="rounded-full px-5">
               Get Started
-              <ChevronRight className="h-3.5 w-3.5" />
             </Button>
           </Link>
         </div>
@@ -80,7 +80,7 @@ export function Navbar() {
         {/* Mobile Menu Button */}
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="md:hidden flex items-center justify-center h-10 w-10 rounded-xl hover:bg-surface transition-colors"
+          className="md:hidden flex items-center justify-center h-10 w-10 rounded-full hover:bg-surface transition-colors"
           aria-label="Toggle menu"
         >
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -89,27 +89,26 @@ export function Navbar() {
 
       {/* Mobile Menu */}
       {mobileOpen && (
-        <div className="md:hidden glass-strong border-t border-border animate-in">
-          <div className="px-4 py-6 space-y-4">
+        <div className="md:hidden bg-background/95 backdrop-blur-md border-t border-border/40 animate-in">
+          <div className="px-6 py-8 space-y-6">
             {isLanding && navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="block text-sm text-muted hover:text-foreground transition-colors py-2"
+                className="block text-base text-muted hover:text-foreground transition-colors py-2 font-light"
               >
                 {link.label}
               </Link>
             ))}
-            <div className="flex flex-col gap-3 pt-4 border-t border-border">
+            <div className="flex flex-col gap-3 pt-6 border-t border-border/40">
               <Link href="/login" className="w-full">
-                <Button variant="secondary" className="w-full">
+                <Button variant="secondary" className="w-full rounded-full">
                   Sign In
                 </Button>
               </Link>
               <Link href="/register" className="w-full">
-                <Button className="w-full">
+                <Button variant="editorial" className="w-full rounded-full">
                   Get Started
-                  <ChevronRight className="h-3.5 w-3.5" />
                 </Button>
               </Link>
             </div>
