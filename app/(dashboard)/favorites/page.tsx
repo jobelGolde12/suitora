@@ -24,7 +24,9 @@ export default function FavoritesPage() {
 
   const fetchFavorites = async () => {
     try {
-      const res = await fetch("/api/analysis");
+      const res = await fetch("/api/analysis", {
+        credentials: "include",
+      });
       if (res.ok) {
         const data = await res.json();
         const allAnalyses = data.analyses || [];
@@ -48,6 +50,7 @@ export default function FavoritesPage() {
     try {
       const res = await fetch(`/api/favorites?analysisId=${id}`, {
         method: "DELETE",
+        credentials: "include",
       });
       if (res.ok) {
         setFavorites((prev) => prev.filter((f) => f.id !== id));

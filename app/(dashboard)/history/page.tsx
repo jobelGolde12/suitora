@@ -35,7 +35,9 @@ export default function HistoryPage() {
 
   const fetchHistory = async () => {
     try {
-      const res = await fetch("/api/analysis");
+      const res = await fetch("/api/analysis", {
+        credentials: "include",
+      });
       if (res.ok) {
         const data = await res.json();
         setAnalyses(data.analyses || []);
@@ -68,6 +70,7 @@ export default function HistoryPage() {
     try {
       const res = await fetch(`/api/analysis?id=${id}`, {
         method: "DELETE",
+        credentials: "include",
       });
       if (res.ok) {
         setAnalyses((prev) => prev.filter((a) => a.id !== id));
@@ -89,6 +92,7 @@ export default function HistoryPage() {
       if (analysis.isFavorite) {
         const res = await fetch(`/api/favorites?analysisId=${id}`, {
           method: "DELETE",
+          credentials: "include",
         });
         if (res.ok) {
           setAnalyses((prev) =>
@@ -101,6 +105,7 @@ export default function HistoryPage() {
       } else {
         const res = await fetch("/api/favorites", {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
           },

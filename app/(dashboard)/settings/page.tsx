@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   User,
@@ -30,9 +31,30 @@ const tabs: { id: SettingsTab; label: string; icon: React.ElementType }[] = [
 
 export default function SettingsPage() {
   const { addToast } = useToast();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await fetch("/api/auth/sign-out", {
+        method: "POST",
+        credentials: "include",
+      });
+      // Notify other tabs
+      if (typeof window !== "undefined") {
+        localStorage.setItem("session_update", Date.now().toString());
+      }
+      router.push("/login");
+    } catch {
+      addToast("Failed to sign out", "error");
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -250,10 +272,16 @@ export default function SettingsPage() {
           <div className="pt-4 mt-4 border-t border-border">
             <button
               type="button"
-              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-error hover:bg-error/5 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-error hover:bg-error/5 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
             >
-              <LogOut className="h-4 w-4" strokeWidth={1.5} />
-              Sign Out
+              {isLoggingOut ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-error border-t-transparent" />
+              ) : (
+                <LogOut className="h-4 w-4" strokeWidth={1.5} />
+              )}
+              {isLoggingOut ? "Signing out..." : "Sign Out"}
             </button>
           </div>
         </nav>

@@ -54,7 +54,9 @@ export default function UploadPage() {
   useEffect(() => {
     async function checkSelfImage() {
       try {
-        const res = await fetch("/api/user/self-image");
+        const res = await fetch("/api/user/self-image", {
+          credentials: "include",
+        });
         if (res.ok) {
           const data = await res.json();
           if (data.selfImageUrl) {
@@ -150,6 +152,7 @@ export default function UploadPage() {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify(payload),
       });
 

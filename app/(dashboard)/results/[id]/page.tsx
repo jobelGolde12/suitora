@@ -100,7 +100,9 @@ export default function ResultsPage() {
         setResult(data.analysis);
 
         // 2. Get favorites to see if this one is favorited
-        const favsRes = await fetch("/api/favorites");
+        const favsRes = await fetch("/api/favorites", {
+          credentials: "include",
+        });
         if (favsRes.ok) {
           const favsData = await favsRes.json();
           const isFav = favsData.favorites?.some((fav: any) => fav.analysisId === id);
@@ -123,6 +125,7 @@ export default function ResultsPage() {
       if (isFavorited) {
         const res = await fetch(`/api/favorites?analysisId=${id}`, {
           method: "DELETE",
+          credentials: "include",
         });
         if (res.ok) {
           setIsFavorited(false);
@@ -133,6 +136,7 @@ export default function ResultsPage() {
       } else {
         const res = await fetch("/api/favorites", {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
           },

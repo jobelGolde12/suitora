@@ -10,7 +10,6 @@ import { Eye, EyeOff, ArrowRight, CheckCircle, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { loginSchema, type LoginFormData } from "@/lib/utils/validation";
-import { loginAction } from "@/lib/auth/actions";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -24,6 +23,11 @@ export default function LoginPage() {
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+      rememberMe: false,
+    },
   });
 
   const onSubmit = async (data: LoginFormData) => {
@@ -31,15 +35,26 @@ export default function LoginPage() {
     setMessage(null);
 
     try {
-      const result = await loginAction(data);
+      const res = await fetch("/api/auth/sign-in/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          email: data.email,
+          password: data.password,
+          callbackURL: "/dashboard",
+        }),
+      });
 
-      if (result.success) {
+      const result = await res.json();
+
+      if (res.ok) {
         setMessage({ type: "success", text: "Welcome back! Redirecting..." });
         setTimeout(() => {
           router.push("/dashboard");
-        }, 1000);
+        }, 500);
       } else {
-        setMessage({ type: "error", text: result.error || "Something went wrong." });
+        setMessage({ type: "error", text: result.error?.message || result.message || "Invalid email or password." });
       }
     } catch {
       setMessage({ type: "error", text: "Network error. Please check your connection and try again." });
@@ -113,7 +128,15 @@ export default function LoginPage() {
           </button>
         </div>
 
-        <div className="flex items-center justify-end">
+        <div className="flex items-center justify-between">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              {...register("rememberMe")}
+              className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+            />
+            <span className="text-sm text-muted font-light">Remember me</span>
+          </label>
           <Link
             href="/forgot-password"
             className="text-xs text-muted hover:text-accent transition-colors font-light"

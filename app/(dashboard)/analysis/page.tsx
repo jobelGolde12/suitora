@@ -41,7 +41,9 @@ function AnalysisPageContent() {
 
     const pollAnalysis = async () => {
       try {
-        const res = await fetch(`/api/analysis?id=${id}`);
+        const res = await fetch(`/api/analysis?id=${id}`, {
+          credentials: "include",
+        });
         if (!res.ok) {
           throw new Error("Failed to fetch analysis state");
         }

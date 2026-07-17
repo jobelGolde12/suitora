@@ -19,6 +19,15 @@ export const auth = betterAuth({
     expiresIn: 60 * 60 * 24 * 7, // 7 days
     updateAge: 60 * 60 * 24, // 1 day
   },
+  advanced: {
+    cookiePrefix: "suitora",
+    cookie: {
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+    },
+  },
   trustedOrigins: ["http://localhost:3000"],
 });
 

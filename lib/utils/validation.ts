@@ -17,7 +17,10 @@ export const loginSchema = z.object({
     .string()
     .min(8, "Password must be at least 8 characters")
     .max(128, "Password must be less than 128 characters"),
+  rememberMe: z.boolean().optional(),
 });
+
+export type LoginFormData = z.infer<typeof loginSchema>;
 
 export const registerSchema = z
   .object({
@@ -46,7 +49,6 @@ export const uploadSchema = z.object({
   clothingImage: imageFileSchema,
 });
 
-export type LoginFormData = z.infer<typeof loginSchema>;
 export type RegisterFormData = z.infer<typeof registerSchema>;
 export type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
 export type UploadFormData = z.infer<typeof uploadSchema>;

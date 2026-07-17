@@ -66,6 +66,7 @@ export function SelfImageModal({ onSuccess }: SelfImageModalProps) {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({ selfImageUrl: res.url }),
       });
 

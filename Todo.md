@@ -1,311 +1,203 @@
----
-name: suitora-next-analysis-and-persistence-plan
-description: Creates a detailed implementation todo covering: (1) how Suitora predicts user weight/height and other traits, (2) single required self-image upload modal behavior, (3) product image input via link or image, and (4) persisting uploads + analyses into the database.
-version: 1.0.0
-author: BlackboxAI
-category: product
-tags:
-  - todo
-  - roadmap
-  - uploads
-  - modal
-  - database
-  - drizzle
-  - turso
----
+Here is a comprehensive, production-grade implementation plan for your Next.js application. This plan covers **Persistent Authentication** (closing and reopening the browser) combined with **Robust Security** (Rate Limiting and Login protections).
 
-# Suitora — Detailed Feature Todo
-
-## 0) Read-me (requirements recap)
-Implement the following behaviors while keeping the existing app stable:
-
-1. **Prediction plan**: Document a detailed next-step plan for how the application predicts user characteristics (including **weight and height**) and uses them inside compatibility scoring.
-2. **Self-image upload modal**:
-   - The user must upload their **whole-body photo** at least once.
-   - When starting a new analysis, if the user has **not** uploaded a self-image yet, show a **non-exitable popup modal** (cannot dismiss/close) that forces uploading.
-   - After upload, the modal must no longer appear.
-3. **Product image input**:
-   - For a new analysis, the user can provide either:
-     - an **image** (upload), or
-     - a **link/URL** to the product image (paste product link).
-   - If the user provides a link, extract the product image on the backend (future-proof for scraping/API adapters).
-4. **Database persistence**:
-   - Uploaded self-image must be **stored in the database**.
-   - Analyses must be persisted (not mock-only), including metadata and results needed for history/favorites/results pages.
+### Technology Stack Assumptions
+- **Framework:** Next.js 14+ (App Router).
+- **Auth Library:** NextAuth.js (v5) or Auth.js.
+- **Database:** PostgreSQL / MongoDB (to store sessions and rate-limit data).
+- **Caching/State:** Upstash Redis or in-memory store (for rate limiting).
 
 ---
 
-## 1) Implementation planning & design alignment
-1. **Design inheritance**
-   - Read `premium-editorial-ui.md` before designing any new UI flows (modal, upload screens, result processing states).
-2. **Confirm existing analysis persistence gap**
-   - Based on `docs/analysis_db_alignment_report.md`, ensure analyses/favorites are actually written/read from the DB (not just UI state).
-3. **Define the new UX contract**
-   - Add an explicit UX contract: “Self-image required once” + “forced modal until satisfied”.
+### Phase 1: Persistent Authentication (The "Stay Logged In" Feature)
 
-Deliverables:
-- A short “UX contract” section written in this Todo (above the code tasks).
+#### 1. Database Schema Update
+- **Action:** Modify the `Session` model in your database.
+- **Implementation:**
+  - Add an `expires` field (if not already present).
+  - Set the `expires` date to **7 days** or **30 days** instead of the default browser-session length.
+  - Ensure the `sessionToken` is hashed securely in the DB.
 
----
+#### 2. Configure NextAuth/Auth.js
+- **Action:** Update the `auth.ts` configuration.
+- **Implementation:**
+  - Set `session.strategy: "database"` (to store sessions in DB, not JWT, for better invalidation control).
+  - Set `cookies.sessionToken.maxAge: 60 * 60 * 24 * 7` (7 days).
+  - Set `cookies.sessionToken.expires: 7 * 24 * 60 * 60` (matches the DB).
+- **Code Snippet:**
+  ```typescript
+  export const { handlers, auth } = NextAuth({
+    session: { strategy: "database", maxAge: 7 * 24 * 60 * 60 }, // 7 days
+    cookies: {
+      sessionToken: {
+        name: `__Secure-next-auth.session-token`,
+        options: {
+          httpOnly: true,
+          sameSite: "lax",
+          path: "/",
+          secure: true,
+          maxAge: 7 * 24 * 60 * 60, // 7 days
+        },
+      },
+    },
+    // ... providers
+  });
+  ```
 
-## 2) Data model & DB persistence plan (uploads + analyses)
-> Goal: Make “self image required once” and “new analysis can be link or image” work end-to-end.
+#### 3. Middleware for Automatic Redirection
+- **Action:** Create/update `middleware.ts` in the project root.
+- **Implementation:**
+  - Check if the user has a valid session on every request.
+  - If authenticated and trying to access `/login` or `/register` → redirect to `/dashboard`.
+  - If **not** authenticated and trying to access `/dashboard` or protected routes → redirect to `/login`.
+- **Code Snippet:**
+  ```typescript
+  import { auth } from "@/auth";
+  import { NextResponse } from "next/server";
 
-### 2.1 Add/verify DB fields
-1. **Users table**
-   - Ensure users can reference a persisted self-image.
-   - If the repo doesn’t already have it: add `user_self_image_url` (or `selfImageUrl`) and optional metadata (width/height, upload provider, created_at).
-2. **Uploads table**
-   - Ensure uploads record:
-     - `kind`: `user_photo` (self-image) or `product_image`
-     - `url`: storage URL
-     - `width/height`, `mime_type`, `size_bytes`
-     - `created_at`
-3. **Analyses table**
-   - Ensure analyses are persisted with fields required by the UI:
-     - user/product image URLs
-     - generated image URL (if applicable)
-     - overall/body/style/color scores
-     - compatibility metadata + recommendations (JSON)
-     - status + timestamps
+  export default auth((req) => {
+    const isLoggedIn = !!req.auth;
+    const isOnDashboard = req.nextUrl.pathname.startsWith("/dashboard");
+    const isOnAuthPage = req.nextUrl.pathname === "/login";
 
-### 2.2 Migrations & Drizzle work
-1. Create migrations to:
-   - add missing columns/tables needed for:
-     - self-image persistence
-     - product URL->image extraction metadata
-     - analysis status + JSON fields
-2. Run `npx drizzle-kit push` / `migrate` after changes.
+    if (isLoggedIn && isOnAuthPage) {
+      return NextResponse.redirect(new URL("/dashboard", req.url));
+    }
+    if (!isLoggedIn && isOnDashboard) {
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
+    return NextResponse.next();
+  });
 
-### 2.3 Wire favorites/history/results to DB
-1. Update server-side queries in `lib/db/queries.ts` if needed.
-2. Ensure pages:
-   - `/dashboard/history`
-   - `/dashboard/favorites`
-   - `/results/[id]`
-   use DB data instead of mock state.
+  export const config = { matcher: ["/dashboard/:path*", "/login"] };
+  ```
 
-Deliverables:
-- DB schema is consistent with `docs/data_schema.md` (or this repo’s canonical schema is updated accordingly).
-
----
-
-## 3) Self-image “required once” modal (forced, non-exitable)
-> Goal: Prevent any analysis from starting without a stored self-image.
-
-### 3.1 Define modal triggering logic
-1. On analysis entrypoints (at minimum):
-   - `/upload`
-   - `/analysis`
-   - any CTA that starts analysis
-2. Fetch user self-image state:
-   - `GET /api/profile` or a new dedicated endpoint `GET /api/user/self-image`
-3. If **no self-image**:
-   - show modal
-   - modal must be **non-dismissible**:
-     - no close button
-     - no ESC key close
-     - no click-outside close
-     - no “skip for later”
-     - only allow “Upload” successful completion
-
-### 3.2 Modal UX behavior
-1. Modal shows:
-   - instructions for whole-body photo
-   - preview
-   - upload drag-and-drop
-   - validation errors (file type/size)
-2. On upload success:
-   - persist to DB
-   - close modal automatically
-   - continue navigation to analysis flow
-3. On failure:
-   - show error UI, keep modal visible
-
-### 3.3 Store modal-uploaded self-image in DB
-1. Upload handler:
-   - store the image (currently Cloudinary is referenced; if not enabled, use existing storage strategy)
-   - create an `uploads` row (kind=user_photo)
-   - update user’s self-image URL reference
-2. Ensure DB read confirms the modal won’t appear again.
-
-### 3.4 Concurrency and correctness
-1. If the user starts multiple analysis flows in parallel:
-   - ensure upload creation is idempotent (avoid duplicate user self-image rows if your DB design allows it)
-   - modal should still resolve with the newest stored URL.
+#### 4. Client-Side Session Refresh (Silent Renewal)
+- **Action:** Create a `SessionProvider` wrapper in `app/providers.tsx`.
+- **Implementation:**
+  - Wrap the app with `<SessionProvider refetchInterval={60 * 10}>` (refetch every 10 minutes) to keep the client in sync with the server session without requiring a full page reload.
 
 ---
 
-## 4) Product input: link or image (one consistent “product source” API)
-> Goal: User can upload a product image OR paste a product link; the backend converts either into a `productImage` URL for analysis.
+### Phase 2: Rate Limiting (Login Endpoint)
 
-### 4.1 UI changes: Upload page
-1. On `/upload`, update the product input section:
-   - Add a toggle or dual input:
-     - “Upload product image”
-     - “Paste product URL”
-2. Ensure validation:
-   - if URL input is selected, validate it’s a URL
-   - if image upload is selected, validate type/size
+#### 1. Server-Side Rate Limiter Setup
+- **Action:** Install a rate-limiting library (e.g., `@upstash/ratelimit` or `express-rate-limit` for API routes).
+- **Implementation:**
+  - Use **Upstash Redis** (recommended for serverless/Edge) or a global `Map` (for development only).
+  - Define **two tiers** of rate limits:
+    - **Tier 1:** 5 attempts per IP per 15 minutes.
+    - **Tier 2:** 15 attempts per IP per 24 hours (hard block).
 
-### 4.2 Backend: normalize “product source” to a stored product image
-Create a server route/handler (align with existing structure):
-1. Accept payload:
-   - `productUrl` OR `productImageUpload`
-   - optional: `meta: { source: 'paste_link' | 'upload_image' }`
-2. If `productUrl`:
-   - extract best image candidate
-   - download/stream to storage (Cloudinary) or temporary buffer
-   - store a `products` record and/or `uploads` record
-3. If image upload:
-   - store to storage
-   - store `uploads` record (kind=product_image)
+#### 2. API Route Protection (`/api/auth/callback/credentials`)
+- **Action:** Wrap the authentication endpoint logic with a rate limiter.
+- **Implementation:**
+  - Extract the user's IP address from `req.headers.get("x-forwarded-for")` or `req.ip`.
+  - Before validating credentials, run the rate limiter.
+  - If the limit is exceeded, return a `429 Too Many Requests` response immediately (do not check the database password).
+- **Code Snippet (in `auth.ts` or route handler):**
+  ```typescript
+  const ip = request.headers.get("x-forwarded-for") ?? "anonymous";
+  const { success, limit, reset, remaining } = await rateLimiter.limit(ip);
 
-### 4.3 Security & robustness
-1. URL scanning:
-   - block unsupported domains or non-http(s)
-2. Rate limiting for URL scraping.
-3. Image verification (must be real images).
-
-Deliverables:
-- A single normalized output:
-  - `productImageUrl` (URL that the analysis engine consumes)
+  if (!success) {
+    return new Response("Too many login attempts. Please try again later.", {
+      status: 429,
+      headers: {
+        "X-RateLimit-Limit": limit.toString(),
+        "X-RateLimit-Remaining": remaining.toString(),
+        "X-RateLimit-Reset": new Date(reset).toISOString(),
+      },
+    });
+  }
+  ```
 
 ---
 
-## 5) How the app predicts weight and height (detailed plan)
-> Goal: Provide a concrete, multi-step plan for predicting weight/height (and related traits) from a whole-body image.
+### Phase 3: Additional Security Features
 
-### 5.1 Inputs needed from the user photo
-1. Whole-body photo (front-facing preferred).
-2. Detect:
-   - body landmarks (head/feet, major joints)
-   - pose (standing straight vs angled)
-   - estimated body proportions and clothing coverage ambiguity.
+#### 1. Brute Force Protection (Account Locking)
+- **Action:** Implement **graduated delays**.
+- **Implementation:**
+  - Track failed attempts per **email** in Redis.
+  - After 3 failures: Add a 5-second artificial delay (`setTimeout` or `sleep` before response).
+  - After 10 failures: Lock the account for 30 minutes (regardless of correct password).
+  - *Note:* Do not disclose if the email exists or the password is wrong. Use a generic error: *"Invalid email or password."*
 
-### 5.2 Approach options (choose at implementation time)
-Document both options so the team can switch later:
+#### 2. CSRF Protection
+- **Action:** Ensure NextAuth.js has CSRF token validation enabled (it does by default for credentials).
+- **Implementation:**
+  - Use `next-auth/csrf` to ensure all login POST requests include a valid `csrfToken`.
 
-**Option A (Best practice): Vision model + calibration heuristics**
-1. Use a vision-capable model to:
-   - estimate body scale segments
-   - output:
-     - relative measurements (e.g., hip-to-ankle ratio, torso/leg ratio)
-     - confidence scores
-2. Convert to absolute height:
-   - use a clothing/shoe baseline if present
-   - optionally request a single calibration datum later (but MVP can avoid this)
-3. Convert to weight:
-   - estimate body volume proxy:
-     - combine silhouette area + body shape classification + pose-normalization
-   - map silhouette/shape to BMI range, then derive weight from height
-4. Output:
-   - `height_cm`, `weight_kg` + confidence
+#### 3. Session Invalidation on Password Change
+- **Action:** When a user changes their password, invalidate all existing sessions.
+- **Implementation:**
+  - Update the user's `password` hash in the DB.
+  - Delete all `Session` entries in the database where `userId` matches the user.
+  - Force a re-login.
 
-**Option B (MVP heuristic): Landmark + proportional estimation**
-1. Use classical landmark detection:
-   - head-to-toe pixel span as height proxy
-   - normalize using known typical garment/body ratios
-2. Estimate weight via body area proxy:
-   - compute segmentation silhouette area (pixels)
-   - map silhouette area to weight using a learned calibration curve (bootstrapped from dataset or simulated priors)
-3. Provide confidence based on photo quality.
-
-### 5.3 Handling pose, camera distance, and confidence
-1. Pose normalization:
-   - detect lean/rotation and normalize.
-2. Camera distance estimation:
-   - optional via reference object detection; if absent, confidence decreases.
-3. Output a “confidence gate”:
-   - if confidence low, the UI should display results as “estimated” with a lower trust label.
-
-### 5.4 How weight/height feed into scoring
-1. Compute derived features:
-   - BMI proxy
-   - body shape fit adjustment
-2. Adjust clothing fit recommendations:
-   - emphasize proportions (e.g., sleeve length proxy for upper-body)
-3. Ensure scores reflect uncertainty:
-   - do not overstate precision.
-
-Deliverables:
-- Define exact fields persisted in `analyses` for:
-  - `height` (with confidence)
-  - `weight` (with confidence)
-  - any additional intermediate estimates (optional)
+#### 4. Secure HTTP Headers (Helmet)
+- **Action:** Use Next.js built-in security headers in `next.config.js`.
+- **Implementation:**
+  ```javascript
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        ],
+      },
+    ];
+  }
+  ```
 
 ---
 
-## 6) Full end-to-end analysis flow (from modal to results)
-### 6.1 Step sequence
-1. User signs in.
-2. User opens “Start Analysis”.
-3. App checks `user.selfImageUrl`.
-4. If missing -> forced self-image modal.
-5. After self-image stored:
-   - user chooses product source (link or image)
-6. Submit analysis request:
-   - create analysis row with status `pending`/`analyzing`
-7. Background processing:
-   - person detection + background removal
-   - body analysis (including height/weight plan)
-   - product image extraction if needed
-   - virtual try-on generation (mock for now or real integration later)
-8. Persist results and update status to `completed`.
-9. Results page loads from DB by analysis id.
+### Phase 4: User Experience & Edge Cases
 
-### 6.2 Progress updates
-1. Add `status` + optional `progress` field to analyses.
-2. UI polling strategy:
-   - poll `analysis:{id}` status endpoint
-3. Ensure errors set status `failed` and expose retry.
+#### 1. "Remember Me" Checkbox
+- **Action:** On the login form, add a checkbox.
+- **Implementation:**
+  - If unchecked: Set `session.maxAge` to `24 * 60 * 60` (1 day).
+  - If checked: Set `session.maxAge` to `7 * 24 * 60 * 60` (7 days).
+  - Pass this value dynamically to the `signIn` function.
+
+#### 2. Logout Flow
+- **Action:** Explicitly invalidate the session on logout.
+- **Implementation:**
+  - Call `signOut({ redirect: true, callbackUrl: "/login" })`.
+  - This deletes the session from the database and clears the browser cookie.
+
+#### 3. Handling Multiple Tabs
+- **Action:** Use the `useSession` hook with `required: true` in `app/dashboard/layout.tsx`.
+- **Implementation:**
+  - If the session expires while the user is inactive, redirect them to login automatically when they interact with the app.
 
 ---
 
-## 7) Update/extend AI pipeline code (mock -> real-ready)
-1. Locate:
-   - `lib/ai/mock-analysis.ts`
-   - `lib/ai/upload.ts`
-2. Refactor to accept a normalized payload:
-   - `userImageUrl`
-   - `productImageUrl`
-   - metadata (source, url, etc.)
-3. Add new module boundaries:
-   - `lib/ai/body-estimation.ts` (height/weight plan)
-   - `lib/ai/product-extraction.ts` (URL->image extraction)
-   - `lib/ai/tryon.ts` (virtual generation)
+### Phase 5: Monitoring & Alerting (Optional but Recommended)
 
-Deliverables:
-- A function signature plan and persistence points.
+- **Action:** Log all failed login attempts (IP, Email, Timestamp).
+- **Implementation:**
+  - Use a logging service (e.g., Vercel Logs, Datadog) to track `429` responses.
+  - Set up an alert if a single IP generates > 50 rate-limit hits in 1 hour (potential DDoS).
 
 ---
 
-## 8) Testing plan
-1. Unit tests:
-   - URL validation
-   - image type validation
-   - DB insert/update correctness
-2. Integration tests:
-   - self-image missing -> modal blocks analysis
-   - upload self-image -> modal not shown next time
-   - product URL -> extracted product image stored and analysis row created
-3. Manual QA checklist:
-   - desktop + mobile
-   - modal non-dismissable verification
-   - history/favorites reflect persisted DB state
+### Summary Execution Checklist
 
----
+| Step | Task | Status |
+| :--- | :--- | :--- |
+| 1 | Update database session model with extended `expires` field. | |
+| 2 | Configure NextAuth `maxAge` and cookie expiration to 7 days. | |
+| 3 | Implement `middleware.ts` for automatic route protection. | |
+| 4 | Deploy Redis and implement rate limiter on the login endpoint. | |
+| 5 | Add artificial delays and account locking after failed attempts. | |
+| 6 | Add "Remember Me" logic to the login UI. | |
+| 7 | Add security headers in `next.config.js`. | |
+| 8 | Test flow: Login → Close browser → Reopen → Auto-redirect to Dashboard. | |
+| 9 | Test limit: Attempt login 6 times in 15 minutes → Verify 429 error. | |
 
-## 9) Acceptance criteria
-1. When user has never uploaded self-image:
-   - forced modal appears and cannot be dismissed.
-2. After self-image upload:
-   - self-image stored in DB.
-   - modal never appears again for new analyses.
-3. Product input supports:
-   - image upload and URL paste.
-4. Analyses:
-   - persisted to DB
-   - results/history/favorites read from DB.
-5. Weight/height prediction plan is documented and implemented behind a feature flag if needed.
-
+This plan ensures your users have a seamless experience (persistent sessions) while your application remains hardened against automated attacks (rate limiting, brute force, and session management).
