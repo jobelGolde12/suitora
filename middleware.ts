@@ -23,11 +23,13 @@ export function middleware(request: NextRequest) {
     return pathname.startsWith(route);
   });
 
-  // Get the session token from cookies
-  const sessionToken = request.cookies.get("suitora.session_token")?.value ||
-    request.cookies.get("__Secure-suitora.session_token")?.value;
-
-  const isAuthenticated = !!sessionToken;
+  // Check for session token - Better Auth uses various cookie names
+  const cookies = request.cookies;
+  const isAuthenticated = cookies.has("suitora.session_token") ||
+    cookies.has("__Secure-suitora.session_token") ||
+    cookies.has("better-auth.session_token") ||
+    cookies.has("__Secure-better-auth.session_token") ||
+    [...cookies.getAll()].some((c) => c.name.includes("session_token"));
 
   // Redirect authenticated users away from auth pages
   if (isAuthenticated && isPublicRoute && pathname !== "/") {

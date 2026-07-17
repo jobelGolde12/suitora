@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { useRouter, usePathname } from "next/navigation";
 
 interface Session {
   user: {
@@ -31,8 +30,6 @@ export function useSession() {
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter();
-  const pathname = usePathname();
 
   const fetchSession = async () => {
     try {
@@ -41,8 +38,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       });
       if (res.ok) {
         const data = await res.json();
-        if (data?.session?.user) {
-          setSession(data.session);
+        // Better Auth returns session directly or nested
+        const sess = data?.session || data;
+        if (sess?.user) {
+          setSession(sess);
         } else {
           setSession(null);
         }
@@ -85,13 +84,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     window.addEventListener("storage", handleStorageChange);
     return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
-
-  // Redirect to login if session expires on protected routes
-  useEffect(() => {
-    if (!isLoading && !session && !pathname.startsWith("/login") && !pathname.startsWith("/register") && !pathname.startsWith("/forgot-password") && pathname !== "/") {
-      router.push("/login");
-    }
-  }, [isLoading, session, pathname, router]);
 
   return (
     <SessionContext.Provider value={{ session, isLoading, refreshSession }}>
