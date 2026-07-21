@@ -5,10 +5,7 @@ import { ScrollFlyIn } from "@/components/ui/hero-section-3";
 export function ScrollSection() {
   return (
     <section className="w-full bg-background text-foreground">
-      <ScrollFlyIn
-        imageUrl="https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=1600&q=80"
-        imageAlt="Fashion and style showcase"
-      >
+      <ScrollFlyIn>
         <div className="max-w-3xl mx-auto px-4 text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent mb-4">
             See It Before You Buy It

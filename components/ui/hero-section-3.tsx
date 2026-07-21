@@ -6,85 +6,132 @@ import { cn } from "@/lib/utils/cn";
 
 interface ScrollFlyInProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
-  imageUrl: string;
-  imageAlt?: string;
+}
+
+const STAR_COUNT = 25;
+
+function generateStars() {
+  return Array.from({ length: STAR_COUNT }, (_, i) => ({
+    id: i,
+    y: Math.random() * 100,
+    delay: Math.random() * 6,
+    duration: 2 + Math.random() * 3,
+    repeatDelay: 2 + Math.random() * 4,
+    size: 0.5 + Math.random() * 1.5,
+    opacity: 0.15 + Math.random() * 0.25,
+  }));
+}
+
+function ShootingStar({
+  y,
+  delay,
+  duration,
+  repeatDelay,
+  size,
+  opacity,
+}: {
+  y: number;
+  delay: number;
+  duration: number;
+  repeatDelay: number;
+  size: number;
+  opacity: number;
+}) {
+  const starWidth = size * 20;
+  const tailWidth = size * 60;
+
+  return (
+    <motion.div
+      className="absolute left-0 top-0 pointer-events-none"
+      style={{ top: `${y}%` }}
+      initial={{ opacity: 0 }}
+      animate={{
+        x: [
+          "calc(-100vw - 100px)",
+          "calc(-100vw - 100px)",
+          "calc(-100vw - 100px)",
+          "calc(100vw + 100px)",
+          "calc(100vw + 100px)",
+          "calc(100vw + 100px)",
+        ],
+        opacity: [0, 0, opacity, opacity, 0, 0],
+      }}
+      transition={{
+        duration: duration + repeatDelay + 2,
+        times: [
+          0,
+          delay / (duration + repeatDelay + 2),
+          (delay + 0.1) / (duration + repeatDelay + 2),
+          (delay + duration - 0.3) / (duration + repeatDelay + 2),
+          (delay + duration) / (duration + repeatDelay + 2),
+          1,
+        ],
+        ease: "linear",
+        repeat: Infinity,
+      }}
+    >
+      {/* Star head */}
+      <div
+        className="absolute top-1/2 -translate-y-1/2 rounded-full bg-accent"
+        style={{
+          width: `${starWidth}px`,
+          height: `${Math.max(2, size * 2)}px`,
+          boxShadow: `0 0 ${3 + size * 1.5}px ${size * 0.8}px rgba(197, 160, 122, ${opacity * 0.3})`,
+        }}
+      />
+      {/* Tail */}
+      <div
+        className="absolute top-1/2 -translate-y-1/2"
+        style={{
+          width: `${tailWidth}px`,
+          height: `${Math.max(1, size)}px`,
+          right: `${starWidth}px`,
+          background: `linear-gradient(to left, rgba(197, 160, 122, ${opacity * 0.7}) 0%, rgba(197, 160, 122, ${opacity * 0.2}) 40%, transparent 100%)`,
+        }}
+      />
+    </motion.div>
+  );
 }
 
 function ScrollFlyIn({
   children,
-  imageUrl,
-  imageAlt = "Animated image",
   className,
   ...props
 }: ScrollFlyInProps) {
-  const targetRef = React.useRef<HTMLDivElement>(null);
-  const [screenWidth, setScreenWidth] = React.useState(1920);
-  const [imageLoaded, setImageLoaded] = React.useState(false);
-
-  React.useEffect(() => {
-    setScreenWidth(window.innerWidth);
-    const handleResize = () => setScreenWidth(window.innerWidth);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  const [stars] = React.useState(generateStars);
+  const sectionRef = React.useRef<HTMLDivElement>(null);
 
   const { scrollYProgress } = useScroll({
-    target: targetRef,
-    offset: ["start end", "end start"],
+    target: sectionRef,
+    offset: ["start end", "start center"],
   });
 
-  const x = useTransform(
-    scrollYProgress,
-    [0.1, 0.45],
-    [`-${2 * screenWidth}px`, `${0.5 * screenWidth}px`]
-  );
-
-  const containerOpacity = useTransform(
-    scrollYProgress,
-    [0.1, 0.2, 0.35, 0.45],
-    [0, 1, 1, 0]
-  );
+  const contentOpacity = useTransform(scrollYProgress, [0, 1], [0, 1]);
+  const contentY = useTransform(scrollYProgress, [0, 1], [24, 0]);
 
   return (
     <div
-      ref={targetRef}
-      className={cn("relative h-[110vh] overflow-x-hidden", className)}
+      ref={sectionRef}
+      className={cn(
+        "relative h-screen overflow-hidden bg-gradient-to-br from-accent/5 via-background to-accent/10",
+        className
+      )}
       {...props}
     >
-      <div className="sticky top-0 flex h-screen items-center justify-center">
-        {/* Static Text Content */}
-        <div className="relative z-10 text-center">{children}</div>
-
-        {/* Animated Image Container — always animating, visible even before image loads */}
-        <motion.div
-          style={{ x, opacity: containerOpacity }}
-          className="absolute top-0 left-0 z-0 flex h-full w-full items-center justify-center bg-gradient-to-br from-accent/5 via-background to-accent/10"
-        >
-          {/* Placeholder gradient that shows while the image loads */}
-          <div
-            className={cn(
-              "absolute inset-0 bg-gradient-to-br from-accent/20 via-background to-accent/30 transition-opacity duration-700",
-              imageLoaded ? "opacity-0" : "opacity-100"
-            )}
-          />
-
-          <img
-            src={imageUrl}
-            alt={imageAlt}
-            className={cn(
-              "w-auto h-auto max-w-none transition-opacity duration-700",
-              imageLoaded ? "opacity-100" : "opacity-0"
-            )}
-            loading="eager"
-            fetchPriority="high"
-            onLoad={() => setImageLoaded(true)}
-            onError={(e) => {
-              e.currentTarget.src = `https://placehold.co/1200x800/000000/ffffff?text=Image+Error`;
-              setImageLoaded(true);
-            }}
-          />
-        </motion.div>
+      {/* Shooting Stars Layer */}
+      <div className="absolute inset-0 z-0">
+        {stars.map((star) => (
+          <ShootingStar key={star.id} {...star} />
+        ))}
       </div>
+
+      {/* Animated Text Content */}
+      <motion.div
+        style={{ opacity: contentOpacity, y: contentY }}
+        className="relative z-10 flex h-full items-center justify-center px-4"
+      >
+        <div className="text-center">{children}</div>
+      </motion.div>
     </div>
   );
 }
