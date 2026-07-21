@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
 
 export default function AuthLayout({
   children,
@@ -13,8 +12,14 @@ export default function AuthLayout({
         <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-accent/10" />
         <div className="relative z-10 max-w-md text-center space-y-8">
           <Link href="/" className="inline-flex items-center gap-2.5 group">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full border border-accent/30 bg-accent/10">
-              <Sparkles className="h-5 w-5 text-accent" strokeWidth={1.5} />
+            <div className="flex h-10 w-10 items-center justify-center rounded-full border border-accent/30 bg-accent/10 overflow-hidden">
+              <img
+                src="/suitora_logo.png"
+                alt="Suitora"
+                width={40}
+                height={40}
+                className="object-cover"
+              />
             </div>
             <span className="font-heading text-2xl font-medium tracking-tight">
               Suitora
@@ -57,8 +62,14 @@ export default function AuthLayout({
         {/* Mobile Header */}
         <div className="lg:hidden p-6">
           <Link href="/" className="inline-flex items-center gap-2.5 group">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full border border-accent/30 bg-accent/10">
-              <Sparkles className="h-4 w-4 text-accent" strokeWidth={1.5} />
+            <div className="flex h-8 w-8 items-center justify-center rounded-full border border-accent/30 bg-accent/10 overflow-hidden">
+              <img
+                src="/suitora_logo.png"
+                alt="Suitora"
+                width={32}
+                height={32}
+                className="object-cover"
+              />
             </div>
             <span className="font-heading text-lg font-medium tracking-tight">
               Suitora

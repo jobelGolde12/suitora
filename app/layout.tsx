@@ -48,6 +48,13 @@ export const metadata: Metadata = {
     description:
       "Know if it suits you before you buy. AI-powered fashion analysis and virtual try-on.",
   },
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/suitora_logo.png", type: "image/png", sizes: "1254x1254" },
+    ],
+    apple: "/suitora_logo.png",
+  },
   robots: {
     index: true,
     follow: true,

@@ -1,203 +1,123 @@
-Here is a comprehensive, production-grade implementation plan for your Next.js application. This plan covers **Persistent Authentication** (closing and reopening the browser) combined with **Robust Security** (Rate Limiting and Login protections).
+Create another section at the bottom of "How it works" section and implement this:
+You are given a task to integrate an existing React component in the codebase
 
-### Technology Stack Assumptions
-- **Framework:** Next.js 14+ (App Router).
-- **Auth Library:** NextAuth.js (v5) or Auth.js.
-- **Database:** PostgreSQL / MongoDB (to store sessions and rate-limit data).
-- **Caching/State:** Upstash Redis or in-memory store (for rate limiting).
+The codebase should support:
+- shadcn project structure  
+- Tailwind CSS
+- Typescript
 
----
+If it doesn't, provide instructions on how to setup project via shadcn CLI, install Tailwind or Typescript.
 
-### Phase 1: Persistent Authentication (The "Stay Logged In" Feature)
+Determine the default path for components and styles. 
+If default path for components is not /components/ui, provide instructions on why it's important to create this folder
+Copy-paste this component to /components/ui folder:
+```tsx
+hero-section-3.tsx
+"use client";
 
-#### 1. Database Schema Update
-- **Action:** Modify the `Session` model in your database.
-- **Implementation:**
-  - Add an `expires` field (if not already present).
-  - Set the `expires` date to **7 days** or **30 days** instead of the default browser-session length.
-  - Ensure the `sessionToken` is hashed securely in the DB.
+import * as React from "react";
+import { motion, useScroll, useTransform } from "framer-motion";
+import { cn } from "@/lib/utils"; // Assuming you have a `cn` utility
 
-#### 2. Configure NextAuth/Auth.js
-- **Action:** Update the `auth.ts` configuration.
-- **Implementation:**
-  - Set `session.strategy: "database"` (to store sessions in DB, not JWT, for better invalidation control).
-  - Set `cookies.sessionToken.maxAge: 60 * 60 * 24 * 7` (7 days).
-  - Set `cookies.sessionToken.expires: 7 * 24 * 60 * 60` (matches the DB).
-- **Code Snippet:**
-  ```typescript
-  export const { handlers, auth } = NextAuth({
-    session: { strategy: "database", maxAge: 7 * 24 * 60 * 60 }, // 7 days
-    cookies: {
-      sessionToken: {
-        name: `__Secure-next-auth.session-token`,
-        options: {
-          httpOnly: true,
-          sameSite: "lax",
-          path: "/",
-          secure: true,
-          maxAge: 7 * 24 * 60 * 60, // 7 days
-        },
-      },
-    },
-    // ... providers
-  });
-  ```
+interface ScrollFlyInProps extends React.HTMLAttributes<HTMLDivElement> {
+  children: React.ReactNode; // For the static text content
+  imageUrl: string;
+  imageAlt?: string;
+}
 
-#### 3. Middleware for Automatic Redirection
-- **Action:** Create/update `middleware.ts` in the project root.
-- **Implementation:**
-  - Check if the user has a valid session on every request.
-  - If authenticated and trying to access `/login` or `/register` → redirect to `/dashboard`.
-  - If **not** authenticated and trying to access `/dashboard` or protected routes → redirect to `/login`.
-- **Code Snippet:**
-  ```typescript
-  import { auth } from "@/auth";
-  import { NextResponse } from "next/server";
+const ScrollFlyIn = React.forwardRef<HTMLDivElement, ScrollFlyInProps>(
+  ({ children, imageUrl, imageAlt = "Animated image", className, ...props }, ref) => {
+    const targetRef = React.useRef<HTMLDivElement>(null);
+    const screenWidth = window.innerWidth;
 
-  export default auth((req) => {
-    const isLoggedIn = !!req.auth;
-    const isOnDashboard = req.nextUrl.pathname.startsWith("/dashboard");
-    const isOnAuthPage = req.nextUrl.pathname === "/login";
-
-    if (isLoggedIn && isOnAuthPage) {
-      return NextResponse.redirect(new URL("/dashboard", req.url));
-    }
-    if (!isLoggedIn && isOnDashboard) {
-      return NextResponse.redirect(new URL("/login", req.url));
-    }
-    return NextResponse.next();
-  });
-
-  export const config = { matcher: ["/dashboard/:path*", "/login"] };
-  ```
-
-#### 4. Client-Side Session Refresh (Silent Renewal)
-- **Action:** Create a `SessionProvider` wrapper in `app/providers.tsx`.
-- **Implementation:**
-  - Wrap the app with `<SessionProvider refetchInterval={60 * 10}>` (refetch every 10 minutes) to keep the client in sync with the server session without requiring a full page reload.
-
----
-
-### Phase 2: Rate Limiting (Login Endpoint)
-
-#### 1. Server-Side Rate Limiter Setup
-- **Action:** Install a rate-limiting library (e.g., `@upstash/ratelimit` or `express-rate-limit` for API routes).
-- **Implementation:**
-  - Use **Upstash Redis** (recommended for serverless/Edge) or a global `Map` (for development only).
-  - Define **two tiers** of rate limits:
-    - **Tier 1:** 5 attempts per IP per 15 minutes.
-    - **Tier 2:** 15 attempts per IP per 24 hours (hard block).
-
-#### 2. API Route Protection (`/api/auth/callback/credentials`)
-- **Action:** Wrap the authentication endpoint logic with a rate limiter.
-- **Implementation:**
-  - Extract the user's IP address from `req.headers.get("x-forwarded-for")` or `req.ip`.
-  - Before validating credentials, run the rate limiter.
-  - If the limit is exceeded, return a `429 Too Many Requests` response immediately (do not check the database password).
-- **Code Snippet (in `auth.ts` or route handler):**
-  ```typescript
-  const ip = request.headers.get("x-forwarded-for") ?? "anonymous";
-  const { success, limit, reset, remaining } = await rateLimiter.limit(ip);
-
-  if (!success) {
-    return new Response("Too many login attempts. Please try again later.", {
-      status: 429,
-      headers: {
-        "X-RateLimit-Limit": limit.toString(),
-        "X-RateLimit-Remaining": remaining.toString(),
-        "X-RateLimit-Reset": new Date(reset).toISOString(),
-      },
+    const { scrollYProgress } = useScroll({
+      target: targetRef,
+      offset: ["start end", "end start"],
     });
+
+    // Using a more aggressive value for x-transform to ensure the plane is completely off-screen.
+    const x = useTransform(scrollYProgress, [0.1, 0.8], [`-${5*screenWidth}px`, `${2.5*screenWidth}px`]);
+    
+    const opacity = useTransform(scrollYProgress, [0.1, 0.25, 0.7, 0.8], [0, 1, 1, 0]);
+
+    return (
+      <div ref={targetRef} className={cn("relative h-[200vh]", className)} {...props}>
+        {/* The sticky container no longer has overflow-hidden, which prevents clipping */}
+        <div className="sticky top-0 flex h-screen items-center justify-center">
+          {/* Static Text Content */}
+          <div className="z-10 text-center">
+            {children}
+          </div>
+
+          {/* Animated Image (Plane) */}
+          <motion.div 
+            style={{ x, opacity }} 
+            className="absolute top-0 left-0 z-20 flex h-full w-full items-center"
+          >
+            <img
+              src={imageUrl}
+              alt={imageAlt}
+              className="w-auto h-auto max-w-none"
+              onError={(e) => {
+                e.currentTarget.src = `https://placehold.co/1200x800/000000/ffffff?text=Image+Error`;
+              }}
+            />
+          </motion.div>
+        </div>
+      </div>
+    );
   }
-  ```
+);
 
----
+ScrollFlyIn.displayName = "ScrollFlyIn";
 
-### Phase 3: Additional Security Features
+export { ScrollFlyIn };
 
-#### 1. Brute Force Protection (Account Locking)
-- **Action:** Implement **graduated delays**.
-- **Implementation:**
-  - Track failed attempts per **email** in Redis.
-  - After 3 failures: Add a 5-second artificial delay (`setTimeout` or `sleep` before response).
-  - After 10 failures: Lock the account for 30 minutes (regardless of correct password).
-  - *Note:* Do not disclose if the email exists or the password is wrong. Use a generic error: *"Invalid email or password."*
 
-#### 2. CSRF Protection
-- **Action:** Ensure NextAuth.js has CSRF token validation enabled (it does by default for credentials).
-- **Implementation:**
-  - Use `next-auth/csrf` to ensure all login POST requests include a valid `csrfToken`.
+demo.tsx
+import { ScrollFlyIn } from "@/components/ui/hero-section-3"; // Adjust path as needed
 
-#### 3. Session Invalidation on Password Change
-- **Action:** When a user changes their password, invalidate all existing sessions.
-- **Implementation:**
-  - Update the user's `password` hash in the DB.
-  - Delete all `Session` entries in the database where `userId` matches the user.
-  - Force a re-login.
+export default function ScrollFlyInDemo() {
+  return (
+    <div className="w-full bg-background text-foreground">
+      <ScrollFlyIn
+        imageUrl="https://cdn.prod.website-files.com/661fdce3e735db03332bf817/66223004372c7c1124c1b0d1_Top-view2x-p-2000.webp"
+        imageAlt="Top view of a private jet flying across the screen"
+      >
+        {/* This is the static text content */}
+        <div className="max-w-3xl mx-auto px-4 text-center">
+          <p className="text-md font-semibold uppercase tracking-widest text-muted-foreground">
+            Welcome to Airvoir
+          </p>
+          <h2 className="text-5xl md:text-7xl font-bold leading-tight mt-2">
+            Where journeys become unforgettable
+          </h2>
+        </div>
+      </ScrollFlyIn>
+    </div>
+  );
+}
 
-#### 4. Secure HTTP Headers (Helmet)
-- **Action:** Use Next.js built-in security headers in `next.config.js`.
-- **Implementation:**
-  ```javascript
-  async headers() {
-    return [
-      {
-        source: "/(.*)",
-        headers: [
-          { key: "X-Frame-Options", value: "DENY" },
-          { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-        ],
-      },
-    ];
-  }
-  ```
+```
 
----
+Install NPM dependencies:
+```bash
+framer-motion
+```
 
-### Phase 4: User Experience & Edge Cases
+Implementation Guidelines
+ 1. Analyze the component structure and identify all required dependencies
+ 2. Review the component's argumens and state
+ 3. Identify any required context providers or hooks and install them
+ 4. Questions to Ask
+ - What data/props will be passed to this component?
+ - Are there any specific state management requirements?
+ - Are there any required assets (images, icons, etc.)?
+ - What is the expected responsive behavior?
+ - What is the best place to use this component in the app?
 
-#### 1. "Remember Me" Checkbox
-- **Action:** On the login form, add a checkbox.
-- **Implementation:**
-  - If unchecked: Set `session.maxAge` to `24 * 60 * 60` (1 day).
-  - If checked: Set `session.maxAge` to `7 * 24 * 60 * 60` (7 days).
-  - Pass this value dynamically to the `signIn` function.
-
-#### 2. Logout Flow
-- **Action:** Explicitly invalidate the session on logout.
-- **Implementation:**
-  - Call `signOut({ redirect: true, callbackUrl: "/login" })`.
-  - This deletes the session from the database and clears the browser cookie.
-
-#### 3. Handling Multiple Tabs
-- **Action:** Use the `useSession` hook with `required: true` in `app/dashboard/layout.tsx`.
-- **Implementation:**
-  - If the session expires while the user is inactive, redirect them to login automatically when they interact with the app.
-
----
-
-### Phase 5: Monitoring & Alerting (Optional but Recommended)
-
-- **Action:** Log all failed login attempts (IP, Email, Timestamp).
-- **Implementation:**
-  - Use a logging service (e.g., Vercel Logs, Datadog) to track `429` responses.
-  - Set up an alert if a single IP generates > 50 rate-limit hits in 1 hour (potential DDoS).
-
----
-
-### Summary Execution Checklist
-
-| Step | Task | Status |
-| :--- | :--- | :--- |
-| 1 | Update database session model with extended `expires` field. | |
-| 2 | Configure NextAuth `maxAge` and cookie expiration to 7 days. | |
-| 3 | Implement `middleware.ts` for automatic route protection. | |
-| 4 | Deploy Redis and implement rate limiter on the login endpoint. | |
-| 5 | Add artificial delays and account locking after failed attempts. | |
-| 6 | Add "Remember Me" logic to the login UI. | |
-| 7 | Add security headers in `next.config.js`. | |
-| 8 | Test flow: Login → Close browser → Reopen → Auto-redirect to Dashboard. | |
-| 9 | Test limit: Attempt login 6 times in 15 minutes → Verify 429 error. | |
-
-This plan ensures your users have a seamless experience (persistent sessions) while your application remains hardened against automated attacks (rate limiting, brute force, and session management).
+Steps to integrate
+ 0. Copy paste all the code above in the correct directories
+ 1. Install external dependencies
+ 2. Fill image assets with Unsplash stock images you know exist
+ 3. Use lucide-react icons for svgs or logos if component requires them

@@ -9,7 +9,6 @@ import {
   History,
   Heart,
   Settings,
-  Sparkles,
   Menu,
   X,
   ChevronLeft,
@@ -30,8 +29,14 @@ function BrandMark({ collapsed }: { collapsed?: boolean }) {
       href="/dashboard"
       className={cn("flex items-center gap-2.5 group", collapsed && "justify-center")}
     >
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-accent/30 bg-accent/10 transition-colors group-hover:border-accent/50">
-        <Sparkles className="h-4 w-4 text-accent" strokeWidth={1.5} />
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-accent/30 bg-accent/10 overflow-hidden transition-colors group-hover:border-accent/50">
+        <img
+          src="/suitora_logo.png"
+          alt="Suitora"
+          width={32}
+          height={32}
+          className="object-cover"
+        />
       </div>
       {!collapsed && (
         <span className="font-heading text-xl font-medium tracking-tight">Suitora</span>

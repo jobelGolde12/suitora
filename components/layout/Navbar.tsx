@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
 import { Button } from "@/components/ui/Button";
-import { Sparkles, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 
 const navLinks = [
   { label: "Features", href: "/#features" },
@@ -41,8 +41,14 @@ export function Navbar() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 sm:px-8 lg:px-12">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-accent/30 bg-accent/10">
-            <Sparkles className="h-4 w-4 text-accent" strokeWidth={1.5} />
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-accent/30 bg-accent/10 overflow-hidden">
+            <img
+              src="/suitora_logo.png"
+              alt="Suitora"
+              width={32}
+              height={32}
+              className="object-cover"
+            />
           </div>
           <span className="font-heading text-xl font-medium tracking-tight">
             Suitora
