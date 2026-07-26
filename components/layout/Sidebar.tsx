@@ -13,12 +13,14 @@ import {
   Menu,
   X,
   ChevronLeft,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 const sidebarLinks = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Try It On", href: "/upload", icon: Upload },
+  { label: "Trending", href: "/trending", icon: Sparkles },
   { label: "History", href: "/history", icon: History },
   { label: "Favorites", href: "/favorites", icon: Heart },
   { label: "Settings", href: "/settings", icon: Settings },

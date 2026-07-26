@@ -32,6 +32,7 @@ const CATEGORY_KEYWORDS: Record<ItemCategory, string[]> = {
   accessories: ["belt", "scarf", "bag", "necklace", "bracelet", "earrings", "watch", "sunglasses"],
   activewear: ["leggings", "sports bra", "swimsuit", "swim", "athletic", "yoga", "running"],
   formal: ["suit", "tuxedo", "gown", "formal", "evening", "cocktail", "ceremony"],
+  full_outfit: ["outfit", "ensemble", "look", "full look", "head to toe", "coordinated"],
 };
 
 export function detectCategory(text: string): ItemCategory {
@@ -106,6 +107,9 @@ function detectSubtype(title: string, category: ItemCategory): string {
     accessories: {},
     activewear: {},
     formal: {},
+    full_outfit: {
+      "head_to_toe": ["outfit", "ensemble", "full look", "coordinated"],
+    },
   };
 
   const patterns = subtypePatterns[category] || {};
@@ -148,6 +152,7 @@ function detectSilhouette(title: string, category: ItemCategory): Silhouette {
     accessories: "regular",
     activewear: "fitted",
     formal: "fitted",
+    full_outfit: "a-line",
   };
 
   return defaults[category] || "regular";

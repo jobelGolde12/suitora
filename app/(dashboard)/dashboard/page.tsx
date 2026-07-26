@@ -12,6 +12,7 @@ import {
   Camera,
   History,
   Settings,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import {
@@ -25,12 +26,16 @@ import {
   Sparkline,
   fadeInUp,
 } from "@/components/dashboard";
+import { TrendingCollection } from "@/components/trending";
 import type { Analysis, DashboardStats } from "@/types";
+import type { TrendItem } from "@/types/trend";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentAnalyses, setRecentAnalyses] = useState<(Analysis & { isFavorite?: boolean })[]>([]);
   const [scoreTrend, setScoreTrend] = useState<number[]>([]);
+  const [trendingItems, setTrendingItems] = useState<TrendItem[]>([]);
+  const [trendingLoading, setTrendingLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -51,7 +56,25 @@ export default function DashboardPage() {
         setIsLoading(false);
       }
     }
+
+    async function loadTrending() {
+      try {
+        const res = await fetch("/api/trending?limit=8", {
+          credentials: "include",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setTrendingItems(data.items || []);
+        }
+      } catch (err) {
+        console.error("Error loading trending items:", err);
+      } finally {
+        setTrendingLoading(false);
+      }
+    }
+
     loadStats();
+    loadTrending();
   }, []);
 
   if (isLoading) {
@@ -217,7 +240,7 @@ export default function DashboardPage() {
 
       <section className="mb-12">
         <SectionTitle title="Quick actions" />
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <QuickActionCard
             href="/upload"
             icon={Camera}
@@ -226,21 +249,36 @@ export default function DashboardPage() {
             delay={8}
           />
           <QuickActionCard
+            href="/trending"
+            icon={Sparkles}
+            title="Trending"
+            description="Explore fashion picks"
+            delay={9}
+          />
+          <QuickActionCard
             href="/history"
             icon={History}
             title="View History"
             description="Browse past analyses"
-            delay={9}
+            delay={10}
           />
           <QuickActionCard
             href="/settings"
             icon={Settings}
             title="Settings"
             description="Manage your account"
-            delay={10}
+            delay={11}
           />
         </div>
       </section>
+
+      <TrendingCollection
+        title="Trending items"
+        items={trendingItems}
+        isLoading={trendingLoading}
+        layout="carousel"
+        href="/trending"
+      />
 
       <section>
         <SectionTitle title="Recent analyses" href="/history" />

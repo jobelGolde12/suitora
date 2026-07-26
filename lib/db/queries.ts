@@ -1,5 +1,5 @@
 import { db, schema } from "@/drizzle";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, and, sql, type SQL } from "drizzle-orm";
 import { nanoid } from "@/lib/utils/id";
 import type { UpdateProfilePayload } from "@/types";
 
@@ -201,3 +201,177 @@ export async function getDashboardStats(userId: string) {
     recentActivity: stats?.recentActivity ?? 0,
   };
 }
+
+// ─── Trend Item Queries ──────────────────────────────────────────
+
+export type TrendItemRow = typeof schema.trendItems.$inferSelect;
+
+export async function listTrendItems(opts: {
+  limit?: number;
+  category?: string;
+  season?: string;
+  gender?: string;
+  featured?: boolean;
+  occasion?: string;
+  brand?: string;
+  availableOnly?: boolean;
+} = {}): Promise<TrendItemRow[]> {
+  const {
+    limit = 12,
+    category,
+    season,
+    gender,
+    featured,
+    occasion,
+    brand,
+    availableOnly = true,
+  } = opts;
+
+  const conditions: SQL[] = [];
+  if (availableOnly) {
+    conditions.push(eq(schema.trendItems.isAvailable, true));
+  }
+  if (category) {
+    conditions.push(eq(schema.trendItems.category, category));
+  }
+  if (season) {
+    conditions.push(eq(schema.trendItems.season, season));
+  }
+  if (gender) {
+    conditions.push(eq(schema.trendItems.gender, gender));
+  }
+  if (featured === true) {
+    conditions.push(eq(schema.trendItems.isFeatured, true));
+  }
+  if (occasion) {
+    conditions.push(eq(schema.trendItems.occasion, occasion));
+  }
+  if (brand) {
+    conditions.push(eq(schema.trendItems.brand, brand));
+  }
+
+  const base = db
+    .select()
+    .from(schema.trendItems)
+    .orderBy(
+      desc(schema.trendItems.isFeatured),
+      desc(schema.trendItems.popularityScore),
+      desc(schema.trendItems.updatedAt)
+    )
+    .limit(limit);
+
+  if (conditions.length === 0) {
+    return base;
+  }
+
+  return base.where(and(...conditions));
+}
+
+export async function getTrendItemById(id: string): Promise<TrendItemRow | null> {
+  const [item] = await db
+    .select()
+    .from(schema.trendItems)
+    .where(eq(schema.trendItems.id, id));
+  return item ?? null;
+}
+
+export async function countTrendItems(): Promise<number> {
+  const [row] = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(schema.trendItems);
+  return row?.count ?? 0;
+}
+
+export async function upsertTrendItem(
+  data: Omit<typeof schema.trendItems.$inferInsert, "id"> & { id?: string }
+) {
+  const now = new Date().toISOString();
+  const existing = await db
+    .select()
+    .from(schema.trendItems)
+    .where(
+      sql`${schema.trendItems.provider} = ${data.provider} AND ${schema.trendItems.providerId} = ${data.providerId}`
+    )
+    .limit(1);
+
+  if (existing[0]) {
+    const [updated] = await db
+      .update(schema.trendItems)
+      .set({
+        title: data.title,
+        brand: data.brand,
+        description: data.description,
+        category: data.category,
+        subcategory: data.subcategory,
+        gender: data.gender,
+        imageUrl: data.imageUrl,
+        productUrl: data.productUrl,
+        price: data.price,
+        currency: data.currency,
+        season: data.season,
+        occasion: data.occasion,
+        styleTags: data.styleTags,
+        colors: data.colors,
+        popularityScore: data.popularityScore,
+        isFeatured: data.isFeatured,
+        isAvailable: data.isAvailable ?? true,
+        lastSynced: now,
+        updatedAt: now,
+      })
+      .where(eq(schema.trendItems.id, existing[0].id))
+      .returning();
+    return updated;
+  }
+
+  const [inserted] = await db
+    .insert(schema.trendItems)
+    .values({
+      id: data.id ?? nanoid(),
+      provider: data.provider,
+      providerId: data.providerId,
+      title: data.title,
+      brand: data.brand,
+      description: data.description,
+      category: data.category,
+      subcategory: data.subcategory,
+      gender: data.gender,
+      imageUrl: data.imageUrl,
+      productUrl: data.productUrl,
+      price: data.price,
+      currency: data.currency,
+      season: data.season,
+      occasion: data.occasion,
+      styleTags: data.styleTags ?? "[]",
+      colors: data.colors ?? "[]",
+      popularityScore: data.popularityScore ?? 0,
+      isFeatured: data.isFeatured ?? false,
+      isAvailable: data.isAvailable ?? true,
+      lastSynced: now,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
+  return inserted;
+}
+
+export async function createTrendSyncLog(data: {
+  provider: string;
+  status: string;
+  itemsFetched: number;
+  itemsUpserted: number;
+  message?: string;
+}) {
+  const [log] = await db
+    .insert(schema.trendSyncLogs)
+    .values({
+      id: nanoid(),
+      provider: data.provider,
+      status: data.status,
+      itemsFetched: data.itemsFetched,
+      itemsUpserted: data.itemsUpserted,
+      message: data.message,
+    })
+    .returning();
+  return log;
+}
+

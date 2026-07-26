@@ -32,7 +32,8 @@ export type ItemCategory =
   | "headwear"
   | "accessories"
   | "activewear"
-  | "formal";
+  | "formal"
+  | "full_outfit";
 
 export type Silhouette =
   | "fitted"
@@ -208,6 +209,7 @@ export const CATEGORY_WEIGHTS: Record<ItemCategory, CategoryWeights> = {
   accessories: { body: 0.15, color: 0.35, style: 0.50 },
   activewear:  { body: 0.55, color: 0.20, style: 0.25 },
   formal:      { body: 0.45, color: 0.25, style: 0.30 },
+  full_outfit: { body: 0.35, color: 0.30, style: 0.35 },
 };
 
 // ─── Silhouette vs Body Shape Rules ──────────────────────────────

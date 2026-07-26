@@ -199,3 +199,6 @@ export interface ProfileResponse {
 // Re-export body-fit types
 export * from "./body-fit";
 
+// Re-export trend types
+export * from "./trend";
+

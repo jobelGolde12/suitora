@@ -1,123 +1,196 @@
-Create another section at the bottom of "How it works" section and implement this:
-You are given a task to integrate an existing React component in the codebase
+# AI Agent Implementation Rules
 
-The codebase should support:
-- shadcn project structure  
-- Tailwind CSS
-- Typescript
+> **IMPORTANT**
+>
+> These rules are mandatory for every implementation session. The AI agent must follow them before, during, and after implementing any feature in this document.
 
-If it doesn't, provide instructions on how to setup project via shadcn CLI, install Tailwind or Typescript.
+---
 
-Determine the default path for components and styles. 
-If default path for components is not /components/ui, provide instructions on why it's important to create this folder
-Copy-paste this component to /components/ui folder:
-```tsx
-hero-section-3.tsx
-"use client";
+# Rule 1 — Read Required Documentation
 
-import * as React from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
-import { cn } from "@/lib/utils"; // Assuming you have a `cn` utility
+Before implementing any task, the AI agent **MUST** read and understand the following project documentation:
 
-interface ScrollFlyInProps extends React.HTMLAttributes<HTMLDivElement> {
-  children: React.ReactNode; // For the static text content
-  imageUrl: string;
-  imageAlt?: string;
-}
+- `docs/body_fit_match/trend_outfit_display.md`
+- `docs/body_fit_match/trending_items_online.md`
+- `docs/body_fit_match/body_fit_file_component_map.md`
 
-const ScrollFlyIn = React.forwardRef<HTMLDivElement, ScrollFlyInProps>(
-  ({ children, imageUrl, imageAlt = "Animated image", className, ...props }, ref) => {
-    const targetRef = React.useRef<HTMLDivElement>(null);
-    const screenWidth = window.innerWidth;
+These documents define the project's architecture, component relationships, feature flow, and implementation requirements. That documents also define the features to implement so do it.
 
-    const { scrollYProgress } = useScroll({
-      target: targetRef,
-      offset: ["start end", "end start"],
-    });
+The AI agent must not begin coding until these documents have been reviewed.
 
-    // Using a more aggressive value for x-transform to ensure the plane is completely off-screen.
-    const x = useTransform(scrollYProgress, [0.1, 0.8], [`-${5*screenWidth}px`, `${2.5*screenWidth}px`]);
-    
-    const opacity = useTransform(scrollYProgress, [0.1, 0.25, 0.7, 0.8], [0, 1, 1, 0]);
+---
 
-    return (
-      <div ref={targetRef} className={cn("relative h-[200vh]", className)} {...props}>
-        {/* The sticky container no longer has overflow-hidden, which prevents clipping */}
-        <div className="sticky top-0 flex h-screen items-center justify-center">
-          {/* Static Text Content */}
-          <div className="z-10 text-center">
-            {children}
-          </div>
+# Rule 2 — Follow the Documentation
 
-          {/* Animated Image (Plane) */}
-          <motion.div 
-            style={{ x, opacity }} 
-            className="absolute top-0 left-0 z-20 flex h-full w-full items-center"
-          >
-            <img
-              src={imageUrl}
-              alt={imageAlt}
-              className="w-auto h-auto max-w-none"
-              onError={(e) => {
-                e.currentTarget.src = `https://placehold.co/1200x800/000000/ffffff?text=Image+Error`;
-              }}
-            />
-          </motion.div>
-        </div>
-      </div>
-    );
-  }
-);
+The AI agent must implement features exactly as defined by the project documentation.
 
-ScrollFlyIn.displayName = "ScrollFlyIn";
+The AI agent must not:
 
-export { ScrollFlyIn };
+- invent new architecture
+- redesign existing flows
+- remove existing functionality
+- ignore documented requirements
+- create duplicate implementations
 
+If implementation details are missing, the AI agent should follow the existing project architecture and coding conventions.
 
-demo.tsx
-import { ScrollFlyIn } from "@/components/ui/hero-section-3"; // Adjust path as needed
+---
 
-export default function ScrollFlyInDemo() {
-  return (
-    <div className="w-full bg-background text-foreground">
-      <ScrollFlyIn
-        imageUrl="https://cdn.prod.website-files.com/661fdce3e735db03332bf817/66223004372c7c1124c1b0d1_Top-view2x-p-2000.webp"
-        imageAlt="Top view of a private jet flying across the screen"
-      >
-        {/* This is the static text content */}
-        <div className="max-w-3xl mx-auto px-4 text-center">
-          <p className="text-md font-semibold uppercase tracking-widest text-muted-foreground">
-            Welcome to Airvoir
-          </p>
-          <h2 className="text-5xl md:text-7xl font-bold leading-tight mt-2">
-            Where journeys become unforgettable
-          </h2>
-        </div>
-      </ScrollFlyIn>
-    </div>
-  );
-}
+# Rule 3 — Work Sequentially
 
+Tasks must be completed in order.
+
+The AI agent must never skip unfinished tasks or jump to a later phase unless explicitly instructed by the user.
+
+---
+
+# Rule 4 — Update Progress
+
+Immediately after successfully completing a task, the AI agent **MUST** update this document.
+
+Change
+
+```md
+- [ ]
 ```
 
-Install NPM dependencies:
-```bash
-framer-motion
+to
+
+```md
+- [x]
 ```
 
-Implementation Guidelines
- 1. Analyze the component structure and identify all required dependencies
- 2. Review the component's argumens and state
- 3. Identify any required context providers or hooks and install them
- 4. Questions to Ask
- - What data/props will be passed to this component?
- - Are there any specific state management requirements?
- - Are there any required assets (images, icons, etc.)?
- - What is the expected responsive behavior?
- - What is the best place to use this component in the app?
+The checkbox must only be checked after the implementation has been completed and verified.
 
-Steps to integrate
- 0. Copy paste all the code above in the correct directories
- 1. Install external dependencies
- 2. Fill image assets with Unsplash stock images you know exist
- 3. Use lucide-react icons for svgs or logos if component requires them
+---
+
+# Rule 5 — Verification Before Completion
+
+A task may only be marked as complete when all of the following are true:
+
+- The implementation is finished.
+- The project builds successfully.
+- No new TypeScript errors exist.
+- No new ESLint errors exist.
+- Existing features remain functional.
+- The implementation follows the referenced documentation.
+
+If any of these conditions are not met, the checkbox must remain unchecked.
+
+---
+
+# Rule 6 — Resume After Interruption
+
+If development is interrupted for any reason (context limit, IDE restart, power outage, network issue, or user pause), the AI agent must resume work without repeating completed tasks.
+
+The AI agent must:
+
+1. Read the three required documentation files.
+2. Open this implementation TODO document.
+3. Find the first unchecked task (`- [ ]`).
+4. Resume implementation from that task.
+5. Continue sequentially.
+
+The AI agent must not restart from Phase 1 unless explicitly instructed.
+
+---
+
+# Rule 7 — Never Uncheck Completed Work
+
+Once a task has been marked as completed (`- [x]`), it must remain completed unless the implementation has been intentionally removed or reverted.
+
+---
+
+# Rule 8 — Preserve Existing Functionality
+
+The AI agent must not break or remove existing project functionality while implementing new features.
+
+Backward compatibility with the existing Suitora codebase must always be maintained.
+
+---
+
+# Rule 9 — Complete the Current Phase
+
+The AI agent should finish all tasks within the current phase before moving to the next one.
+
+A phase is considered complete only when every checkbox in that phase has been marked as completed.
+
+---
+
+# Rule 10 — Keep the TODO Updated
+
+---
+
+# Implementation Checklist
+
+All tasks below have been verified as complete.
+
+## Phase 1 — Types & Schema
+
+- [x] `types/trend.ts` — TrendItem, TrendOutfit, RawProviderProduct types
+- [x] `types/body-fit.ts` — ItemCategory (including `full_outfit`), all fit interfaces
+- [x] `types/index.ts` — Re-exports from body-fit and trend
+- [x] `drizzle/schema.ts` — trendItems + trendSyncLogs tables
+- [x] `drizzle/migrations/2026-07-26-add-trend-items.sql` — Migration SQL
+- [x] Migration applied to SQLite database
+
+## Phase 2 — Config & Services
+
+- [x] `config/category-display.ts` — Category display config + normalize helpers
+- [x] `config/trend-providers.ts` — Provider configuration
+- [x] `lib/trend/normalize.ts` — Product normalization pipeline
+- [x] `lib/trend/fetch.ts` — Fetch service for providers
+- [x] `lib/trend/ranking.ts` — Ranking service
+- [x] `lib/trend/cache.ts` — In-memory cache layer
+- [x] `lib/trend/sync.ts` — Synchronization orchestrator
+- [x] `lib/trend/providers/curated.ts` — Curated dataset provider
+- [x] `jobs/trend-sync.ts` — Cron job entrypoint
+
+## Phase 3 — API Routes
+
+- [x] `app/api/trending/route.ts` — GET list with filters + caching
+- [x] `app/api/trending/[id]/route.ts` — GET detail + similar items
+- [x] `app/api/trending/sync/route.ts` — POST manual sync
+
+## Phase 4 — UI Components
+
+- [x] `components/ui/CategoryBadge.tsx` — Category badge with icon + label
+- [x] `components/ui/index.ts` — Export CategoryBadge
+- [x] `components/results/CategoryHeroImage.tsx` — Category-aware hero image
+- [x] `components/results/index.ts` — Export CategoryHeroImage
+- [x] `components/results/FitSummary.tsx` — Category-aware summary text
+- [x] `components/trending/TrendingCard.tsx` — Trend item card
+- [x] `components/trending/TrendingCardSkeleton.tsx` — Loading skeleton
+- [x] `components/trending/TrendingCarousel.tsx` — Horizontal carousel
+- [x] `components/trending/TrendingGrid.tsx` — Responsive grid
+- [x] `components/trending/TrendingCollection.tsx` — Section with title + layout
+- [x] `components/trending/TrendingFilters.tsx` — Category filter bar
+- [x] `components/trending/index.ts` — Exports
+- [x] `components/outfits/OutfitItemStrip.tsx` — Multi-item outfit strip
+- [x] `components/outfits/TrendOutfitCard.tsx` — Outfit card
+- [x] `components/outfits/index.ts` — Exports
+
+## Phase 5 — Pages & Integration
+
+- [x] `app/(dashboard)/trending/page.tsx` — Trending list page with filters
+- [x] `app/(dashboard)/trending/[id]/page.tsx` — Trending item detail page
+- [x] `app/(dashboard)/dashboard/page.tsx` — Dashboard with TrendingCollection
+- [x] `app/(dashboard)/favorites/page.tsx` — Favorites with category filter
+- [x] `app/(dashboard)/history/page.tsx` — History with heart/filter UI
+- [x] `components/layout/Sidebar.tsx` — "Trending" nav link with Sparkles icon
+- [x] `components/dashboard/AnalysisListItem.tsx` — Category badge integration
+- [x] `lib/db/queries.ts` — All trend (listTrendItems, getTrendItemById, etc.)
+
+## Phase 6 — Fixes & Build
+
+- [x] `lib/ai/item-attributes.ts` — Added missing `full_outfit` entries (3 records)
+- [x] `next.config.ts` — Added `images.remotePatterns` for Unsplash, Cloudinary, Placeholder
+- [x] TypeScript check — Zero errors
+- [x] Database migration applied
+
+
+This implementation document is the single source of truth for project progress.
+
+The AI agent must keep it synchronized with the codebase throughout development.
+
+Every completed task must be reflected immediately by updating its checkbox.

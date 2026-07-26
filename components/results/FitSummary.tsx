@@ -78,6 +78,7 @@ function getCategoryLabel(category: ItemCategory): string {
     accessories: "accessory",
     activewear: "activewear piece",
     formal: "formal piece",
+    full_outfit: "outfit",
   };
   return labels[category] || "item";
 }

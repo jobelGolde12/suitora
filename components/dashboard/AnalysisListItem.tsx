@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, Heart, Shirt } from "lucide-react";
+import { ArrowRight, Heart } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
+import { CategoryBadge } from "@/components/ui/CategoryBadge";
 import { cn } from "@/lib/utils/cn";
 import { formatRelativeTime, formatScore, getScoreColor } from "@/lib/utils/format";
+import { formatCategoryLabel, getCategoryConfig } from "@/config/category-display";
 import { fadeInUp } from "./motion";
 
 interface AnalysisListItemProps {
@@ -13,6 +15,8 @@ interface AnalysisListItemProps {
   overallScore: number;
   createdAt: string;
   isFavorite?: boolean;
+  /** Item category when available from compatibility metadata */
+  category?: string | null;
   delay?: number;
   className?: string;
 }
@@ -22,9 +26,16 @@ export function AnalysisListItem({
   overallScore,
   createdAt,
   isFavorite,
+  category,
   delay = 0,
   className,
 }: AnalysisListItemProps) {
+  const config = getCategoryConfig(category);
+  const Icon = config.icon;
+  const title = category
+    ? `${formatCategoryLabel(category)} analysis`
+    : "Clothing Analysis";
+
   return (
     <motion.div
       initial="hidden"
@@ -53,13 +64,14 @@ export function AnalysisListItem({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <Shirt className="h-3.5 w-3.5 text-muted shrink-0" strokeWidth={1.5} />
-            <p className="text-sm font-medium truncate">Clothing Analysis</p>
+            <Icon className="h-3.5 w-3.5 text-muted shrink-0" strokeWidth={1.5} />
+            <p className="text-sm font-medium truncate">{title}</p>
             {isFavorite && (
               <Heart className="h-3 w-3 text-accent fill-accent shrink-0" />
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2 mt-1.5">
+            {category && <CategoryBadge category={category} />}
             <Badge variant={overallScore >= 70 ? "success" : "warning"}>
               {overallScore >= 70 ? "Good Match" : "Average"}
             </Badge>

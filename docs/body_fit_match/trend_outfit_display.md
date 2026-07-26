@@ -1056,3 +1056,5 @@ MOBILE displays MUST:
 *This document defines how Suitora visually presents every clothing category — from a single dress to a complete trend outfit. As new categories are added or display patterns evolve, update this file to keep it aligned with the codebase and the premium editorial UI standards.*
 
 *Companion docs: `docs/body_fit_match/main.md`, `docs/body_fit_match/body_fit_file_component_map.md`, `premium-editorial-ui.md`, `docs/data_schema.md`*
+
+Display that at the main page of dashboard at the bottom of overview section.

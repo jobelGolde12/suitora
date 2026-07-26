@@ -223,3 +223,51 @@ export const meta = sqliteTable("meta", {
   key: text("key").primaryKey(),
   value: text("value"),
 });
+
+/** Normalized online trending fashion items (provider-agnostic). */
+export const trendItems = sqliteTable(
+  "trend_items",
+  {
+    id: text("id").primaryKey(),
+    provider: text("provider").notNull(),
+    providerId: text("provider_id").notNull(),
+    title: text("title").notNull(),
+    brand: text("brand"),
+    description: text("description"),
+    category: text("category").notNull(),
+    subcategory: text("subcategory"),
+    gender: text("gender"),
+    imageUrl: text("image_url").notNull(),
+    productUrl: text("product_url"),
+    price: real("price"),
+    currency: text("currency"),
+    season: text("season"),
+    occasion: text("occasion"),
+    styleTags: text("style_tags").notNull().default("[]"),
+    colors: text("colors").notNull().default("[]"),
+    popularityScore: real("popularity_score").notNull().default(0),
+    isFeatured: integer("is_featured", { mode: "boolean" }).notNull().default(false),
+    isAvailable: integer("is_available", { mode: "boolean" }).notNull().default(true),
+    lastSynced: text("last_synced"),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (t) => [unique("trend_items_provider_id_idx").on(t.provider, t.providerId)]
+);
+
+export const trendSyncLogs = sqliteTable("trend_sync_logs", {
+  id: text("id").primaryKey(),
+  provider: text("provider").notNull(),
+  status: text("status").notNull(), // success | partial | failed
+  itemsFetched: integer("items_fetched").notNull().default(0),
+  itemsUpserted: integer("items_upserted").notNull().default(0),
+  message: text("message"),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+});
+
