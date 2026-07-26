@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
 import { Button } from "@/components/ui/Button";
@@ -42,12 +43,13 @@ export function Navbar() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 group">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-accent/30 bg-accent/10 overflow-hidden">
-            <img
+            <Image
               src="/suitora_logo.png"
               alt="Suitora"
               width={32}
               height={32}
               className="object-cover"
+              priority
             />
           </div>
           <span className="font-heading text-xl font-medium tracking-tight">

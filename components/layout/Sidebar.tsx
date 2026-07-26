@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -30,7 +31,7 @@ function BrandMark({ collapsed }: { collapsed?: boolean }) {
       className={cn("flex items-center gap-2.5 group", collapsed && "justify-center")}
     >
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-accent/30 bg-accent/10 overflow-hidden transition-colors group-hover:border-accent/50">
-        <img
+        <Image
           src="/suitora_logo.png"
           alt="Suitora"
           width={32}

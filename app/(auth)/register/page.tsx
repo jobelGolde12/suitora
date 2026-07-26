@@ -13,6 +13,7 @@ import { registerSchema, type RegisterFormData } from "@/lib/utils/validation";
 
 export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const router = useRouter();
@@ -132,13 +133,22 @@ export default function RegisterPage() {
           </button>
         </div>
 
-        <Input
-          label="Confirm Password"
-          type="password"
-          placeholder="Confirm your password"
-          error={errors.confirmPassword?.message}
-          {...register("confirmPassword")}
-        />
+        <div className="relative">
+          <Input
+            label="Confirm Password"
+            type={showConfirmPassword ? "text" : "password"}
+            placeholder="Confirm your password"
+            error={errors.confirmPassword?.message}
+            {...register("confirmPassword")}
+          />
+          <button
+            type="button"
+            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+            className="absolute right-3 top-[38px] text-muted hover:text-foreground transition-colors"
+          >
+            {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
 
         <Button type="submit" loading={isLoading} variant="editorial" className="w-full rounded-full h-12">
           Create Account

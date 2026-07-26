@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/Button";
 
 export default function NotFound() {
@@ -7,7 +8,7 @@ export default function NotFound() {
       <div className="text-center max-w-sm">
         <div className="flex justify-center mb-6">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/10 overflow-hidden">
-            <img
+            <Image
               src="/suitora_logo.png"
               alt="Suitora"
               width={64}

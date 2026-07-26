@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export default function AuthLayout({
   children,
@@ -13,7 +14,7 @@ export default function AuthLayout({
         <div className="relative z-10 max-w-md text-center space-y-8">
           <Link href="/" className="inline-flex items-center gap-2.5 group">
             <div className="flex h-10 w-10 items-center justify-center rounded-full border border-accent/30 bg-accent/10 overflow-hidden">
-              <img
+              <Image
                 src="/suitora_logo.png"
                 alt="Suitora"
                 width={40}
@@ -63,7 +64,7 @@ export default function AuthLayout({
         <div className="lg:hidden p-6">
           <Link href="/" className="inline-flex items-center gap-2.5 group">
             <div className="flex h-8 w-8 items-center justify-center rounded-full border border-accent/30 bg-accent/10 overflow-hidden">
-              <img
+              <Image
                 src="/suitora_logo.png"
                 alt="Suitora"
                 width={32}
