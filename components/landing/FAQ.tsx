@@ -1,28 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { motion, type Easing } from "framer-motion";
+import Link from "next/link";
+import { motion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-
-const easeOut: Easing = [0.21, 0.47, 0.32, 0.98];
-
-const fadeInUp = {
-  hidden: { opacity: 0, y: 24 },
-  visible: (i = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.6, delay: i * 0.08, ease: easeOut },
-  }),
-};
-
-const stagger = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.06, delayChildren: 0.1 },
-  },
-};
+import {
+  fadeInUp,
+  stagger,
+  revealViewport,
+} from "./motion";
 
 const faqs = [
   {
@@ -60,7 +47,7 @@ export function FAQ() {
         <motion.div
           initial="hidden"
           whileInView="visible"
-          viewport={{ once: true, margin: "-100px" }}
+          viewport={revealViewport}
           variants={stagger}
           className="text-center mb-16"
         >
@@ -79,45 +66,78 @@ export function FAQ() {
         </motion.div>
 
         <div className="space-y-4">
-          {faqs.map((faq, i) => (
-            <motion.div
-              key={i}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={fadeInUp}
-              custom={i}
-              className="rounded-xl border border-border/60 bg-card overflow-hidden transition-all duration-300 hover:border-accent/30"
-            >
-              <button
-                onClick={() => setOpenIndex(openIndex === i ? null : i)}
-                className="flex w-full items-center justify-between px-6 py-5 text-left transition-colors hover:bg-surface/30"
+          {faqs.map((faq, i) => {
+            const isOpen = openIndex === i;
+            const panelId = `faq-panel-${i}`;
+            const buttonId = `faq-button-${i}`;
+
+            return (
+              <motion.div
+                key={i}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                variants={fadeInUp}
+                custom={i}
+                className="rounded-xl border border-border/60 bg-card overflow-hidden transition-all duration-300 hover:border-accent/30"
               >
-                <span className="text-sm font-medium text-foreground pr-4">
-                  {faq.question}
-                </span>
-                <ChevronDown
+                <button
+                  id={buttonId}
+                  aria-expanded={isOpen}
+                  aria-controls={panelId}
+                  onClick={() => setOpenIndex(isOpen ? null : i)}
+                  className="flex w-full items-center justify-between px-6 py-5 text-left transition-colors hover:bg-surface/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-xl"
+                >
+                  <span className="text-sm font-medium text-foreground pr-4">
+                    {faq.question}
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 shrink-0 text-muted transition-transform duration-300",
+                      isOpen && "rotate-180"
+                    )}
+                    aria-hidden="true"
+                  />
+                </button>
+                <div
+                  id={panelId}
+                  role="region"
+                  aria-labelledby={buttonId}
                   className={cn(
-                    "h-4 w-4 shrink-0 text-muted transition-transform duration-300",
-                    openIndex === i && "rotate-180"
+                    "grid transition-all duration-300 ease-in-out",
+                    isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
                   )}
-                />
-              </button>
-              <div
-                className={cn(
-                  "grid transition-all duration-300 ease-in-out",
-                  openIndex === i ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
-                )}
-              >
-                <div className="overflow-hidden">
-                  <p className="px-6 pb-5 text-sm text-muted leading-relaxed font-light">
-                    {faq.answer}
-                  </p>
+                >
+                  <div className="overflow-hidden">
+                    <p className="px-6 pb-5 text-sm text-muted leading-relaxed font-light">
+                      {faq.answer}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
         </div>
+
+        {/* Micro-CTA */}
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={revealViewport}
+          variants={fadeInUp}
+          className="mt-12 text-center"
+        >
+          <p className="text-sm text-muted font-light">
+            Still have questions?{" "}
+            <Link
+              href="/register"
+              className="text-accent hover:text-accent-light transition-colors underline underline-offset-2 decoration-accent/30 hover:decoration-accent/60"
+            >
+              Try it free
+            </Link>{" "}
+            and see for yourself.
+          </p>
+        </motion.div>
       </div>
     </section>
   );

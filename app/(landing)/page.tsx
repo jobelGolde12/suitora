@@ -1,4 +1,5 @@
 import { Hero } from "@/components/landing/Hero";
+import { TrustBar } from "@/components/landing/TrustBar";
 import { Features } from "@/components/landing/Features";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { ScrollSection } from "@/components/landing/ScrollSection";
@@ -9,6 +10,7 @@ export default function LandingPage() {
   return (
     <>
       <Hero />
+      <TrustBar />
       <Features />
       <HowItWorks />
       <ScrollSection />

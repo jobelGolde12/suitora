@@ -1,26 +1,13 @@
 "use client";
 
-import { motion, type Easing } from "framer-motion";
+import { motion } from "framer-motion";
 import { Upload, Shirt, Zap, Star } from "lucide-react";
-
-const easeOut: Easing = [0.21, 0.47, 0.32, 0.98];
-
-const fadeInUp = {
-  hidden: { opacity: 0, y: 24 },
-  visible: (i = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.6, delay: i * 0.12, ease: easeOut },
-  }),
-};
-
-const stagger = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1, delayChildren: 0.1 },
-  },
-};
+import {
+  fadeInUp,
+  stagger,
+  revealViewport,
+  easeOut,
+} from "./motion";
 
 const steps = [
   {
@@ -52,7 +39,7 @@ export function HowItWorks() {
         <motion.div
           initial="hidden"
           whileInView="visible"
-          viewport={{ once: true, margin: "-100px" }}
+          viewport={revealViewport}
           variants={stagger}
           className="text-center mb-20"
         >
@@ -66,7 +53,7 @@ export function HowItWorks() {
             variants={fadeInUp}
             className="font-heading text-4xl sm:text-5xl font-light tracking-tight text-balance"
           >
-            Three simple steps to fashion clarity
+            Four simple steps to fashion clarity
           </motion.h2>
           <motion.p
             variants={fadeInUp}
@@ -77,8 +64,15 @@ export function HowItWorks() {
         </motion.div>
 
         <div className="relative grid grid-cols-1 md:grid-cols-4 gap-12 md:gap-8">
-          {/* Connection Line (Desktop) */}
-          <div className="hidden md:block absolute top-16 left-[12.5%] right-[12.5%] h-px bg-gradient-to-r from-border via-accent/40 to-border" />
+          {/* Connection Line (Desktop) — animated draw-in */}
+          <motion.div
+            initial={{ scaleX: 0 }}
+            whileInView={{ scaleX: 1 }}
+            viewport={revealViewport}
+            transition={{ duration: 1.2, ease: easeOut, delay: 0.3 }}
+            style={{ transformOrigin: "left" }}
+            className="hidden md:block absolute top-16 left-[12.5%] right-[12.5%] h-px bg-gradient-to-r from-border via-accent/40 to-border"
+          />
 
           {steps.map((step, i) => {
             const Icon = step.icon;
@@ -87,14 +81,14 @@ export function HowItWorks() {
                 key={step.title}
                 initial="hidden"
                 whileInView="visible"
-                viewport={{ once: true, margin: "-50px" }}
+                viewport={revealViewport}
                 variants={fadeInUp}
                 custom={i}
                 className="relative flex flex-col items-center text-center"
               >
                 {/* Step Number */}
                 <div className="relative z-10 mb-8">
-                  <div className="flex h-20 w-20 items-center justify-center rounded-full border border-border bg-card">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-full border border-border bg-card transition-all duration-300">
                     <Icon className="h-7 w-7 text-accent" strokeWidth={1.5} />
                   </div>
                   <div className="absolute -top-1 -right-1 h-6 w-6 rounded-full bg-foreground text-background text-[10px] font-medium flex items-center justify-center">

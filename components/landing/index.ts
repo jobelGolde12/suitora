@@ -4,3 +4,4 @@ export { HowItWorks } from "./HowItWorks";
 export { ScrollSection } from "./ScrollSection";
 export { FAQ } from "./FAQ";
 export { CTA } from "./CTA";
+export { TrustBar } from "./TrustBar";

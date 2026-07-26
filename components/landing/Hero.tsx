@@ -1,28 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { motion, type Easing } from "framer-motion";
-import { ArrowRight, ChevronDown } from "lucide-react";
+import { motion } from "framer-motion";
+import { ArrowRight, ChevronDown, Shield, Clock, Lock } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-
-const easeOut: Easing = [0.21, 0.47, 0.32, 0.98];
-
-const fadeInUp = {
-  hidden: { opacity: 0, y: 30 },
-  visible: (i = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.8, delay: i * 0.15, ease: easeOut },
-  }),
-};
-
-const stagger = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.12, delayChildren: 0.1 },
-  },
-};
+import {
+  fadeInUpHero as fadeInUp,
+  staggerHero as stagger,
+  revealViewport,
+} from "./motion";
 
 export function Hero() {
   return (
@@ -60,9 +46,9 @@ export function Hero() {
             className="flex flex-col sm:flex-row items-center justify-center gap-5 pt-2"
           >
             <Link href="/register">
-              <Button variant="editorial" size="lg" className="rounded-full px-8">
+              <Button variant="editorial" size="lg" className="rounded-full px-8 group">
                 Start Free Trial
-                <ArrowRight className="h-4 w-4" />
+                <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
               </Button>
             </Link>
             <Link href="/#how-it-works">
@@ -72,15 +58,36 @@ export function Hero() {
             </Link>
           </motion.div>
 
+          {/* Trust Strip */}
+          <motion.div
+            variants={fadeInUp}
+            className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] text-muted font-light"
+          >
+            <span className="flex items-center gap-1.5">
+              <Shield className="h-3 w-3 text-muted/60" strokeWidth={1.5} />
+              No credit card required
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Lock className="h-3 w-3 text-muted/60" strokeWidth={1.5} />
+              Private by design
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Clock className="h-3 w-3 text-muted/60" strokeWidth={1.5} />
+              Results in under 30s
+            </span>
+          </motion.div>
+
           {/* Social Proof */}
-          <motion.div variants={fadeInUp} className="pt-8">
+          <motion.div variants={fadeInUp} className="pt-4">
             <div className="flex items-center justify-center gap-3 text-sm text-muted">
               <div className="flex -space-x-2">
-                {[1, 2, 3, 4].map((i) => (
+                {["A", "M", "K", "S"].map((initial) => (
                   <div
-                    key={i}
-                    className="h-8 w-8 rounded-full border-2 border-background bg-gradient-to-br from-accent/60 to-accent/30"
-                  />
+                    key={initial}
+                    className="h-8 w-8 rounded-full border-2 border-background bg-surface flex items-center justify-center text-[10px] font-medium text-muted"
+                  >
+                    {initial}
+                  </div>
                 ))}
               </div>
               <span className="font-light">
@@ -97,6 +104,7 @@ export function Hero() {
         animate={{ opacity: 1 }}
         transition={{ delay: 2, duration: 0.8 }}
         className="absolute bottom-10 left-1/2 -translate-x-1/2"
+        aria-hidden="true"
       >
         <motion.div
           animate={{ y: [0, 8, 0] }}

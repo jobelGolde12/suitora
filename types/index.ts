@@ -196,3 +196,6 @@ export interface ProfileResponse {
   profile: UserProfile;
 }
 
+// Re-export body-fit types
+export * from "./body-fit";
+

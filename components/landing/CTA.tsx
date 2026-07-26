@@ -1,28 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { motion, type Easing } from "framer-motion";
+import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-
-const easeOut: Easing = [0.21, 0.47, 0.32, 0.98];
-
-const fadeInUp = {
-  hidden: { opacity: 0, y: 24 },
-  visible: (i = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.6, delay: i * 0.12, ease: easeOut },
-  }),
-};
-
-const stagger = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1, delayChildren: 0.1 },
-  },
-};
+import {
+  fadeInUp,
+  stagger,
+  revealViewport,
+} from "./motion";
 
 export function CTA() {
   return (
@@ -31,7 +17,7 @@ export function CTA() {
         <motion.div
           initial="hidden"
           whileInView="visible"
-          viewport={{ once: true }}
+          viewport={revealViewport}
           variants={stagger}
           className="space-y-10"
         >
@@ -47,14 +33,26 @@ export function CTA() {
           >
             Join thousands of smart shoppers who never wonder &quot;Will this look good on me?&quot; again.
           </motion.p>
-          <motion.div variants={fadeInUp}>
+          <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link href="/register">
-              <Button variant="editorial" size="lg" className="rounded-full px-10">
+              <Button variant="editorial" size="lg" className="rounded-full px-10 group">
                 Get Started Free
-                <ArrowRight className="h-4 w-4" />
+                <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
+              </Button>
+            </Link>
+            <Link href="/#how-it-works">
+              <Button variant="ghost" size="lg" className="rounded-full px-8">
+                See How It Works
               </Button>
             </Link>
           </motion.div>
+          {/* Trust line */}
+          <motion.p
+            variants={fadeInUp}
+            className="text-[11px] text-muted font-light"
+          >
+            Free to start · Cancel anytime · Your photos stay private
+          </motion.p>
         </motion.div>
       </div>
     </section>

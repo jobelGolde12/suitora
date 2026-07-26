@@ -4,7 +4,7 @@
  * across different vision model providers.
  */
 
-import type { BodyShape, SkinTone, FaceShape, StyleType } from "@/types";
+import type { BodyShape, SkinTone, FaceShape, StyleTag } from "@/types";
 
 export interface VisionAnalysisInput {
   userImageUrl: string;
@@ -22,7 +22,7 @@ export interface VisionAnalysisResult {
     bodyShape: BodyShape;
     skinTone: SkinTone;
     faceShape: FaceShape;
-    styleType: StyleType;
+    styleType: StyleTag;
   };
   height?: number;
   heightConfidence?: number;
@@ -68,10 +68,10 @@ export async function analyzeWithVision(
 
   return {
     scores: {
-      overall: mockResult.overallScore,
-      body: mockResult.bodyScore,
-      style: mockResult.styleScore,
-      color: mockResult.colorScore,
+      overall: mockResult.scores.overall,
+      body: mockResult.scores.body,
+      style: mockResult.scores.style,
+      color: mockResult.scores.color,
     },
     traits: {
       bodyShape: mockResult.bodyShape,

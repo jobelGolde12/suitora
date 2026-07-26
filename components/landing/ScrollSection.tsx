@@ -4,7 +4,10 @@ import { ScrollFlyIn } from "@/components/ui/hero-section-3";
 
 export function ScrollSection() {
   return (
-    <section className="w-full bg-background text-foreground">
+    <section className="w-full bg-background text-foreground relative">
+      {/* Top fade for smooth transition from HowItWorks */}
+      <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-b from-surface/40 to-transparent pointer-events-none z-10" />
+
       <ScrollFlyIn>
         <div className="max-w-3xl mx-auto px-4 text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent mb-4">
@@ -21,6 +24,9 @@ export function ScrollSection() {
           </p>
         </div>
       </ScrollFlyIn>
+
+      {/* Bottom fade for smooth transition to FAQ */}
+      <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-background to-transparent pointer-events-none z-10" />
     </section>
   );
 }

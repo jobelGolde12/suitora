@@ -2,21 +2,30 @@
  * Mock AI analysis service.
  * Returns simulated analysis results so the UI is fully functional
  * before integrating real AI services like OpenAI or Gemini Vision.
+ *
+ * Returns FitAnalysisResult shape for compatibility with the fit engine.
  */
 
 import type {
-  Analysis,
+  FitAnalysisResult,
+  FitScores,
+  FitInsights,
+  SizeRecommendation,
+  CompatibilityMetadata,
   BodyShape,
   SkinTone,
   FaceShape,
-  StyleType,
-  ColorAnalysis,
+  StyleTag,
+  ItemCategory,
+  Silhouette,
+  ItemProfile,
+  UserBodyProfile,
 } from "@/types";
 
 const bodyShapes: BodyShape[] = ["rectangle", "pear", "apple", "hourglass", "triangle"];
 const skinTones: SkinTone[] = ["warm", "cool", "neutral"];
 const faceShapes: FaceShape[] = ["round", "oval", "heart", "square", "diamond"];
-const styleTypes: StyleType[] = [
+const styleTypes: StyleTag[] = [
   "casual",
   "minimalist",
   "streetwear",
@@ -34,30 +43,8 @@ function randomScore(min = 40, max = 98): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function randomRecommendations(): string[] {
-  const all: string[] = [
-    "This piece complements your body shape well",
-    "Consider pairing with neutral accessories",
-    "Works great for both casual and semi-formal occasions",
-    "The silhouette flatters your frame",
-    "Try tucking it in for a more polished look",
-    "Roll up the sleeves for a relaxed vibe",
-    "Add a belt to define your waist",
-    "Layer with a blazer for evening events",
-    "Pair with high-waisted bottoms for balance",
-    "Opt for lighter fabrics in warmer months",
-  ];
-  const count = randomScore(2, 5);
-  const shuffled = [...all].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, count);
-}
-
-function generateColorAnalysis(): ColorAnalysis {
-  return {
-    primaryColors: ["#2D2D2D", "#F5F5F5", "#8B7355"],
-    recommendedColors: ["#E8D5B7", "#4A90D9", "#2ECC71", "#F39C12"],
-    avoidColors: ["#FF6B6B", "#98FB98", "#FFD700"],
-  };
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 interface MockAnalysisInput {
@@ -65,36 +52,17 @@ interface MockAnalysisInput {
   clothingImageUrl: string;
 }
 
-interface AnalysisResult {
-  overallScore: number;
-  bodyScore: number;
-  styleScore: number;
-  colorScore: number;
-  bodyShape: BodyShape;
-  skinTone: SkinTone;
-  faceShape: FaceShape;
-  styleType: StyleType;
-  recommendations: string[];
-  colorAnalysis: ColorAnalysis;
-  generatedImageUrl: string;
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 /**
  * Simulate an AI analysis process with progress callbacks.
+ * Returns a full FitAnalysisResult.
  */
 export async function analyzeFashion(
   input: MockAnalysisInput,
   onProgress?: (stage: string, progress: number, message: string) => void
-): Promise<AnalysisResult> {
+): Promise<FitAnalysisResult> {
   const stages = [
     { stage: "detecting", duration: 800, message: "Detecting person in image..." },
     { stage: "analyzing", duration: 1200, message: "Analyzing body shape & features..." },
-    { stage: "analyzing", duration: 1000, message: "Analyzing skin tone & face shape..." },
-    { stage: "try-on", duration: 1500, message: "Generating virtual try-on..." },
     { stage: "scoring", duration: 1000, message: "Calculating compatibility scores..." },
   ];
 
@@ -112,24 +80,99 @@ export async function analyzeFashion(
   }
 
   // Generate mock result
-  const overallScore = randomScore(55, 95);
-  const bodyScore = randomScore(50, 98);
-  const styleScore = randomScore(45, 95);
-  const colorScore = randomScore(50, 92);
+  const bodyShape = randomItem(bodyShapes);
+  const skinTone = randomItem(skinTones);
+  const faceShape = randomItem(faceShapes);
+  const styleType = randomItem(styleTypes);
+
+  const scores: FitScores = {
+    overall: randomScore(55, 95),
+    body: randomScore(50, 98),
+    style: randomScore(45, 95),
+    color: randomScore(50, 92),
+  };
+
+  const height = 155 + Math.floor(Math.random() * 35);
+  const weight = 50 + Math.floor(Math.random() * 50);
+  const confidence = 0.75 + Math.random() * 0.2;
+
+  const sizeRecommendation: SizeRecommendation = {
+    suggested: randomItem(["XS", "S", "M", "L", "XL"]),
+    rationale: "Based on standard sizing for this garment type.",
+  };
+
+  const insights: FitInsights = {
+    positives: [
+      "This piece complements your body shape well",
+      "The silhouette works well for both casual and semi-formal occasions",
+    ],
+    cautions: [
+      "May feel slightly fitted across the bust if you prefer more ease",
+    ],
+    stylingTips: [
+      "Add a belt to define your waist",
+      "Layer with a blazer for evening events",
+    ],
+  };
+
+  const bodyProfile: UserBodyProfile = {
+    heightCm: height,
+    weightKg: weight,
+    bodyShape,
+    measurements: {
+      bust: 85 + Math.floor(Math.random() * 20),
+      waist: 65 + Math.floor(Math.random() * 20),
+      hips: 90 + Math.floor(Math.random() * 20),
+      shoulderWidth: 35 + Math.floor(Math.random() * 10),
+    },
+    skinTone,
+    faceShape,
+    stylePreference: [styleType],
+    confidence,
+  };
+
+  const itemProfile: ItemProfile = {
+    category: "tops",
+    subtype: "casual_shirt",
+    silhouette: "regular",
+    keyMeasurements: {
+      bust: 90,
+      waist: 75,
+      hips: 95,
+    },
+    fabricStretch: "moderate",
+    colors: ["#2D2D2D", "#F5F5F5", "#8B7355"],
+    styleTags: [styleType],
+  };
+
+  const compatibilityMetadata: CompatibilityMetadata = {
+    bodyProfile,
+    itemProfile,
+    scores,
+    sizeRecommendation,
+    insights,
+    confidence,
+    flags: insights.cautions,
+  };
 
   onProgress?.("complete", 100, "Analysis complete!");
 
   return {
-    overallScore,
-    bodyScore,
-    styleScore,
-    colorScore,
-    bodyShape: randomItem(bodyShapes),
-    skinTone: randomItem(skinTones),
-    faceShape: randomItem(faceShapes),
-    styleType: randomItem(styleTypes),
-    recommendations: randomRecommendations(),
-    colorAnalysis: generateColorAnalysis(),
-    generatedImageUrl: input.clothingImageUrl, // In production, this would be the AI-generated try-on
+    scores,
+    bodyShape,
+    skinTone,
+    faceShape,
+    styleType,
+    height,
+    heightConfidence: confidence,
+    weight,
+    weightConfidence: confidence,
+    recommendations: [...insights.positives, ...insights.stylingTips],
+    colorAnalysis: {
+      primaryColors: ["#2D2D2D", "#F5F5F5", "#8B7355"],
+      recommendedColors: ["#E8D5B7", "#4A90D9", "#2ECC71", "#F39C12"],
+      avoidColors: ["#FF6B6B", "#98FB98", "#FFD700"],
+    },
+    compatibilityMetadata,
   };
 }

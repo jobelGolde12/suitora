@@ -2,9 +2,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/drizzle";
-import { eq } from "drizzle-orm";
 import { nanoid } from "@/lib/utils/id";
-import { uploadToCloudinary, deleteFromCloudinary } from "@/lib/storage/cloudinary";
 
 export async function POST(req: Request) {
   try {
@@ -27,28 +25,56 @@ export async function POST(req: Request) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Upload to Cloudinary
-    const result = await uploadToCloudinary(buffer, {
-      folder: "suitora/uploads",
-    });
+    // Check if Cloudinary is configured
+    const hasCloudinary =
+      process.env.CLOUDINARY_CLOUD_NAME &&
+      process.env.CLOUDINARY_API_KEY &&
+      process.env.CLOUDINARY_API_SECRET;
+
+    let url: string;
+    let publicId: string;
+    let width = 0;
+    let height = 0;
+    let format = "webp";
+    let bytes = buffer.length;
+
+    if (hasCloudinary) {
+      // Upload to Cloudinary
+      const { uploadToCloudinary } = await import("@/lib/storage/cloudinary");
+      const result = await uploadToCloudinary(buffer, {
+        folder: "suitora/uploads",
+      });
+      url = result.url;
+      publicId = result.publicId;
+      width = result.width;
+      height = result.height;
+      format = result.format;
+      bytes = result.bytes;
+    } else {
+      // Fallback: store as base64 data URL (dev mode only)
+      const base64 = buffer.toString("base64");
+      const mimeType = file.type || "image/jpeg";
+      url = `data:${mimeType};base64,${base64}`;
+      publicId = `local_${nanoid()}`;
+    }
 
     // Track in uploads table
     await db.insert(schema.uploads).values({
       id: nanoid(),
       userId: session.user.id,
       kind: "product_image",
-      url: result.url,
-      width: result.width,
-      height: result.height,
-      mimeType: `image/${result.format}`,
-      sizeBytes: result.bytes,
+      url,
+      width: width || null,
+      height: height || null,
+      mimeType: `image/${format}`,
+      sizeBytes: bytes,
       createdAt: new Date().toISOString(),
     });
 
     return NextResponse.json({
       success: true,
-      url: result.url,
-      publicId: result.publicId,
+      url,
+      publicId,
     });
   } catch (err: any) {
     console.error("Error in POST /api/uploads:", err);
@@ -73,7 +99,16 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "publicId is required" }, { status: 400 });
     }
 
-    await deleteFromCloudinary(publicId);
+    // Only delete from Cloudinary if configured
+    const hasCloudinary =
+      process.env.CLOUDINARY_CLOUD_NAME &&
+      process.env.CLOUDINARY_API_KEY &&
+      process.env.CLOUDINARY_API_SECRET;
+
+    if (hasCloudinary && !publicId.startsWith("local_")) {
+      const { deleteFromCloudinary } = await import("@/lib/storage/cloudinary");
+      await deleteFromCloudinary(publicId);
+    }
 
     return NextResponse.json({ success: true });
   } catch (err: any) {
