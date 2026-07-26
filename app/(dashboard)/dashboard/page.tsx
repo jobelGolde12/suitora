@@ -272,14 +272,6 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <TrendingCollection
-        title="Trending items"
-        items={trendingItems}
-        isLoading={trendingLoading}
-        layout="carousel"
-        href="/trending"
-      />
-
       <section>
         <SectionTitle title="Recent analyses" href="/history" />
 
@@ -312,6 +304,14 @@ export default function DashboardPage() {
           </div>
         )}
       </section>
+
+      <TrendingCollection
+        title="Trending items"
+        items={trendingItems}
+        isLoading={trendingLoading}
+        layout="carousel"
+        href="/trending"
+      />
     </PageContainer>
   );
 }

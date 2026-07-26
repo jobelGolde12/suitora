@@ -5,8 +5,8 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils/cn";
 import { CategoryBadge } from "@/components/ui/CategoryBadge";
-import { getCategoryCropClass } from "@/config/category-display";
 import { fadeInUp } from "@/components/dashboard/motion";
+import { formatLocalPrice } from "@/lib/currency";
 import type { TrendItem } from "@/types/trend";
 
 interface TrendingCardProps {
@@ -15,22 +15,8 @@ interface TrendingCardProps {
   className?: string;
 }
 
-function formatPrice(price?: number | null, currency?: string | null): string | null {
-  if (price == null) return null;
-  try {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currency || "USD",
-      maximumFractionDigits: 0,
-    }).format(price);
-  } catch {
-    return `$${Math.round(price)}`;
-  }
-}
-
 export function TrendingCard({ item, delay = 0, className }: TrendingCardProps) {
-  const priceLabel = formatPrice(item.price, item.currency);
-  const cropClass = getCategoryCropClass(item.category);
+  const priceLabel = formatLocalPrice(item.price, item.currency);
 
   return (
     <motion.div
@@ -47,7 +33,7 @@ export function TrendingCard({ item, delay = 0, className }: TrendingCardProps) 
           className
         )}
       >
-        <div className={cn("relative overflow-hidden bg-surface", cropClass)}>
+        <div className="relative h-56 sm:h-64 md:h-72 overflow-hidden bg-surface">
           <Image
             src={item.imageUrl}
             alt={`${item.title}${item.brand ? ` by ${item.brand}` : ""}`}

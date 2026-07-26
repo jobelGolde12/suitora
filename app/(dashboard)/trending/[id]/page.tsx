@@ -25,6 +25,7 @@ import {
 import { TrendingGrid } from "@/components/trending";
 import { getCategoryCropClass } from "@/config/category-display";
 import { cn } from "@/lib/utils/cn";
+import { formatLocalPrice } from "@/lib/currency";
 import type { TrendItem } from "@/types/trend";
 
 export default function TrendingItemDetailPage() {
@@ -92,14 +93,7 @@ export default function TrendingItemDetailPage() {
     );
   }
 
-  const priceLabel =
-    item.price != null
-      ? new Intl.NumberFormat("en-US", {
-          style: "currency",
-          currency: item.currency || "USD",
-          maximumFractionDigits: 0,
-        }).format(item.price)
-      : null;
+  const priceLabel = formatLocalPrice(item.price, item.currency);
 
   const cropClass = getCategoryCropClass(item.category);
 
