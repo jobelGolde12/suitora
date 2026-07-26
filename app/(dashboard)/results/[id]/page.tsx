@@ -41,12 +41,15 @@ const bodyShapeLabels: Record<BodyShape, string> = {
   apple: "Apple",
   hourglass: "Hourglass",
   triangle: "Triangle",
+  "inverted-triangle": "Inverted Triangle",
 };
 
 const skinToneLabels: Record<SkinTone, string> = {
   warm: "Warm Tone",
   cool: "Cool Tone",
   neutral: "Neutral Tone",
+  olive: "Olive Tone",
+  deep: "Deep Tone",
 };
 
 const faceShapeLabels: Record<FaceShape, string> = {
@@ -55,6 +58,7 @@ const faceShapeLabels: Record<FaceShape, string> = {
   heart: "Heart",
   square: "Square",
   diamond: "Diamond",
+  oblong: "Oblong",
 };
 
 const styleTypeLabels: Record<StyleType, string> = {

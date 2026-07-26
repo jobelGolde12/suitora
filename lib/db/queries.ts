@@ -1,6 +1,7 @@
 import { db, schema } from "@/drizzle";
 import { eq, desc, sql } from "drizzle-orm";
 import { nanoid } from "@/lib/utils/id";
+import type { UpdateProfilePayload } from "@/types";
 
 // ─── User Queries ─────────────────────────────────────────────────
 
@@ -92,6 +93,92 @@ export async function isFavorite(analysisId: string, userId: string) {
       sql`${schema.favorites.analysisId} = ${analysisId} AND ${schema.favorites.userId} = ${userId}`
     );
   return !!favorite;
+}
+
+// ─── Stats Queries ────────────────────────────────────────────────
+
+// ─── Profile Queries ─────────────────────────────────────────────
+
+export async function getProfileByUserId(userId: string) {
+  const [profile] = await db
+    .select()
+    .from(schema.userProfiles)
+    .where(eq(schema.userProfiles.userId, userId));
+  return profile ?? null;
+}
+
+export async function createProfile(userId: string) {
+  const [profile] = await db
+    .insert(schema.userProfiles)
+    .values({ id: nanoid(), userId })
+    .returning();
+  return profile;
+}
+
+export async function upsertProfile(
+  userId: string,
+  data: UpdateProfilePayload
+) {
+  // Ensure profile exists
+  const existing = await getProfileByUserId(userId);
+  if (!existing) {
+    await createProfile(userId);
+  }
+
+  // Build update object from the payload, filtering only known profile fields
+  const profileFields: Record<string, any> = {};
+  const allowedFields = [
+    "phone", "dateOfBirth", "gender",
+    "height", "weight", "chestCircumference", "waistCircumference",
+    "hipCircumference", "shoulderWidth", "inseamLength", "armLength",
+    "neckCircumference", "footLength", "footWidth", "shoeSize", "bustCupSize",
+    "styleTags", "preferredBrands", "preferredColors", "avoidColors",
+    "priceRangeMin", "priceRangeMax", "fitPreference", "sizePreference",
+  ];
+
+  for (const field of allowedFields) {
+    if (field in data && data[field as keyof UpdateProfilePayload] !== undefined) {
+      const value = data[field as keyof UpdateProfilePayload];
+      // Serialize arrays to JSON strings
+      if (Array.isArray(value)) {
+        profileFields[field] = JSON.stringify(value);
+      } else {
+        profileFields[field] = value;
+      }
+    }
+  }
+
+  if (Object.keys(profileFields).length === 0) return existing ?? null;
+
+  profileFields.updatedAt = new Date().toISOString();
+
+  const [updated] = await db
+    .update(schema.userProfiles)
+    .set(profileFields)
+    .where(eq(schema.userProfiles.userId, userId))
+    .returning();
+
+  return updated ?? null;
+}
+
+export async function updateProfileSelfImage(
+  userId: string,
+  selfImageUrl: string
+) {
+  // Ensure profile exists
+  const existing = await getProfileByUserId(userId);
+  if (!existing) {
+    await createProfile(userId);
+  }
+
+  await db
+    .update(schema.userProfiles)
+    .set({
+      selfImageUrl,
+      selfImageUploadedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(schema.userProfiles.userId, userId));
 }
 
 // ─── Stats Queries ────────────────────────────────────────────────

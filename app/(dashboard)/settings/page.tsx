@@ -11,6 +11,7 @@ import {
   CreditCard,
   LogOut,
   Check,
+  Ruler,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -18,12 +19,14 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Avatar } from "@/components/ui/Avatar";
 import { useToast } from "@/components/ui/Toast";
 import { PageContainer, PageHeader, fadeInUp } from "@/components/dashboard";
+import { ProfileForm } from "@/components/settings/ProfileForm";
 import { cn } from "@/lib/utils/cn";
 
-type SettingsTab = "profile" | "password" | "appearance" | "subscription";
+type SettingsTab = "profile" | "measurements" | "password" | "appearance" | "subscription";
 
 const tabs: { id: SettingsTab; label: string; icon: React.ElementType }[] = [
   { id: "profile", label: "Profile", icon: User },
+  { id: "measurements", label: "Body Data", icon: Ruler },
   { id: "password", label: "Password", icon: Lock },
   { id: "appearance", label: "Appearance", icon: Palette },
   { id: "subscription", label: "Subscription", icon: CreditCard },
@@ -66,38 +69,7 @@ export default function SettingsPage() {
   const renderContent = () => {
     switch (activeTab) {
       case "profile":
-        return (
-          <motion.div
-            key="profile"
-            initial="hidden"
-            animate="visible"
-            variants={fadeInUp}
-            className="space-y-6"
-          >
-            <div className="flex items-center gap-4">
-              <Avatar initials="JD" size="xl" />
-              <div>
-                <Button variant="editorial" size="sm" className="rounded-full">
-                  Change Photo
-                </Button>
-                <p className="text-[11px] text-muted-foreground mt-2 font-light">
-                  JPG, PNG or WEBP. 1:1 ratio recommended.
-                </p>
-              </div>
-            </div>
-            <Input label="Full Name" defaultValue="John Doe" />
-            <Input label="Email" type="email" defaultValue="john@example.com" />
-            <Button
-              onClick={handleSave}
-              loading={isSaving}
-              variant="editorial"
-              className="rounded-full px-6"
-            >
-              <Check className="h-4 w-4" strokeWidth={1.5} />
-              Save Changes
-            </Button>
-          </motion.div>
-        );
+        return <ProfileForm />;
 
       case "password":
         return (

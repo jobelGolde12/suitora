@@ -1,0 +1,85 @@
+/**
+ * Vision AI provider abstraction.
+ * Provides a unified interface for analyzing fashion compatibility
+ * across different vision model providers.
+ */
+
+import type { BodyShape, SkinTone, FaceShape, StyleType } from "@/types";
+
+export interface VisionAnalysisInput {
+  userImageUrl: string;
+  clothingImageUrl: string;
+}
+
+export interface VisionAnalysisResult {
+  scores: {
+    overall: number;
+    body: number;
+    style: number;
+    color: number;
+  };
+  traits: {
+    bodyShape: BodyShape;
+    skinTone: SkinTone;
+    faceShape: FaceShape;
+    styleType: StyleType;
+  };
+  height?: number;
+  heightConfidence?: number;
+  weight?: number;
+  weightConfidence?: number;
+  recommendations: string[];
+  colorAnalysis: {
+    primaryColors: string[];
+    recommendedColors: string[];
+    avoidColors: string[];
+  };
+}
+
+export interface VisionProvider {
+  name: string;
+  analyze(input: VisionAnalysisInput): Promise<VisionAnalysisResult>;
+}
+
+let activeProvider: VisionProvider | null = null;
+
+export function setVisionProvider(provider: VisionProvider) {
+  activeProvider = provider;
+}
+
+export function getVisionProvider(): VisionProvider | null {
+  return activeProvider;
+}
+
+/**
+ * Analyze fashion compatibility using the configured vision provider.
+ * Falls back to mock if no provider is configured.
+ */
+export async function analyzeWithVision(
+  input: VisionAnalysisInput
+): Promise<VisionAnalysisResult> {
+  if (activeProvider) {
+    return activeProvider.analyze(input);
+  }
+
+  // Fallback: use mock analysis
+  const { analyzeFashion } = await import("./mock-analysis");
+  const mockResult = await analyzeFashion(input);
+
+  return {
+    scores: {
+      overall: mockResult.overallScore,
+      body: mockResult.bodyScore,
+      style: mockResult.styleScore,
+      color: mockResult.colorScore,
+    },
+    traits: {
+      bodyShape: mockResult.bodyShape,
+      skinTone: mockResult.skinTone,
+      faceShape: mockResult.faceShape,
+      styleType: mockResult.styleType,
+    },
+    recommendations: mockResult.recommendations,
+    colorAnalysis: mockResult.colorAnalysis,
+  };
+}

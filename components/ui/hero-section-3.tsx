@@ -98,8 +98,12 @@ function ScrollFlyIn({
   className,
   ...props
 }: ScrollFlyInProps) {
-  const [stars] = React.useState(generateStars);
+  const [stars, setStars] = React.useState<ReturnType<typeof generateStars>>([]);
   const sectionRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    setStars(generateStars());
+  }, []);
 
   const { scrollYProgress } = useScroll({
     target: sectionRef,

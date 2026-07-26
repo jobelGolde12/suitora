@@ -5,13 +5,8 @@ import { db, schema } from "@/drizzle";
 import { eq, and } from "drizzle-orm";
 import { nanoid } from "@/lib/utils/id";
 import { extractProductFromUrl } from "@/lib/ai/product-extraction";
-import { estimateBodyTraits } from "@/lib/ai/body-estimation";
-import { generateVirtualTryOn } from "@/lib/ai/tryon";
-import { getAnalysesByUserId, getFavoritesByUserId } from "@/lib/db/queries";
-
-function randomScore(min = 55, max = 95): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
+import { analyzeWithVision } from "@/lib/ai/vision";
+import "@/lib/ai/providers"; // Auto-initialize vision providers
 
 export async function POST(req: Request) {
   try {
@@ -91,7 +86,7 @@ export async function POST(req: Request) {
       productId: productId,
       userImage: finalUserImage,
       productImage: finalProductImage,
-      status: "pending", // Starts as pending
+      status: "pending",
       overallScore: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -140,7 +135,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Analysis not found" }, { status: 404 });
     }
 
-    // If analysis is already completed, return it
+    // If analysis is already completed or failed, return it
     if (analysis.status === "completed" || analysis.status === "failed") {
       return NextResponse.json({
         analysis: {
@@ -160,60 +155,47 @@ export async function GET(req: Request) {
     let message = "Detecting person in image...";
 
     if (elapsedMs > 6000) {
-      // Transition to completed
+      // Pipeline complete — run real analysis
       try {
-        const traits = await estimateBodyTraits(analysis.userImage);
-        const tryon = await generateVirtualTryOn(analysis.userImage, analysis.productImage);
+        const visionResult = await analyzeWithVision({
+          userImageUrl: analysis.userImage,
+          clothingImageUrl: analysis.productImage,
+        });
 
-        const overallScore = randomScore(55, 95);
-        const bodyScore = randomScore(50, 98);
-        const styleScore = randomScore(45, 95);
-        const colorScore = randomScore(50, 92);
+        const recommendations = visionResult.recommendations;
 
-        const recommendations = [
-          "This piece complements your figure beautifully",
-          "Consider pairing with neutral-toned accessories for balance",
-          "The silhouette works well for both casual and semi-formal occasions",
-          "Try rolling up the sleeves for a more relaxed look",
-        ];
-
-        const colorAnalysis = {
-          primaryColors: ["#2D2D2D", "#F5F5F5", "#8B7355"],
-          recommendedColors: ["#E8D5B7", "#4A90D9", "#2ECC71"],
-          avoidColors: ["#FF6B6B", "#98FB98"],
-        };
+        const colorAnalysis = visionResult.colorAnalysis;
 
         const compatibilityMetadata = {
-          bodyShape: traits.bodyShape,
-          skinTone: traits.skinTone,
-          faceShape: traits.faceShape,
-          height: traits.height,
-          heightConfidence: traits.heightConfidence,
-          weight: traits.weight,
-          weightConfidence: traits.weightConfidence,
+          bodyShape: visionResult.traits.bodyShape,
+          skinTone: visionResult.traits.skinTone,
+          faceShape: visionResult.traits.faceShape,
+          height: visionResult.height,
+          heightConfidence: visionResult.heightConfidence,
+          weight: visionResult.weight,
+          weightConfidence: visionResult.weightConfidence,
         };
 
-        // Update DB record
+        // Update DB record with real analysis results
         await db
           .update(schema.analyses)
           .set({
             status: "completed",
-            overallScore,
-            bodyScore,
-            styleScore,
-            colorScore,
-            bodyShape: traits.bodyShape,
-            skinTone: traits.skinTone,
-            faceShape: traits.faceShape,
-            styleType: "minimalist",
+            overallScore: visionResult.scores.overall,
+            bodyScore: visionResult.scores.body,
+            styleScore: visionResult.scores.style,
+            colorScore: visionResult.scores.color,
+            bodyShape: visionResult.traits.bodyShape,
+            skinTone: visionResult.traits.skinTone,
+            faceShape: visionResult.traits.faceShape,
+            styleType: visionResult.traits.styleType,
             recommendations: JSON.stringify(recommendations),
             colorAnalysis: JSON.stringify(colorAnalysis),
             compatibilityMetadata: JSON.stringify(compatibilityMetadata),
-            generatedImage: tryon.generatedImageUrl,
-            height: traits.height,
-            heightConfidence: traits.heightConfidence,
-            weight: traits.weight,
-            weightConfidence: traits.weightConfidence,
+            height: visionResult.height ?? null,
+            heightConfidence: visionResult.heightConfidence ?? null,
+            weight: visionResult.weight ?? null,
+            weightConfidence: visionResult.weightConfidence ?? null,
             updatedAt: new Date().toISOString(),
           })
           .where(eq(schema.analyses.id, id));
@@ -236,6 +218,8 @@ export async function GET(req: Request) {
           message: "Analysis complete!"
         });
       } catch (err: any) {
+        console.error("Vision analysis failed:", err);
+
         // Mark as failed
         await db
           .update(schema.analyses)
@@ -247,7 +231,7 @@ export async function GET(req: Request) {
 
         return NextResponse.json({
           analysis: { ...analysis, status: "failed" },
-          error: "Pipeline execution failed",
+          error: `Analysis pipeline failed: ${err.message}`,
         });
       }
     } else if (elapsedMs > 4500) {
@@ -257,7 +241,7 @@ export async function GET(req: Request) {
     } else if (elapsedMs > 3000) {
       stage = "try-on";
       progress = 60;
-      message = "Generating virtual try-on...";
+      message = "Analyzing style compatibility...";
     } else if (elapsedMs > 1500) {
       stage = "analyzing";
       progress = 35;
@@ -304,3 +288,6 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+
+// Re-import these from queries to avoid circular dependency
+import { getAnalysesByUserId, getFavoritesByUserId } from "@/lib/db/queries";

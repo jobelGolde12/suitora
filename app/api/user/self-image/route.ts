@@ -50,16 +50,22 @@ export async function POST(req: Request) {
       .set({ selfImageUrl, updatedAt: new Date().toISOString() })
       .where(eq(schema.users.id, session.user.id));
 
-    // 2. Add uploads record
-    await db.insert(schema.uploads).values({
-      id: nanoid(),
-      userId: session.user.id,
-      kind: "user_photo",
-      url: selfImageUrl,
-      mimeType: "image/jpeg",
-      sizeBytes: 1024 * 100, // mock size
-      createdAt: new Date().toISOString(),
-    });
+    // 2. Add uploads record (skip if already tracked by upload service)
+    const existingUpload = await db
+      .select({ id: schema.uploads.id })
+      .from(schema.uploads)
+      .where(eq(schema.uploads.url, selfImageUrl))
+      .limit(1);
+
+    if (existingUpload.length === 0) {
+      await db.insert(schema.uploads).values({
+        id: nanoid(),
+        userId: session.user.id,
+        kind: "user_photo",
+        url: selfImageUrl,
+        createdAt: new Date().toISOString(),
+      });
+    }
 
     return NextResponse.json({ success: true, selfImageUrl });
   } catch (err: any) {

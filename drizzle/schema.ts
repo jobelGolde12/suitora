@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, unique } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
@@ -109,10 +109,13 @@ export const favorites = sqliteTable("favorites", {
   analysisId: text("analysis_id")
     .notNull()
     .references(() => analyses.id, { onDelete: "cascade" }),
+  productId: text("product_id").references(() => products.id, { onDelete: "set null" }),
   createdAt: text("created_at")
     .notNull()
     .default(sql`CURRENT_TIMESTAMP`),
-});
+}, (t) => [
+  unique("favorites_user_analysis_idx").on(t.userId, t.analysisId),
+]);
 
 export const products = sqliteTable("products", {
   id: text("id").primaryKey(),
@@ -152,6 +155,68 @@ export const auditLogs = sqliteTable("audit_logs", {
   action: text("action").notNull(),
   details: text("details"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const userProfiles = sqliteTable("user_profiles", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+
+  // Basic info
+  phone: text("phone"),
+  dateOfBirth: text("date_of_birth"),
+  gender: text("gender"),
+
+  // Manual body measurements
+  height: real("height"),
+  weight: real("weight"),
+  chestCircumference: real("chest_circumference"),
+  waistCircumference: real("waist_circumference"),
+  hipCircumference: real("hip_circumference"),
+  shoulderWidth: real("shoulder_width"),
+  inseamLength: real("inseam_length"),
+  armLength: real("arm_length"),
+  neckCircumference: real("neck_circumference"),
+  footLength: real("foot_length"),
+  footWidth: real("foot_width"),
+  shoeSize: text("shoe_size"),
+  bustCupSize: text("bust_cup_size"),
+
+  // AI-estimated fields
+  estimatedHeight: real("estimated_height"),
+  estimatedHeightConfidence: real("estimated_height_confidence"),
+  estimatedWeight: real("estimated_weight"),
+  estimatedWeightConfidence: real("estimated_weight_confidence"),
+  bodyShape: text("body_shape"),
+  bodyShapeConfidence: real("body_shape_confidence"),
+  skinTone: text("skin_tone"),
+  faceShape: text("face_shape"),
+  bmiCategory: text("bmi_category"),
+
+  // Self image
+  selfImageUrl: text("self_image_url"),
+  selfImageThumbnailUrl: text("self_image_thumbnail_url"),
+  selfImageUploadedAt: text("self_image_uploaded_at"),
+
+  // Style preferences
+  styleTags: text("style_tags").default("[]"),
+  preferredBrands: text("preferred_brands").default("[]"),
+  preferredColors: text("preferred_colors").default("[]"),
+  avoidColors: text("avoid_colors").default("[]"),
+  priceRangeMin: integer("price_range_min"),
+  priceRangeMax: integer("price_range_max"),
+  fitPreference: text("fit_preference").default("regular"),
+  sizePreference: text("size_preference").default("US"),
+
+  // Timestamps
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const meta = sqliteTable("meta", {
