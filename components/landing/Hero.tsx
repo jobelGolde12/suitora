@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { ArrowRight, ChevronDown, Shield, Clock, Lock } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -58,35 +59,28 @@ export function Hero() {
             </Link>
           </motion.div>
 
-          {/* Trust Strip */}
-          <motion.div
-            variants={fadeInUp}
-            className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] text-muted font-light"
-          >
-            <span className="flex items-center gap-1.5">
-              <Shield className="h-3 w-3 text-muted/60" strokeWidth={1.5} />
-              No credit card required
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Lock className="h-3 w-3 text-muted/60" strokeWidth={1.5} />
-              Private by design
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Clock className="h-3 w-3 text-muted/60" strokeWidth={1.5} />
-              Results in under 30s
-            </span>
-          </motion.div>
-
           {/* Social Proof */}
           <motion.div variants={fadeInUp} className="pt-4">
             <div className="flex items-center justify-center gap-3 text-sm text-muted">
               <div className="flex -space-x-2">
-                {["A", "M", "K", "S"].map((initial) => (
+                {[
+                  { initial: "A", src: "/images/landing/profile-a.png" },
+                  { initial: "M", src: "/images/landing/profile-m.png" },
+                  { initial: "S", src: "/images/landing/profile-s.png" },
+                  { initial: "K", src: "/images/landing/profile-k.png" },
+                ].map(({ initial, src }) => (
                   <div
                     key={initial}
-                    className="h-8 w-8 rounded-full border-2 border-background bg-surface flex items-center justify-center text-[10px] font-medium text-muted"
+                    className="h-8 w-8 overflow-hidden rounded-full border-2 border-background"
                   >
-                    {initial}
+                    <Image
+                      src={src}
+                      alt={`User ${initial}`}
+                      width={32}
+                      height={32}
+                      className="h-full w-full object-cover"
+                      unoptimized
+                    />
                   </div>
                 ))}
               </div>
