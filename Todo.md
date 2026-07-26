@@ -186,7 +186,9 @@ All tasks below have been verified as complete.
 - [x] `lib/ai/item-attributes.ts` — Added missing `full_outfit` entries (3 records)
 - [x] `next.config.ts` — Added `images.remotePatterns` for Unsplash, Cloudinary, Placeholder
 - [x] TypeScript check — Zero errors
-- [x] Database migration applied
+- [x] Database migration applied to local SQLite DB
+- [x] Remote Turso DB: Added `product_id` column to `favorites` table (fixes `GET /api/dashboard/stats` 500)
+- [x] Remote Turso DB: Created `trend_items` and `trend_sync_logs` tables (fixes `GET /api/trending` 500)
 
 
 This implementation document is the single source of truth for project progress.
