@@ -20,6 +20,7 @@ export default function AuthLayout({
                 width={40}
                 height={40}
                 className="object-cover"
+                unoptimized
               />
             </div>
             <span className="font-heading text-2xl font-medium tracking-tight">
@@ -70,6 +71,7 @@ export default function AuthLayout({
                 width={32}
                 height={32}
                 className="object-cover"
+                unoptimized
               />
             </div>
             <span className="font-heading text-lg font-medium tracking-tight">

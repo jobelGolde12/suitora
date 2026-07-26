@@ -84,7 +84,7 @@ export default function DashboardPage() {
           <Link href="/upload">
             <Button variant="editorial" className="rounded-full px-6">
               <Plus className="h-4 w-4" strokeWidth={1.5} />
-              New Analysis
+              Try It On
             </Button>
           </Link>
         }

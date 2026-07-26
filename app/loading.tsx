@@ -11,6 +11,7 @@ export default function Loading() {
             width={48}
             height={48}
             className="object-cover animate-pulse"
+            unoptimized
           />
         </div>
         <p className="text-sm text-muted animate-pulse">Loading...</p>

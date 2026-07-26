@@ -50,6 +50,7 @@ export function Navbar() {
               height={32}
               className="object-cover"
               priority
+              unoptimized
             />
           </div>
           <span className="font-heading text-xl font-medium tracking-tight">

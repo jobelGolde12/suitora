@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils/cn";
 
 const sidebarLinks = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "New Analysis", href: "/upload", icon: Upload },
+  { label: "Try It On", href: "/upload", icon: Upload },
   { label: "History", href: "/history", icon: History },
   { label: "Favorites", href: "/favorites", icon: Heart },
   { label: "Settings", href: "/settings", icon: Settings },
@@ -37,6 +37,7 @@ function BrandMark({ collapsed }: { collapsed?: boolean }) {
           width={32}
           height={32}
           className="object-cover"
+          unoptimized
         />
       </div>
       {!collapsed && (
@@ -122,7 +123,7 @@ export function Sidebar() {
       <button
         onClick={() => setMobileOpen((open) => !open)}
         className={cn(
-          "fixed bottom-6 left-6 z-[60] flex h-12 w-12 items-center justify-center rounded-full",
+          "fixed top-6 left-6 z-[60] flex h-12 w-12 items-center justify-center rounded-full",
           "border border-border bg-card text-foreground shadow-elevated md:hidden",
           "transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]",
           "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"

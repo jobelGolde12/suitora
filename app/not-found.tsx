@@ -14,6 +14,7 @@ export default function NotFound() {
               width={64}
               height={64}
               className="object-cover"
+              unoptimized
             />
           </div>
         </div>

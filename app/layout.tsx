@@ -51,9 +51,10 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
-      { url: "/suitora_logo.png", type: "image/png", sizes: "1254x1254" },
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/icon-512.png", type: "image/png", sizes: "512x512" },
     ],
-    apple: "/suitora_logo.png",
+    apple: "/icon-192.png",
   },
   robots: {
     index: true,

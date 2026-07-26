@@ -205,7 +205,7 @@ export default function UploadPage() {
 
       <PageHeader
         label="Create"
-        title="New Analysis"
+        title="Try It On"
         description="Select a clothing item and see how well it fits your body profile."
       />
 
