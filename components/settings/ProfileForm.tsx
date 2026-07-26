@@ -18,7 +18,6 @@ import { motion } from "framer-motion";import {
   ShoppingBag,
   AlertCircle,
   Info,
-}
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -287,36 +286,6 @@ export function ProfileForm() {
       addToast("Failed to save profile", "error");
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleEstimate = async () => {
-    setEstimating(true);
-    try {
-      const res = await fetch("/api/user/self-image", { method: "GET" });
-      const data = await res.json();
-      if (data.selfImageUrl) {
-        // Simulate estimation - in production, this calls the AI pipeline
-        const mockEstimate = {
-          height: 165 + Math.round(Math.random() * 15),
-          weight: 55 + Math.round(Math.random() * 20),
-          bodyShape: ["rectangle", "pear", "apple", "hourglass", "triangle"][Math.floor(Math.random() * 5)] as string,
-          heightConfidence: 0.85 + Math.random() * 0.14,
-          weightConfidence: 0.75 + Math.random() * 0.2,
-        };
-        setEstimatedHeight(mockEstimate.height);
-        setEstimatedWeight(mockEstimate.weight);
-        setEstimatedBodyShape(mockEstimate.bodyShape);
-        setEstimatedHeightConf(mockEstimate.heightConfidence);
-        setEstimatedWeightConf(mockEstimate.weightConfidence);
-        addToast("Body estimation complete", "success");
-      } else {
-        addToast("Upload a self-image first for AI estimation", "info");
-      }
-    } catch {
-      addToast("Estimation failed", "error");
-    } finally {
-      setEstimating(false);
     }
   };
 
