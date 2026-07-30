@@ -1,6 +1,9 @@
 /**
  * Synchronization pipeline:
  * fetch → normalize → upsert → log → invalidate cache
+ *
+ * Optional post-processing:
+ * - Affiliate enrichment (wraps product URLs with tracking)
  */
 
 import {
@@ -9,8 +12,9 @@ import {
   upsertTrendItem,
 } from "@/lib/db/queries";
 import { invalidateTrendCache } from "./cache";
-import { fetchAllProviders } from "./fetch";
+import { fetchAllProviders, fetchFromProvider } from "./fetch";
 import { normalizeProduct } from "./normalize";
+import type { RawProviderProduct } from "@/types/trend";
 
 export interface SyncResult {
   providers: number;
@@ -25,12 +29,17 @@ export async function syncTrendItems(): Promise<SyncResult> {
   let itemsUpserted = 0;
   const errors: string[] = [];
 
+  // Collect all products for optional affiliate enrichment
+  const allProducts: { provider: string; products: RawProviderProduct[] }[] = [];
+
   for (const result of results) {
     if (result.error) {
       errors.push(`${result.provider}: ${result.error}`);
     }
 
     itemsFetched += result.products.length;
+    allProducts.push(result);
+
     let upsertedForProvider = 0;
 
     // Deduplicate within this batch by providerId
@@ -64,6 +73,50 @@ export async function syncTrendItems(): Promise<SyncResult> {
       itemsUpserted: upsertedForProvider,
       message: result.error,
     });
+  }
+
+  // Post-processing: Affiliate enrichment
+  const affiliateApiKey = process.env.TREND_AFFILIATE_API_KEY;
+  if (affiliateApiKey) {
+    try {
+      const affiliateResult = await fetchFromProvider("affiliate");
+      if (affiliateResult.products.length === 0) {
+        // Affiliate provider returns empty — enrich existing products
+        const sourceProducts = allProducts.flatMap((r) => r.products);
+        if (sourceProducts.length > 0) {
+          const { fetchAffiliateProducts } = await import("./providers/affiliate");
+          const enriched = await fetchAffiliateProducts(sourceProducts, affiliateApiKey);
+
+          // Re-upsert enriched products with affiliate URLs
+          let enrichedCount = 0;
+          for (const raw of enriched) {
+            if (!raw.productUrl?.includes("skim")) continue;
+            try {
+              const normalized = normalizeProduct("affiliate", raw);
+              await upsertTrendItem(normalized);
+              enrichedCount += 1;
+            } catch {
+              // Skip failed enrichment silently
+            }
+          }
+
+          if (enrichedCount > 0) {
+            await createTrendSyncLog({
+              provider: "affiliate",
+              status: "success",
+              itemsFetched: enriched.length,
+              itemsUpserted: enrichedCount,
+              message: `Enriched ${enrichedCount} products with affiliate links`,
+            });
+            itemsUpserted += enrichedCount;
+          }
+        }
+      }
+    } catch (err) {
+      errors.push(
+        `affiliate: ${err instanceof Error ? err.message : "enrichment failed"}`
+      );
+    }
   }
 
   invalidateTrendCache();

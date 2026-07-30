@@ -7,6 +7,7 @@ import {
   getProfileByUserId,
   upsertProfile,
 } from "@/lib/db/queries";
+import { updateProfileSchema } from "@/lib/utils/validation";
 import type { UpdateProfilePayload, UserProfile } from "@/types";
 
 /**
@@ -61,17 +62,28 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body: UpdateProfilePayload = await req.json();
+    const body = await req.json();
+
+    // Validate input with Zod
+    const validated = updateProfileSchema.safeParse(body);
+    if (!validated.success) {
+      const message = validated.error.issues
+        .map((i) => `${i.path.join(".")}: ${i.message}`)
+        .join(", ");
+      return NextResponse.json({ error: `Invalid input: ${message}` }, { status: 400 });
+    }
+
+    const profileData: UpdateProfilePayload = validated.data;
 
     // Also update the user's name if provided
-    if (body.name) {
+    if (profileData.name) {
       await db
         .update(schema.users)
-        .set({ name: body.name, updatedAt: new Date().toISOString() })
+        .set({ name: profileData.name, updatedAt: new Date().toISOString() })
         .where(eq(schema.users.id, session.user.id));
     }
 
-    const updated = await upsertProfile(session.user.id, body);
+    const updated = await upsertProfile(session.user.id, profileData);
 
     if (!updated) {
       return NextResponse.json({ error: "Failed to update profile" }, { status: 500 });

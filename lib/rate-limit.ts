@@ -1,34 +1,36 @@
-import { Ratelimit } from "@upstash/ratelimit";
+import { Ratelimit, type Duration } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL || "",
-  token: process.env.UPSTASH_REDIS_REST_TOKEN || "",
-});
+const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
+const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-// Tier 1: 5 attempts per 15 minutes per IP
-export const loginRateLimiter = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(5, "15 m"),
-  analytics: true,
-  prefix: "ratelimit:login",
-});
+const redis =
+  redisUrl && redisToken
+    ? new Redis({ url: redisUrl, token: redisToken })
+    : null;
 
-// Tier 2: 15 attempts per 24 hours per IP (brute force protection)
-export const bruteForceLimiter = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(15, "24 h"),
-  analytics: true,
-  prefix: "ratelimit:brute",
-});
+function createLimiter(prefix: string, window: [number, Duration]) {
+  if (!redis) {
+    return {
+      limit: async () => ({ success: true, limit: 0, remaining: 0, reset: 0 }),
+    };
+  }
+  return new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(...window),
+    analytics: true,
+    prefix,
+  });
+}
 
-// Failed attempts tracker per email
-export const failedAttemptsLimiter = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(10, "30 m"),
-  analytics: true,
-  prefix: "ratelimit:failed",
-});
+// Login limiters
+export const loginRateLimiter = createLimiter("ratelimit:login", [5, "15 m"]);
+export const bruteForceLimiter = createLimiter("ratelimit:brute", [15, "24 h"]);
+export const failedAttemptsLimiter = createLimiter("ratelimit:failed", [10, "30 m"]);
+
+// Registration limiters
+export const registerRateLimiter = createLimiter("ratelimit:register", [3, "1 h"]);
+export const registerEmailLimiter = createLimiter("ratelimit:register-email", [3, "1 h"]);
 
 export type RateLimitResult = {
   success: boolean;

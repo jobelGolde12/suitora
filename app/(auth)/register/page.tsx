@@ -10,6 +10,7 @@ import { Eye, EyeOff, ArrowRight, CheckCircle, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { registerSchema, type RegisterFormData } from "@/lib/utils/validation";
+import { registerAction } from "@/lib/auth/actions";
 
 export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -31,27 +32,15 @@ export default function RegisterPage() {
     setMessage(null);
 
     try {
-      const res = await fetch("/api/auth/sign-up/email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          name: data.name,
-          email: data.email,
-          password: data.password,
-          callbackURL: "/dashboard",
-        }),
-      });
+      const result = await registerAction(data);
 
-      const result = await res.json();
-
-      if (res.ok) {
+      if (result.success) {
         setMessage({ type: "success", text: "Account created! Redirecting to your dashboard..." });
         setTimeout(() => {
           router.push("/dashboard");
         }, 1500);
       } else {
-        setMessage({ type: "error", text: result.error?.message || result.message || "Unable to create account." });
+        setMessage({ type: "error", text: result.error || "Unable to create account." });
       }
     } catch {
       setMessage({ type: "error", text: "Network error. Please check your connection and try again." });

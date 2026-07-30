@@ -5,28 +5,51 @@ import { syncTrendItems } from "@/lib/trend/sync";
 
 /**
  * POST /api/trending/sync
- * Protected: authenticated user (admin-style manual refresh).
+ *
+ * Authentication (pick ONE per invocation):
+ *  - Bearer session  — any authenticated user (manual refresh).
+ *  - x-vercel-cron header + CRON_SECRET — Vercel Cron Jobs.
+ *
  * Runs the server-side synchronization pipeline.
  */
 export async function POST() {
-  try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
+  const startTime = Date.now();
 
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const headerStore = await headers();
+    const cronSecret = process.env.CRON_SECRET;
+    const isVercelCron =
+      cronSecret && headerStore.get("x-vercel-cron") === "1";
+
+    if (isVercelCron) {
+      const authHeader = headerStore.get("authorization");
+      if (authHeader !== `Bearer ${cronSecret}`) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    } else {
+      const session = await auth.api.getSession({ headers: headerStore });
+      if (!session?.user) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
     }
 
-    // Optional: require CRON_SECRET for automated jobs
-    // For now, any authenticated user can trigger a refresh in dev.
-
     const result = await syncTrendItems();
-    return NextResponse.json({ ok: true, ...result });
+    const duration = Date.now() - startTime;
+
+    console.log(
+      `[trend-sync] Completed in ${duration}ms: ${result.itemsUpserted} items upserted, ${result.errors.length} errors`
+    );
+
+    return NextResponse.json({
+      ok: true,
+      ...result,
+      duration,
+    });
   } catch (err) {
+    const duration = Date.now() - startTime;
     console.error("Error in POST /api/trending/sync:", err);
     return NextResponse.json(
-      { error: "Synchronization failed" },
+      { error: "Synchronization failed", duration },
       { status: 500 }
     );
   }

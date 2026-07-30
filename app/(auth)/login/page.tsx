@@ -10,6 +10,7 @@ import { Eye, EyeOff, ArrowRight, CheckCircle, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { loginSchema, type LoginFormData } from "@/lib/utils/validation";
+import { loginAction } from "@/lib/auth/actions";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -35,26 +36,15 @@ export default function LoginPage() {
     setMessage(null);
 
     try {
-      const res = await fetch("/api/auth/sign-in/email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          email: data.email,
-          password: data.password,
-          callbackURL: "/dashboard",
-        }),
-      });
+      const result = await loginAction(data);
 
-      const result = await res.json();
-
-      if (res.ok) {
+      if (result.success) {
         setMessage({ type: "success", text: "Welcome back! Redirecting..." });
         setTimeout(() => {
           router.push("/dashboard");
         }, 500);
       } else {
-        setMessage({ type: "error", text: result.error?.message || result.message || "Invalid email or password." });
+        setMessage({ type: "error", text: result.error || "Invalid email or password." });
       }
     } catch {
       setMessage({ type: "error", text: "Network error. Please check your connection and try again." });

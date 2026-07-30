@@ -14,18 +14,35 @@ export interface TrendProviderConfig {
 }
 
 export const trendProviders: TrendProviderConfig[] = [
+  // Live providers (real data)
   {
-    id: "curated",
-    name: "Suitora Curated",
+    id: "shopify",
+    name: "Shopify Storefronts",
     enabled: true,
   },
-  // Future live providers (disabled until keys are configured)
+  {
+    id: "serpapi",
+    name: "Google Shopping (SerpAPI)",
+    enabled: !!process.env.SERPAPI_API_KEY,
+    apiKeyEnv: "SERPAPI_API_KEY",
+  },
+  {
+    id: "asos",
+    name: "ASOS Catalog",
+    enabled: true,
+  },
+  // Post-processors (enrich existing products)
   {
     id: "affiliate",
-    name: "Affiliate Feed",
-    enabled: false,
-    baseUrl: process.env.TREND_AFFILIATE_API_URL,
+    name: "Affiliate Link Enrichment",
+    enabled: !!process.env.TREND_AFFILIATE_API_KEY,
     apiKeyEnv: "TREND_AFFILIATE_API_KEY",
+  },
+  // Fallback: keep curated data available but disabled by default
+  {
+    id: "curated",
+    name: "Suitora Curated (Fallback)",
+    enabled: false,
   },
 ];
 

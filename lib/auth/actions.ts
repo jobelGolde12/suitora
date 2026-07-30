@@ -3,7 +3,13 @@
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/drizzle";
 import { loginSchema, registerSchema, type LoginFormData, type RegisterFormData } from "@/lib/utils/validation";
-import { loginRateLimiter, bruteForceLimiter, failedAttemptsLimiter } from "@/lib/rate-limit";
+import {
+  loginRateLimiter,
+  bruteForceLimiter,
+  failedAttemptsLimiter,
+  registerRateLimiter,
+  registerEmailLimiter,
+} from "@/lib/rate-limit";
 import { nanoid } from "@/lib/utils/id";
 
 export type AuthResult = {
@@ -131,7 +137,7 @@ export async function loginAction(
   }
 }
 
-export async function registerAction(data: RegisterFormData): Promise<AuthResult> {
+export async function registerAction(data: RegisterFormData, ip: string = "anonymous"): Promise<AuthResult> {
   try {
     // Validate input
     const validated = registerSchema.safeParse(data);
@@ -143,6 +149,34 @@ export async function registerAction(data: RegisterFormData): Promise<AuthResult
     }
 
     const { name, email, password } = validated.data;
+
+    // Check rate limit: 3 registrations per hour per IP
+    const ipLimit = await registerRateLimiter.limit(ip);
+    if (!ipLimit.success) {
+      return {
+        success: false,
+        error: "Too many registration attempts. Please try again later.",
+        rateLimit: {
+          limit: ipLimit.limit,
+          remaining: ipLimit.remaining,
+          reset: ipLimit.reset,
+        },
+      };
+    }
+
+    // Check rate limit: 3 registrations per hour per email
+    const emailLimit = await registerEmailLimiter.limit(email);
+    if (!emailLimit.success) {
+      return {
+        success: false,
+        error: "Too many registration attempts for this email. Please try again later.",
+        rateLimit: {
+          limit: emailLimit.limit,
+          remaining: emailLimit.remaining,
+          reset: emailLimit.reset,
+        },
+      };
+    }
 
     // Attempt sign up
     const result = await auth.api.signUpEmail({
