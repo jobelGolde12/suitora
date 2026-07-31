@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { sqliteTable, text, integer, real, unique } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, unique, index } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
@@ -99,7 +99,10 @@ export const analyses = sqliteTable("analyses", {
   updatedAt: text("updated_at")
     .notNull()
     .default(sql`CURRENT_TIMESTAMP`),
-});
+}, (t) => [
+  index("analyses_user_id_idx").on(t.userId),
+  index("analyses_created_at_idx").on(t.createdAt),
+]);
 
 export const favorites = sqliteTable("favorites", {
   id: text("id").primaryKey(),
@@ -115,6 +118,7 @@ export const favorites = sqliteTable("favorites", {
     .default(sql`CURRENT_TIMESTAMP`),
 }, (t) => [
   unique("favorites_user_analysis_idx").on(t.userId, t.analysisId),
+  index("favorites_user_id_idx").on(t.userId),
 ]);
 
 export const products = sqliteTable("products", {
@@ -140,7 +144,9 @@ export const uploads = sqliteTable("uploads", {
   mimeType: text("mime_type"),
   sizeBytes: integer("size_bytes"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
-});
+}, (t) => [
+  index("uploads_user_id_idx").on(t.userId),
+]);
 
 export const settings = sqliteTable("settings", {
   id: text("id").primaryKey(),

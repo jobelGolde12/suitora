@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db, schema } from "@/drizzle";
 import { eq, and } from "drizzle-orm";
 import { nanoid } from "@/lib/utils/id";
+import { getFavoritesByUserId } from "@/lib/db/queries";
 
 export async function GET() {
   try {
@@ -15,16 +16,21 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userFavorites = await db
-      .select({
-        id: schema.favorites.id,
-        analysisId: schema.favorites.analysisId,
-        createdAt: schema.favorites.createdAt,
-      })
-      .from(schema.favorites)
-      .where(eq(schema.favorites.userId, session.user.id));
+    const favorites = await getFavoritesByUserId(session.user.id);
 
-    return NextResponse.json({ favorites: userFavorites });
+    const result = favorites.map(({ favorite, analysis }) => ({
+      id: favorite.id,
+      analysisId: favorite.analysisId,
+      createdAt: favorite.createdAt,
+      analysis: {
+        ...analysis,
+        recommendations: analysis.recommendations ? JSON.parse(analysis.recommendations) : [],
+        colorAnalysis: analysis.colorAnalysis ? JSON.parse(analysis.colorAnalysis) : null,
+        compatibilityMetadata: analysis.compatibilityMetadata ? JSON.parse(analysis.compatibilityMetadata) : null,
+      },
+    }));
+
+    return NextResponse.json({ favorites: result });
   } catch (err: any) {
     console.error("Error in GET /api/favorites:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

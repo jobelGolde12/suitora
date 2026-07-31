@@ -47,16 +47,16 @@ export default function FavoritesPage() {
 
   const fetchFavorites = async () => {
     try {
-      const res = await fetch("/api/analysis", {
+      const res = await fetch("/api/favorites", {
         credentials: "include",
       });
       if (res.ok) {
         const data = await res.json();
-        const allAnalyses = data.analyses || [];
-        // Filter to only favorited analyses
-        const favorited = (allAnalyses as FavoriteAnalysis[])
-          .filter((a) => a.isFavorite)
-          .map((a) => ({ ...a, category: extractCategory(a) }));
+        const favorited = (data.favorites || []).map((fav: any) => ({
+          ...fav.analysis,
+          isFavorite: true,
+          category: extractCategory(fav.analysis),
+        }));
         setFavorites(favorited);
       }
     } catch (err) {
