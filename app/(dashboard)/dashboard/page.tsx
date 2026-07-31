@@ -25,6 +25,7 @@ import {
   EmptyState,
   Sparkline,
   fadeInUp,
+  DashboardSkeleton,
 } from "@/components/dashboard";
 import { TrendingCollection } from "@/components/trending";
 import type { Analysis, DashboardStats } from "@/types";
@@ -78,14 +79,7 @@ export default function DashboardPage() {
   }, []);
 
   if (isLoading) {
-    return (
-      <PageContainer>
-        <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
-          <p className="text-sm text-muted font-light">Loading dashboard metrics...</p>
-        </div>
-      </PageContainer>
-    );
+    return <DashboardSkeleton />;
   }
 
   const activeStats = stats || {

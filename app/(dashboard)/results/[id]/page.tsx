@@ -26,6 +26,7 @@ import {
   PageHeader,
   ScoreBar,
   fadeInUp,
+  ResultsSkeleton,
 } from "@/components/dashboard";
 import { cn } from "@/lib/utils/cn";
 import type {
@@ -183,14 +184,7 @@ export default function ResultsPage() {
   };
 
   if (isLoading) {
-    return (
-      <PageContainer>
-        <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
-          <p className="text-sm text-muted font-light">Retrieving compatibility report...</p>
-        </div>
-      </PageContainer>
-    );
+    return <ResultsSkeleton />;
   }
 
   if (!result) {

@@ -8,3 +8,10 @@ export { EmptyState } from "./EmptyState";
 export { Sparkline } from "./Sparkline";
 export { ScoreBar } from "./ScoreBar";
 export { PageContainer } from "./PageContainer";
+export {
+  DashboardSkeleton,
+  HistorySkeleton,
+  FavoritesSkeleton,
+  ResultsSkeleton,
+  UploadSkeleton,
+} from "./Skeletons";

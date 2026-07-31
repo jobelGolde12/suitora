@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { PageContainer, PageHeader, fadeInUp } from "@/components/dashboard";
+import { PageContainer, PageHeader, fadeInUp, UploadSkeleton } from "@/components/dashboard";
 import { cn } from "@/lib/utils/cn";
 import { MAX_FILE_SIZE, ACCEPTED_IMAGE_TYPES } from "@/lib/utils/validation";
 import { uploadImage } from "@/lib/ai/upload";
@@ -179,14 +179,7 @@ export default function UploadPage() {
       : !!productUrl && !productUrlError);
 
   if (isLoadingSelfImage) {
-    return (
-      <PageContainer narrow>
-        <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
-          <p className="text-sm text-muted font-light">Loading profile details...</p>
-        </div>
-      </PageContainer>
-    );
+    return <UploadSkeleton />;
   }
 
   return (

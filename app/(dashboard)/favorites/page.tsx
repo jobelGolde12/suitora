@@ -13,6 +13,7 @@ import {
   PageHeader,
   EmptyState,
   fadeInUp,
+  FavoritesSkeleton,
 } from "@/components/dashboard";
 import { TrendingFilters } from "@/components/trending";
 import { cn } from "@/lib/utils/cn";
@@ -95,14 +96,7 @@ export default function FavoritesPage() {
   };
 
   if (isLoading) {
-    return (
-      <PageContainer>
-        <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
-          <p className="text-sm text-muted font-light">Loading favorites...</p>
-        </div>
-      </PageContainer>
-    );
+    return <FavoritesSkeleton />;
   }
 
   return (

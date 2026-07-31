@@ -21,6 +21,7 @@ import {
   PageHeader,
   EmptyState,
   fadeInUp,
+  HistorySkeleton,
 } from "@/components/dashboard";
 import { cn } from "@/lib/utils/cn";
 import { formatRelativeTime, formatScore, getScoreColor } from "@/lib/utils/format";
@@ -127,14 +128,7 @@ export default function HistoryPage() {
   };
 
   if (isLoading) {
-    return (
-      <PageContainer>
-        <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
-          <p className="text-sm text-muted font-light">Loading archive...</p>
-        </div>
-      </PageContainer>
-    );
+    return <HistorySkeleton />;
   }
 
   return (
