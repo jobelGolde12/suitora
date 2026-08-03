@@ -375,3 +375,14 @@ export async function createTrendSyncLog(data: {
   return log;
 }
 
+/** Most recent trend sync time, or null when no sync has ever run. */
+export async function getLastTrendSyncAt(): Promise<Date | null> {
+  const [row] = await db
+    .select({
+      lastSync: sql<number>`strftime('%s', MAX(${schema.trendSyncLogs.createdAt}))`,
+    })
+    .from(schema.trendSyncLogs);
+  if (row?.lastSync == null) return null;
+  return new Date(row.lastSync * 1000);
+}
+

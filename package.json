@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "sync:trend": "tsx --env-file=.env.local jobs/trend-sync.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.6.23",
@@ -39,6 +40,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "tailwindcss": "^4.3.2",
+    "tsx": "^4.23.0",
     "typescript": "^5",
     "vitest": "^4.1.10"
   }

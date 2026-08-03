@@ -3,7 +3,7 @@ import { listTrendItems } from "@/lib/db/queries";
 import { buildTrendCacheKey, getCached, setCached } from "@/lib/trend/cache";
 import { rowToTrendItem } from "@/lib/trend/normalize";
 import { getCurrentSeason, rankTrendItems } from "@/lib/trend/ranking";
-import { ensureTrendItemsSeeded } from "@/lib/trend/sync";
+import { ensureTrendItemsSeeded, maybeRefreshTrendItems } from "@/lib/trend/sync";
 import type { TrendItem } from "@/types/trend";
 
 /**
@@ -46,6 +46,9 @@ export async function GET(request: NextRequest) {
 
     // Seed curated items on first empty DB
     await ensureTrendItemsSeeded();
+
+    // Refresh from live providers in the background when data is stale
+    void maybeRefreshTrendItems();
 
     const rows = await listTrendItems({
       limit: Math.min(limit * 2, 48), // over-fetch slightly for ranking

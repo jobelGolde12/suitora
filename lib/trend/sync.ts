@@ -9,6 +9,7 @@
 import {
   countTrendItems,
   createTrendSyncLog,
+  getLastTrendSyncAt,
   upsertTrendItem,
 } from "@/lib/db/queries";
 import { invalidateTrendCache } from "./cache";
@@ -141,5 +142,38 @@ export async function ensureTrendItemsSeeded(): Promise<void> {
   } catch (err) {
     // Table may not exist yet — log and continue with empty list
     console.error("ensureTrendItemsSeeded failed:", err);
+  }
+}
+
+let refreshInFlight: Promise<void> | null = null;
+
+/**
+ * Kick off a live provider refresh when the cached trend data is stale.
+ * Fire-and-forget: the current request is served from the DB while the
+ * sync runs in the background, so the next request sees fresh items.
+ * Guards against concurrent syncs (in-memory lock).
+ */
+export async function maybeRefreshTrendItems(
+  maxAgeMs = 6 * 60 * 60 * 1000 // 6 hours
+): Promise<boolean> {
+  try {
+    const lastSync = await getLastTrendSyncAt();
+    if (lastSync && Date.now() - lastSync.getTime() < maxAgeMs) {
+      return false;
+    }
+    if (refreshInFlight) {
+      return true;
+    }
+    refreshInFlight = syncTrendItems()
+      .catch((err) =>
+        console.error("[trend] background refresh failed:", err)
+      )
+      .then(() => {
+        refreshInFlight = null;
+      });
+    return true;
+  } catch (err) {
+    console.error("maybeRefreshTrendItems failed:", err);
+    return false;
   }
 }

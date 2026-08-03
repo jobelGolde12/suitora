@@ -68,7 +68,7 @@ const nextConfig: NextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' https://images.unsplash.com https://res.cloudinary.com https://*.myshopify.com https://images.asos-media.com https://via.placeholder.com https://go.skimresources.com data: blob:",
+              "img-src 'self' https://images.unsplash.com https://res.cloudinary.com https://cdn.shopify.com https://*.myshopify.com https://images.asos-media.com https://via.placeholder.com https://go.skimresources.com data: blob:",
               "connect-src 'self' https://api.openai.com https://*.upstash.io",
               "font-src 'self'",
               "frame-ancestors 'none'",
