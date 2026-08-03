@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
-  Sparkles,
   Heart,
   Download,
   Share2,
@@ -15,6 +14,7 @@ import {
   User as UserIcon,
   Star,
   AlertCircle,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
@@ -83,9 +83,12 @@ export default function ResultsPage() {
   const [isFavorited, setIsFavorited] = useState(false);
   const [selectedView, setSelectedView] = useState<"tryon" | "original">("tryon");
 
-  // Fetch results and check if favorited
+  // Fetch results, check favorites, and poll while the virtual try-on is
+  // still generating so the preview appears as soon as it completes.
   useEffect(() => {
     if (!id) return;
+
+    let intervalId: ReturnType<typeof setInterval> | null = null;
 
     async function loadData() {
       try {
@@ -95,7 +98,7 @@ export default function ResultsPage() {
           throw new Error("Failed to load analysis");
         }
         const data = await res.json();
-        
+
         if (data.error) {
           addToast(data.error, "error");
           router.push("/upload");
@@ -104,7 +107,16 @@ export default function ResultsPage() {
 
         setResult(data.analysis);
 
-        // 2. Get favorites to see if this one is favorited
+        // 2. Start/stop polling based on the try-on state.
+        const status = data.analysis?.tryOnStatus;
+        if (status === "processing") {
+          if (!intervalId) intervalId = setInterval(loadData, 3000);
+        } else if (intervalId) {
+          clearInterval(intervalId);
+          intervalId = null;
+        }
+
+        // 3. Get favorites to see if this one is favorited
         const favsRes = await fetch("/api/favorites", {
           credentials: "include",
         });
@@ -122,6 +134,10 @@ export default function ResultsPage() {
     }
 
     loadData();
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [id, addToast, router]);
 
   const handleFavorite = async () => {
@@ -162,7 +178,10 @@ export default function ResultsPage() {
 
   const handleDownload = () => {
     if (!result) return;
-    const imageUrl = selectedView === "tryon" ? result.generatedImage : result.productImage;
+    const imageUrl =
+      selectedView === "tryon" && result.generatedImage
+        ? result.generatedImage
+        : result.productImage;
     if (!imageUrl) return;
 
     // Direct download trigger for data URL or standard image
@@ -200,6 +219,9 @@ export default function ResultsPage() {
       </PageContainer>
     );
   }
+
+  const tryOnAvailable = !!result.generatedImage;
+  const tryOnGenerating = result.tryOnStatus === "processing";
 
   return (
     <PageContainer>
@@ -255,25 +277,39 @@ export default function ResultsPage() {
             custom={1}
           >
             <div className="flex items-center gap-2 mb-4">
-              {(["tryon", "original"] as const).map((view) => (
-                <button
-                  key={view}
-                  type="button"
-                  onClick={() => setSelectedView(view)}
-                  className={cn(
-                    "px-3.5 py-1.5 text-xs font-medium rounded-full transition-all duration-200",
-                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    selectedView === view
-                      ? "bg-foreground text-background"
-                      : "bg-surface text-muted hover:text-foreground border border-border"
-                  )}
-                >
-                  {view === "tryon" ? "Virtual Try-On" : "Original Item"}
-                </button>
-              ))}
+              {tryOnAvailable ? (
+                (["tryon", "original"] as const).map((view) => (
+                  <button
+                    key={view}
+                    type="button"
+                    onClick={() => setSelectedView(view)}
+                    className={cn(
+                      "px-3.5 py-1.5 text-xs font-medium rounded-full transition-all duration-200",
+                      "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      selectedView === view
+                        ? "bg-foreground text-background"
+                        : "bg-surface text-muted hover:text-foreground border border-border"
+                    )}
+                  >
+                    {view === "tryon" ? "Virtual Try-On" : "Original Item"}
+                  </button>
+                ))
+              ) : (
+                tryOnGenerating && (
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium rounded-full bg-surface border border-border text-muted">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
+                    Generating your try-on…
+                  </div>
+                )
+              )}
             </div>
             <div className="rounded-2xl border border-border bg-card overflow-hidden aspect-[4/5] relative shadow-card">
-              {selectedView === "tryon" && result.generatedImage ? (
+              {tryOnGenerating ? (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-surface">
+                  <Loader2 className="h-6 w-6 text-accent animate-spin" strokeWidth={1.5} />
+                  <p className="text-sm text-muted font-light">Generating preview…</p>
+                </div>
+              ) : selectedView === "tryon" && result.generatedImage ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={result.generatedImage}

@@ -14,7 +14,6 @@ import {
   stagger,
   revealViewport,
   cardHover,
-  easeOut,
 } from "./motion";
 
 const features = [
@@ -52,7 +51,7 @@ const features = [
 
 export function Features() {
   return (
-    <section id="features" className="relative py-32 sm:py-40 px-6">
+    <section id="features" className="relative py-32 sm:py-40 px-6 scroll-mt-20">
       <div className="mx-auto max-w-6xl">
         <motion.div
           initial="hidden"
@@ -98,8 +97,15 @@ export function Features() {
                 transition={cardHover.transition}
                 className="group relative rounded-2xl border border-border/60 bg-card p-8 transition-all duration-500 hover:shadow-elevated hover:border-accent/30 hover:bg-surface/30"
               >
-                <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-full border border-border transition-colors duration-300 group-hover:bg-accent/10 group-hover:border-accent/20">
-                  <Icon className="h-5 w-5 text-accent" strokeWidth={1.5} />
+                {/* Subtle top accent line on hover (first card) */}
+                {i === 0 && (
+                  <span
+                    aria-hidden
+                    className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-accent/60 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                  />
+                )}
+                <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-full border border-border transition-all duration-300 group-hover:bg-accent/10 group-hover:border-accent/20">
+                  <Icon className="h-5 w-5 text-accent transition-transform duration-300 group-hover:scale-110" strokeWidth={1.5} />
                 </div>
                 <h3 className="font-heading text-xl font-medium mb-3">{feature.title}</h3>
                 <p className="text-sm text-muted leading-relaxed font-light">{feature.description}</p>

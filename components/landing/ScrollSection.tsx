@@ -8,7 +8,10 @@ export function ScrollSection() {
       {/* Top fade for smooth transition from HowItWorks */}
       <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-b from-surface/40 to-transparent pointer-events-none z-10" />
 
-      <ScrollFlyIn>
+      <ScrollFlyIn
+        image="/images/landing/women_happy_with_her_dress.webp"
+        imageAlt="Woman in a dress, visualized through Suitora's virtual try-on"
+      >
         <div className="max-w-3xl mx-auto px-4 text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent mb-4">
             See It Before You Buy It

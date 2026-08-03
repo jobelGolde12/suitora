@@ -1,16 +1,34 @@
 "use client";
 
 import * as React from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
+import Image from "next/image";
+import {
+  motion,
+  useReducedMotion,
+  useScroll,
+  useTransform,
+} from "framer-motion";
 import { cn } from "@/lib/utils/cn";
 
 interface ScrollFlyInProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
+  image?: string;
+  imageAlt?: string;
 }
 
 const STAR_COUNT = 25;
 
-function generateStars() {
+interface Star {
+  id: number;
+  y: number;
+  delay: number;
+  duration: number;
+  repeatDelay: number;
+  size: number;
+  opacity: number;
+}
+
+function generateStars(): Star[] {
   return Array.from({ length: STAR_COUNT }, (_, i) => ({
     id: i,
     y: Math.random() * 100,
@@ -96,14 +114,23 @@ function ShootingStar({
 function ScrollFlyIn({
   children,
   className,
+  image,
+  imageAlt,
   ...props
 }: ScrollFlyInProps) {
-  const [stars, setStars] = React.useState<ReturnType<typeof generateStars>>([]);
+  const reduceMotion = useReducedMotion();
+  // Generate the random star field only on the client, after hydration.
+  // Rendering Math.random()-derived values during SSR (or in the useState
+  // initializer, which also runs on the server) causes hydration mismatches.
+  const [stars, setStars] = React.useState<Star[]>([]);
   const sectionRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
-    setStars(generateStars());
-  }, []);
+    if (reduceMotion) return;
+    // Schedule after paint so the star field appears once hydration is done.
+    const raf = requestAnimationFrame(() => setStars(generateStars()));
+    return () => cancelAnimationFrame(raf);
+  }, [reduceMotion]);
 
   const { scrollYProgress } = useScroll({
     target: sectionRef,
@@ -122,16 +149,43 @@ function ScrollFlyIn({
       )}
       {...props}
     >
-      {/* Shooting Stars Layer */}
-      <div className="absolute inset-0 z-0">
-        {stars.map((star) => (
-          <ShootingStar key={star.id} {...star} />
-        ))}
-      </div>
+      {/* Warm editorial image layer */}
+      {image && (
+        <>
+          <div className="absolute inset-0 z-0">
+            <Image
+              src={image}
+              alt={imageAlt ?? ""}
+              fill
+              sizes="100vw"
+              className="object-cover object-center opacity-40"
+              unoptimized
+            />
+          </div>
+          <div aria-hidden className="absolute inset-0 z-0 bg-background/60" />
+          <div
+            aria-hidden
+            className="absolute inset-0 z-0 bg-gradient-to-b from-background/50 via-transparent to-background/50"
+          />
+        </>
+      )}
+
+      {/* Shooting Stars Layer — hidden when the user prefers reduced motion */}
+      {!reduceMotion && stars.length > 0 && (
+        <div className="absolute inset-0 z-[1]">
+          {stars.map((star) => (
+            <ShootingStar key={star.id} {...star} />
+          ))}
+        </div>
+      )}
 
       {/* Animated Text Content */}
       <motion.div
-        style={{ opacity: contentOpacity, y: contentY }}
+        style={
+          reduceMotion
+            ? { opacity: 1 }
+            : { opacity: contentOpacity, y: contentY }
+        }
         className="relative z-10 flex h-full items-center justify-center px-4"
       >
         <div className="text-center">{children}</div>

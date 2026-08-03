@@ -180,6 +180,16 @@ Make analyses and favorites fully database-backed so every subsequent feature ha
 
 ## Future / Longer-Term
 
+### AI Virtual Try-On Engine (Generative)
+
+Real, Fotor-style Latent Diffusion try-on (replaces the current mock in `lib/ai/tryon.ts`).
+
+- **Design source:** `docs/virtual_tryon_engine_plan.md`
+- Backend: RunPod GPU worker behind a provider-agnostic `lib/ai/tryon/` service; `analyses.generatedImage` column already exists
+- ⚠️ License gate: IDM-VTON / CatVTON are non-commercial — production path (commercial license / permissive fine-tune / SaaS VTON API) must be chosen before Phase 1
+
+---
+
 | Feature | Notes | Suggested Starting Point |
 |---------|-------|--------------------------|
 | Mobile app (React Native) | Share API + auth; reuse design tokens where possible | After Phase 2 solid |

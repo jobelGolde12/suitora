@@ -206,6 +206,13 @@ function AnalysisPageContent() {
                 );
               })}
             </div>
+
+            {progress.stage === "try-on" && (
+              <p className="text-xs text-muted mt-4 font-light leading-relaxed">
+                Virtual try-on can take up to a minute to generate — this
+                does not delay your compatibility scores.
+              </p>
+            )}
           </motion.div>
         )}
       </div>

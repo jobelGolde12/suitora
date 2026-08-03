@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import {
   BarChart3,
   Clock,
@@ -23,8 +22,6 @@ import {
   QuickActionCard,
   AnalysisListItem,
   EmptyState,
-  Sparkline,
-  fadeInUp,
   DashboardSkeleton,
 } from "@/components/dashboard";
 import { TrendingCollection } from "@/components/trending";
@@ -96,7 +93,7 @@ export default function DashboardPage() {
       <PageHeader
         label="Overview"
         title="Welcome back"
-        description="Your fashion compatibility overview — calm metrics, recent fits, and a clear next step."
+        description="Your fashion compatibility at a glance — start a new analysis or revisit your recent results."
         action={
           <Link href="/upload">
             <Button variant="editorial" className="rounded-full px-6">
@@ -107,130 +104,30 @@ export default function DashboardPage() {
         }
       />
 
-      <motion.section
-        initial="hidden"
-        animate="visible"
-        variants={fadeInUp}
-        custom={1}
-        className="mb-12 grid gap-6 xl:grid-cols-[1.4fr_0.85fr]"
-      >
-        <div className="relative overflow-hidden rounded-[2rem] border border-border bg-card p-8 shadow-card">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-accent/20 via-transparent to-transparent" />
-          <div className="relative">
-            <span className="editorial-label">Style snapshot</span>
-            <h2 className="font-heading text-3xl sm:text-4xl font-light tracking-tight text-balance mt-3">
-              The calm dashboard for confident fashion choices.
-            </h2>
-            <p className="mt-4 text-sm text-muted font-light max-w-2xl leading-relaxed">
-              Track your compatibility trends, revisit your best results, and begin your next analysis with clarity.
-            </p>
-          </div>
-
-          <div className="mt-10 grid gap-4 sm:grid-cols-2">
-            <div className="rounded-3xl border border-border bg-surface p-6">
-              <p className="text-xs text-muted uppercase tracking-[0.3em] mb-3">Average score</p>
-              <p className="font-heading text-5xl font-light tracking-tight tabular-nums">{activeStats.averageScore}%</p>
-              <p className="mt-3 text-sm text-muted font-light leading-relaxed">
-                The average compatibility rating from your recent analyses.
-              </p>
-            </div>
-            <div className="rounded-3xl border border-border bg-surface p-6">
-              <p className="text-xs text-muted uppercase tracking-[0.3em] mb-3">Favorites</p>
-              <p className="font-heading text-5xl font-light tracking-tight tabular-nums">{activeStats.favoriteCount}</p>
-              <p className="mt-3 text-sm text-muted font-light leading-relaxed">
-                Items you marked as the most flattering and worth saving.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={fadeInUp}
-          custom={2}
-          className="rounded-[2rem] border border-border bg-card p-8 shadow-card"
-        >
-          <span className="editorial-label">Next step</span>
-          <h3 className="font-heading text-2xl font-light tracking-tight mt-3">
-            Start your next analysis
-          </h3>
-          <p className="mt-4 text-sm text-muted font-light leading-relaxed">
-            Upload a new photo and clothing item, then let Suitora evaluate fit, color, and style in moments.
-          </p>
-          <Link href="/upload">
-            <Button variant="editorial" className="mt-8 rounded-full px-6">
-              <Plus className="h-4 w-4" strokeWidth={1.5} />
-              Start analysis
-            </Button>
-          </Link>
-        </motion.div>
-      </motion.section>
-
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-12">
         <MetricCard
           icon={BarChart3}
           label="Total Analyses"
           value={activeStats.totalAnalyses}
-          delay={3}
           sparklineData={activeScoreTrend}
         />
         <MetricCard
           icon={TrendingUp}
           label="Avg. Score"
           value={`${activeStats.averageScore}%`}
-          delay={4}
           sparklineData={activeScoreTrend}
         />
         <MetricCard
           icon={Heart}
           label="Favorites"
           value={activeStats.favoriteCount}
-          delay={5}
         />
         <MetricCard
           icon={Clock}
           label="This Week"
           value={activeStats.recentActivity}
-          delay={6}
         />
       </div>
-
-      <motion.section
-        initial="hidden"
-        animate="visible"
-        variants={fadeInUp}
-        custom={7}
-        className="mb-12"
-      >
-        <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-2xl border border-border bg-card p-6 sm:p-8 shadow-card">
-            <SectionTitle title="Score trend" />
-            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6">
-              <div>
-                <p className="editorial-label mb-2">Compatibility</p>
-                <p className="font-heading text-4xl font-light tracking-tight tabular-nums">
-                  {activeStats.averageScore}%
-                </p>
-                <p className="text-sm text-muted font-light mt-2 max-w-sm leading-relaxed">
-                  Average fit score across your recent analyses — higher is a stronger match.
-                </p>
-              </div>
-              <div className="w-full sm:w-64 h-16 text-accent">
-                <Sparkline data={activeScoreTrend} className="w-full h-full" />
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-border bg-surface p-6 shadow-card">
-            <p className="text-xs text-muted uppercase tracking-[0.3em] mb-3">What this means</p>
-            <p className="font-medium text-lg">Your dashboard is tuned to your most recent style decisions.</p>
-            <p className="mt-4 text-sm text-muted font-light leading-relaxed">
-              Use these signals to compare new outfits, confirm your best matches, and keep your wardrobe aligned with your personal style.
-            </p>
-          </div>
-        </div>
-      </motion.section>
 
       <section className="mb-12">
         <SectionTitle title="Quick actions" />
@@ -240,33 +137,29 @@ export default function DashboardPage() {
             icon={Camera}
             title="Upload Photo"
             description="Start a new analysis"
-            delay={8}
           />
           <QuickActionCard
             href="/trending"
             icon={Sparkles}
             title="Trending"
             description="Explore fashion picks"
-            delay={9}
           />
           <QuickActionCard
             href="/history"
             icon={History}
             title="View History"
             description="Browse past analyses"
-            delay={10}
           />
           <QuickActionCard
             href="/settings"
             icon={Settings}
             title="Settings"
             description="Manage your account"
-            delay={11}
           />
         </div>
       </section>
 
-      <section>
+      <section className="mb-12">
         <SectionTitle title="Recent analyses" href="/history" />
 
         {recentAnalyses.length === 0 ? (
@@ -285,14 +178,13 @@ export default function DashboardPage() {
           />
         ) : (
           <div className="space-y-3">
-            {recentAnalyses.map((analysis, i) => (
+            {recentAnalyses.map((analysis) => (
               <AnalysisListItem
                 key={analysis.id}
                 id={analysis.id}
                 overallScore={analysis.overallScore}
                 createdAt={analysis.createdAt}
                 isFavorite={analysis.isFavorite}
-                delay={11 + i}
               />
             ))}
           </div>

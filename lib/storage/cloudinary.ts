@@ -67,6 +67,42 @@ export async function deleteFromCloudinary(publicId: string): Promise<void> {
 }
 
 /**
+ * Extract the Cloudinary public id from a delivery URL, or null if the URL
+ * is not a Cloudinary image. Handles `/image/upload/v{version}/...` and
+ * transformation segments.
+ */
+export function extractCloudinaryPublicId(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (!parsed.hostname.endsWith("cloudinary.com")) return null;
+    const match = parsed.pathname.match(/\/image\/upload\/(?:v\d+\/)?(.+)$/);
+    if (!match) return null;
+    return match[1].replace(/\.[a-zA-Z0-9]+$/, "");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Delete a Cloudinary asset by its delivery URL. No-ops for non-Cloudinary
+ * URLs so callers never have to branch on provider.
+ */
+export async function deleteCloudinaryImageFromUrl(
+  url: string | null | undefined
+): Promise<boolean> {
+  if (!url) return false;
+  const publicId = extractCloudinaryPublicId(url);
+  if (!publicId) return false;
+  try {
+    await deleteFromCloudinary(publicId);
+    return true;
+  } catch (err) {
+    console.error("[cloudinary] delete failed:", err);
+    return false;
+  }
+}
+
+/**
  * Generate a Cloudinary URL with transformations.
  */
 export function getCloudinaryUrl(

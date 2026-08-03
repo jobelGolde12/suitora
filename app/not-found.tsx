@@ -13,7 +13,7 @@ export default function NotFound() {
               alt="Suitora"
               width={64}
               height={64}
-              className="object-cover"
+              className="object-cover shrink-0"
               unoptimized
             />
           </div>

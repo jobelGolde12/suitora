@@ -9,8 +9,13 @@ import { fadeInUp, stagger, revealViewport } from "./motion";
 
 export function CTA() {
   return (
-    <section className="relative py-14 sm:py-18 lg:py-20 px-6 bg-surface/40">
-      <div className="mx-auto max-w-7xl">
+    <section className="relative overflow-hidden py-14 sm:py-18 lg:py-20 px-6 bg-surface/40">
+      {/* Extremely soft radial accent */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(197,160,122,0.09),transparent_55%)]"
+      />
+      <div className="relative mx-auto max-w-7xl">
         <motion.div
           initial="hidden"
           whileInView="visible"

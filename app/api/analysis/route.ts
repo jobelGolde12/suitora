@@ -7,6 +7,8 @@ import { nanoid } from "@/lib/utils/id";
 import { extractProductFromUrl } from "@/lib/ai/product-extraction";
 import { analyzeWithVision } from "@/lib/ai/vision";
 import "@/lib/ai/providers"; // Auto-initialize vision providers
+import { syncTryOnLifecycle } from "@/lib/ai/tryon/lifecycle";
+import { mapCategoryToTryOn } from "@/lib/ai/tryon";
 
 export async function POST(req: Request) {
   try {
@@ -19,7 +21,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { productUrl, productImageUpload, userImageUrl } = body;
+    const { productUrl, productImageUpload, userImageUrl, category } = body;
 
     // Fetch user's self image if not provided
     let finalUserImage = userImageUrl;
@@ -68,8 +70,8 @@ export async function POST(req: Request) {
           .from(schema.products)
           .where(eq(schema.products.sourceUrl, productUrl));
         productId = existing?.id || prodId;
-      } catch (err: any) {
-        return NextResponse.json({ error: `URL extraction failed: ${err.message}` }, { status: 400 });
+      } catch (err) {
+        return NextResponse.json({ error: `URL extraction failed: ${errorMessage(err)}` }, { status: 400 });
       }
     }
 
@@ -87,13 +89,15 @@ export async function POST(req: Request) {
       userImage: finalUserImage,
       productImage: finalProductImage,
       status: "pending",
+      tryOnStatus: "pending",
+      tryOnCategory: mapCategoryToTryOn(category),
       overallScore: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
 
     return NextResponse.json({ success: true, analysisId });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Error in POST /api/analysis:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
@@ -135,31 +139,51 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Analysis not found" }, { status: 404 });
     }
 
+    // Advance the virtual try-on lifecycle (lazy submit / resolve).
+    await syncTryOnLifecycle(analysis);
+
+    // Re-fetch to reflect any try-on state change.
+    const [current] = await db
+      .select()
+      .from(schema.analyses)
+      .where(eq(schema.analyses.id, id));
+
+    if (!current) {
+      return NextResponse.json({ error: "Analysis not found" }, { status: 404 });
+    }
+
     // If analysis is already completed or failed, return it
-    if (analysis.status === "completed" || analysis.status === "failed") {
+    if (current.status === "completed" || current.status === "failed") {
       return NextResponse.json({
         analysis: {
-          ...analysis,
-          recommendations: analysis.recommendations ? JSON.parse(analysis.recommendations) : [],
-          colorAnalysis: analysis.colorAnalysis ? JSON.parse(analysis.colorAnalysis) : null,
-          compatibilityMetadata: analysis.compatibilityMetadata ? JSON.parse(analysis.compatibilityMetadata) : null,
+          ...current,
+          recommendations: current.recommendations ? JSON.parse(current.recommendations) : [],
+          colorAnalysis: current.colorAnalysis ? JSON.parse(current.colorAnalysis) : null,
+          compatibilityMetadata: current.compatibilityMetadata ? JSON.parse(current.compatibilityMetadata) : null,
         }
       });
     }
 
     // Simulate pipeline stages based on time elapsed since creation
-    const elapsedMs = Date.now() - new Date(analysis.createdAt).getTime();
+    const elapsedMs = Date.now() - new Date(current.createdAt).getTime();
 
     let stage: "detecting" | "analyzing" | "try-on" | "scoring" | "complete" = "detecting";
     let progress = 10;
     let message = "Detecting person in image...";
 
+    // Prefer the real try-on stage while a job is in flight
+    if (current.tryOnStatus === "processing") {
+      stage = "try-on";
+      progress = 60;
+      message = "Generating virtual try-on...";
+    }
+
     if (elapsedMs > 6000) {
       // Pipeline complete — run real analysis
       try {
         const visionResult = await analyzeWithVision({
-          userImageUrl: analysis.userImage,
-          clothingImageUrl: analysis.productImage,
+          userImageUrl: current.userImage,
+          clothingImageUrl: current.productImage,
         });
 
         const recommendations = visionResult.recommendations;
@@ -217,7 +241,7 @@ export async function GET(req: Request) {
           stage: "complete",
           message: "Analysis complete!"
         });
-      } catch (err: any) {
+      } catch (err) {
         console.error("Vision analysis failed:", err);
 
         // Mark as failed
@@ -230,8 +254,8 @@ export async function GET(req: Request) {
           .where(eq(schema.analyses.id, id));
 
         return NextResponse.json({
-          analysis: { ...analysis, status: "failed" },
-          error: `Analysis pipeline failed: ${err.message}`,
+          analysis: { ...current, status: "failed" },
+          error: `Analysis pipeline failed: ${errorMessage(err)}`,
         });
       }
     } else if (elapsedMs > 4500) {
@@ -249,12 +273,12 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json({
-      analysis,
+      analysis: current,
       progress,
       stage,
       message,
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Error in GET /api/analysis:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
@@ -277,13 +301,24 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Analysis ID is required" }, { status: 400 });
     }
 
-    // Verify ownership and delete
-    await db
-      .delete(schema.analyses)
+    // Load the row (ownership-scoped) so we can clean up generated assets.
+    const [analysis] = await db
+      .select()
+      .from(schema.analyses)
       .where(and(eq(schema.analyses.id, id), eq(schema.analyses.userId, session.user.id)));
 
+    if (!analysis) {
+      return NextResponse.json({ error: "Analysis not found" }, { status: 404 });
+    }
+
+    // Best-effort cleanup of the generated try-on image (owned by us in
+    // Cloudinary). Never blocks the delete on storage failures.
+    await deleteCloudinaryImageFromUrl(analysis.generatedImage);
+
+    await db.delete(schema.analyses).where(eq(schema.analyses.id, id));
+
     return NextResponse.json({ success: true });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Error in DELETE /api/analysis:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
@@ -291,3 +326,8 @@ export async function DELETE(req: Request) {
 
 // Re-import these from queries to avoid circular dependency
 import { getAnalysesByUserId, getFavoritesByUserId } from "@/lib/db/queries";
+import { deleteCloudinaryImageFromUrl } from "@/lib/storage/cloudinary";
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}

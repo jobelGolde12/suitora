@@ -38,7 +38,7 @@ function BrandMark({ collapsed }: { collapsed?: boolean }) {
           alt="Suitora"
           width={32}
           height={32}
-          className="object-cover"
+          className="object-cover shrink-0"
           unoptimized
         />
       </div>

@@ -10,7 +10,7 @@ export default function Loading() {
             alt="Suitora"
             width={48}
             height={48}
-            className="object-cover animate-pulse"
+            className="object-cover animate-pulse shrink-0"
             unoptimized
           />
         </div>

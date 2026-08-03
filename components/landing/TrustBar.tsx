@@ -14,7 +14,7 @@ const categories = [
 
 export function TrustBar() {
   return (
-    <section className="relative py-12 px-6 border-y border-border/40">
+    <section className="relative py-12 px-6 sm:px-8 border-y border-border/40">
       <div className="mx-auto max-w-5xl">
         <motion.div
           initial="hidden"
@@ -31,12 +31,12 @@ export function TrustBar() {
           </motion.p>
           <motion.div
             variants={fadeInUp}
-            className="flex flex-wrap items-center justify-center gap-3"
+            className="flex flex-wrap items-center justify-center gap-2 sm:gap-3"
           >
             {categories.map((cat) => (
               <span
                 key={cat}
-                className="px-4 py-2 text-xs font-light text-muted border border-border/60 rounded-full bg-card/50 transition-colors hover:border-accent/30 hover:text-foreground"
+                className="px-4 py-2 text-xs font-light text-muted border border-border/60 rounded-full bg-card/50 transition-all duration-300 hover:-translate-y-0.5 hover:border-accent/30 hover:text-foreground"
               >
                 {cat}
               </span>

@@ -19,7 +19,7 @@ export default function AuthLayout({
                 alt="Suitora"
                 width={40}
                 height={40}
-                className="object-cover"
+                className="object-cover shrink-0"
                 unoptimized
               />
             </div>
@@ -70,7 +70,7 @@ export default function AuthLayout({
                 alt="Suitora"
                 width={32}
                 height={32}
-                className="object-cover"
+                className="object-cover shrink-0"
                 unoptimized
               />
             </div>

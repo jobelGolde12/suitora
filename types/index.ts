@@ -14,6 +14,12 @@ export interface Analysis {
   userImage: string;
   productImage: string;
   generatedImage?: string;
+  tryOnStatus?: "pending" | "processing" | "completed" | "failed" | "skipped";
+  tryOnCategory?: string;
+  tryOnJobId?: string;
+  tryOnProvider?: string;
+  tryOnError?: string;
+  tryOnLatencyMs?: number;
   overallScore: number;
   bodyScore?: number;
   styleScore?: number;
