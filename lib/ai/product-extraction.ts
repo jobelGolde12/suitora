@@ -4,13 +4,45 @@
  * using Open Graph tags, JSON-LD structured data, and meta tags.
  */
 
+import { getCached, setCached } from "@/lib/trend/cache";
+
 export interface ExtractedProduct {
   title: string;
   brand: string;
   priceCents: number;
   currency: string;
   imageUrl: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
+}
+
+// In-memory cache so the same URL isn't scraped on every analysis request.
+const PRODUCT_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+export async function extractProductFromUrlCached(
+  productUrl: string
+): Promise<ExtractedProduct> {
+  const cacheKey = `product:url:${encodeURIComponent(productUrl)}`;
+  const cached = getCached<ExtractedProduct>(cacheKey);
+  if (cached) return cached;
+
+  const extracted = await extractProductFromUrl(productUrl);
+  if (extracted.imageUrl !== "/placeholder.svg") {
+    setCached(cacheKey, extracted, PRODUCT_CACHE_TTL_MS);
+  }
+  return extracted;
+}
+
+interface JsonLdProduct {
+  "@type"?: string | string[];
+  name?: string;
+  brand?: { name?: string } | string;
+  image?: string | string[] | { url?: string };
+  offers?:
+    | { price?: string; priceCurrency?: string }
+    | { price?: string; priceCurrency?: string }[];
+  color?: string | string[];
+  size?: string | string[];
+  description?: string;
 }
 
 const FETCH_TIMEOUT = 10_000;
@@ -22,21 +54,17 @@ function extractMetaContent(html: string, pattern: RegExp): string | null {
   return match?.[1]?.trim() || null;
 }
 
-function extractJsonLd(html: string): Record<string, any> | null {
+function extractJsonLd(html: string): JsonLdProduct | null {
   const scriptRegex = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
   let match;
   while ((match = scriptRegex.exec(html)) !== null) {
     try {
-      const data = JSON.parse(match[1]);
-      if (data["@type"] === "Product" || data["@type"] === "IndividualProduct") {
-        return data;
-      }
-      if (Array.isArray(data)) {
-        const product = data.find(
-          (item: any) => item["@type"] === "Product" || item["@type"] === "IndividualProduct"
-        );
-        if (product) return product;
-      }
+      const data = JSON.parse(match[1]) as JsonLdProduct | JsonLdProduct[];
+      const products = Array.isArray(data) ? data : [data];
+      const product = products.find(
+        (item) => item["@type"] === "Product" || item["@type"] === "IndividualProduct"
+      );
+      if (product) return product;
     } catch {
       // Skip invalid JSON-LD
     }
@@ -127,11 +155,13 @@ export async function extractProductFromUrl(productUrl: string): Promise<Extract
     }
 
     html = await response.text();
-  } catch (err: any) {
-    if (err.name === "AbortError") {
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
       throw new Error("Request timed out. The website may be slow or unavailable.");
     }
-    throw new Error(`Failed to fetch product page: ${err.message}`);
+    throw new Error(
+      `Failed to fetch product page: ${err instanceof Error ? err.message : String(err)}`
+    );
   }
 
   // Extract from multiple sources, prefer higher quality data
@@ -142,8 +172,10 @@ export async function extractProductFromUrl(productUrl: string): Promise<Extract
 
   // Parse brand
   let brand = "Unknown Brand";
-  if (jsonLd?.brand?.name) {
-    brand = jsonLd.brand.name;
+  const jsonLdBrand =
+    typeof jsonLd?.brand === "string" ? jsonLd.brand : jsonLd?.brand?.name;
+  if (jsonLdBrand) {
+    brand = jsonLdBrand;
   } else if (ogTags.brand) {
     brand = ogTags.brand;
   } else {

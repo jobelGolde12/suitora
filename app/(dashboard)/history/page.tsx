@@ -25,35 +25,25 @@ import {
 } from "@/components/dashboard";
 import { cn } from "@/lib/utils/cn";
 import { formatRelativeTime, formatScore, getScoreColor } from "@/lib/utils/format";
-import type { Analysis } from "@/types";
+import type { AnalysisResult } from "@/types";
 
 export default function HistoryPage() {
   const { addToast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"newest" | "highest" | "lowest">("newest");
-  const [analyses, setAnalyses] = useState<(Analysis & { isFavorite: boolean })[]>([]);
+  const [analyses, setAnalyses] = useState<(AnalysisResult & { isFavorite: boolean })[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchHistory = async () => {
-    try {
-      const res = await fetch("/api/analysis", {
-        credentials: "include",
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setAnalyses(data.analyses || []);
-      }
-    } catch (err) {
-      console.error("Failed to load analysis history:", err);
-      addToast("Failed to load analysis history", "error");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchHistory();
-  }, []);
+    fetch("/api/analysis", { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setAnalyses((data?.analyses ?? []) as (AnalysisResult & { isFavorite: boolean })[]))
+      .catch((err) => {
+        console.error("Failed to load analysis history:", err);
+        addToast("Failed to load analysis history", "error");
+      })
+      .finally(() => setIsLoading(false));
+  }, [addToast]);
 
   const filtered = analyses
     .filter(

@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { ScoreCircle } from "@/components/ui/ScoreCircle";
+import { SimilarItems } from "@/components/trending/SimilarItems";
 import { useToast } from "@/components/ui/Toast";
 import {
   PageContainer,
@@ -30,11 +31,22 @@ import {
 } from "@/components/dashboard";
 import { cn } from "@/lib/utils/cn";
 import type {
+  AnalysisResult,
   BodyShape,
   SkinTone,
   FaceShape,
   StyleType,
+  FavoriteItem,
+  UserProfile,
+  FitPreference,
 } from "@/types";
+
+const FIT_OPTIONS: { value: FitPreference; label: string }[] = [
+  { value: "tight", label: "Tight" },
+  { value: "regular", label: "Regular" },
+  { value: "relaxed", label: "Relaxed" },
+  { value: "oversized", label: "Oversized" },
+];
 
 const bodyShapeLabels: Record<BodyShape, string> = {
   rectangle: "Rectangle",
@@ -79,9 +91,19 @@ export default function ResultsPage() {
   const { addToast } = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isFavorited, setIsFavorited] = useState(false);
   const [selectedView, setSelectedView] = useState<"tryon" | "original">("tryon");
+
+  // Fetch the user's saved profile so manual measurements take precedence
+  // over the AI estimates from this analysis.
+  useEffect(() => {
+    fetch("/api/user/profile", { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setProfile(data?.profile ?? null))
+      .catch(() => setProfile(null));
+  }, []);
 
   // Fetch results, check favorites, and poll while the virtual try-on is
   // still generating so the preview appears as soon as it completes.
@@ -122,7 +144,7 @@ export default function ResultsPage() {
         });
         if (favsRes.ok) {
           const favsData = await favsRes.json();
-          const isFav = favsData.favorites?.some((fav: any) => fav.analysisId === id);
+          const isFav = favsData.favorites?.some((fav: FavoriteItem) => fav.analysisId === id);
           setIsFavorited(!!isFav);
         }
       } catch (err) {
@@ -170,9 +192,9 @@ export default function ResultsPage() {
           throw new Error("Failed to add favorite");
         }
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      addToast(err.message || "Failed to update favorite status", "error");
+      addToast(err instanceof Error ? err.message : "Failed to update favorite status", "error");
     }
   };
 
@@ -389,11 +411,11 @@ export default function ResultsPage() {
                   {result.height && (
                     <div className="rounded-2xl bg-surface p-3.5 border border-border/60">
                       <p className="text-[10px] text-muted-foreground uppercase tracking-[0.15em] font-medium">
-                        Predicted Height
+                        {profile?.height ? "Height" : "Predicted Height"}
                       </p>
                       <p className="text-sm font-medium mt-1">
-                        {result.height} cm
-                        {result.heightConfidence && (
+                        {profile?.height ?? result.height} cm
+                        {!profile?.height && result.heightConfidence && (
                           <span className="text-[10px] text-muted font-light block">
                             (± {Math.round((1 - result.heightConfidence) * 10)} cm, {Math.round(result.heightConfidence * 100)}% conf)
                           </span>
@@ -405,15 +427,36 @@ export default function ResultsPage() {
                   {result.weight && (
                     <div className="rounded-2xl bg-surface p-3.5 border border-border/60">
                       <p className="text-[10px] text-muted-foreground uppercase tracking-[0.15em] font-medium">
-                        Predicted Weight
+                        {profile?.weight ? "Weight" : "Predicted Weight"}
                       </p>
                       <p className="text-sm font-medium mt-1">
-                        {result.weight} kg
-                        {result.weightConfidence && (
+                        {profile?.weight ?? result.weight} kg
+                        {!profile?.weight && result.weightConfidence && (
                           <span className="text-[10px] text-muted font-light block">
                             (± {Math.round((1 - result.weightConfidence) * 10)} kg, {Math.round(result.weightConfidence * 100)}% conf)
                           </span>
                         )}
+                      </p>
+                    </div>
+                  )}
+
+                  {profile?.shoeSize && (
+                    <div className="rounded-2xl bg-surface p-3.5 border border-border/60">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-[0.15em] font-medium">
+                        Shoe Size
+                      </p>
+                      <p className="text-sm font-medium mt-1">{profile.shoeSize}</p>
+                    </div>
+                  )}
+
+                  {profile?.fitPreference && (
+                    <div className="rounded-2xl bg-surface p-3.5 border border-border/60">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-[0.15em] font-medium">
+                        Fit Preference
+                      </p>
+                      <p className="text-sm font-medium mt-1">
+                        {FIT_OPTIONS.find((o) => o.value === profile.fitPreference)?.label ??
+                          profile.fitPreference}
                       </p>
                     </div>
                   )}
@@ -521,6 +564,15 @@ export default function ResultsPage() {
             animate="visible"
             variants={fadeInUp}
             custom={6}
+          >
+            <SimilarItems analysisId={id} />
+          </motion.div>
+
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={fadeInUp}
+            custom={7}
           >
             <Link href="/upload">
               <Button variant="editorial" className="w-full rounded-full" size="lg">

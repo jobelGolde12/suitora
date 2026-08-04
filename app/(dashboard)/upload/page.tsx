@@ -12,6 +12,7 @@ import {
   AlertCircle,
   Link as LinkIcon,
   Upload as UploadIcon,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -30,6 +31,12 @@ interface ImageUpload {
 
 type ProductInputMode = "upload" | "link";
 
+interface AnalysisRequest {
+  userImageUrl: string;
+  productImageUpload?: string;
+  productUrl?: string;
+}
+
 export default function UploadPage() {
   const router = useRouter();
   const { addToast } = useToast();
@@ -38,6 +45,10 @@ export default function UploadPage() {
   const [selfImageUrl, setSelfImageUrl] = useState<string | null>(null);
   const [isLoadingSelfImage, setIsLoadingSelfImage] = useState(true);
   const [showSelfImageModal, setShowSelfImageModal] = useState(false);
+  const [pendingSelf, setPendingSelf] = useState<ImageUpload>({ file: null, preview: "" });
+  const [selfUploading, setSelfUploading] = useState(false);
+  const [selfError, setSelfError] = useState("");
+  const [selfDragOver, setSelfDragOver] = useState(false);
 
   // Clothing / Product state
   const [productInputMode, setProductInputMode] = useState<ProductInputMode>("upload");
@@ -49,6 +60,7 @@ export default function UploadPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const clothingInputRef = useRef<HTMLInputElement>(null);
+  const selfInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch self-image on load
   useEffect(() => {
@@ -61,15 +73,10 @@ export default function UploadPage() {
           const data = await res.json();
           if (data.selfImageUrl) {
             setSelfImageUrl(data.selfImageUrl);
-          } else {
-            setShowSelfImageModal(true);
           }
-        } else {
-          setShowSelfImageModal(true);
         }
       } catch (err) {
         console.error("Failed to load self-image:", err);
-        setShowSelfImageModal(true);
       } finally {
         setIsLoadingSelfImage(false);
       }
@@ -114,16 +121,74 @@ export default function UploadPage() {
     setClothingPhoto({ file: null, preview: "" });
   }, []);
 
+  const uploadSelfPhoto = useCallback(
+    async (file: File) => {
+      setSelfUploading(true);
+      setSelfError("");
+      try {
+        const res = await uploadImage(file);
+        const saveRes = await fetch("/api/user/self-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ selfImageUrl: res.url }),
+        });
+        const data = await saveRes.json();
+        if (saveRes.ok && data.success) {
+          setSelfImageUrl(res.url);
+          setPendingSelf({ file: null, preview: "" });
+          addToast("Self photo uploaded successfully!", "success");
+        } else {
+          throw new Error(data.error || "Failed to save self photo");
+        }
+      } catch (err) {
+        console.error(err);
+        const message =
+          err instanceof Error ? err.message : "Failed to upload self photo.";
+        setSelfError(message);
+        setPendingSelf({ file: null, preview: "" });
+        addToast(message, "error");
+      } finally {
+        setSelfUploading(false);
+      }
+    },
+    [addToast]
+  );
+
+  const handleSelfFileSelect = useCallback(
+    (file: File) => {
+      const error = validateFile(file);
+      if (error) {
+        setSelfError(error);
+        return;
+      }
+      setSelfError("");
+      setPendingSelf({ file, preview: URL.createObjectURL(file) });
+      void uploadSelfPhoto(file);
+    },
+    [validateFile, uploadSelfPhoto]
+  );
+
+  const handleSelfDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setSelfDragOver(false);
+      const file = e.dataTransfer.files[0];
+      if (file) handleSelfFileSelect(file);
+    },
+    [handleSelfFileSelect]
+  );
+
   const handleAnalyze = async () => {
     if (!selfImageUrl) {
-      setShowSelfImageModal(true);
+      addToast("Upload your self photo to continue.", "error");
       return;
     }
 
     setIsAnalyzing(true);
 
     try {
-      let payload: Record<string, any> = {
+      const payload: AnalysisRequest = {
         userImageUrl: selfImageUrl,
       };
 
@@ -164,9 +229,12 @@ export default function UploadPage() {
       } else {
         throw new Error(data.error || "Failed to start analysis");
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      addToast(err.message || "An error occurred starting the analysis.", "error");
+      addToast(
+        err instanceof Error ? err.message : "An error occurred starting the analysis.",
+        "error"
+      );
     } finally {
       setIsAnalyzing(false);
     }
@@ -184,7 +252,7 @@ export default function UploadPage() {
 
   return (
     <PageContainer narrow>
-      {/* Forced Self Image Upload Modal */}
+      {/* Self Image Modal (Change Photo) */}
       <AnimatePresence>
         {showSelfImageModal && (
           <SelfImageModal
@@ -203,7 +271,7 @@ export default function UploadPage() {
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 mb-12">
-        {/* User Photo Display */}
+        {/* Upload Self */}
         <motion.div
           initial="hidden"
           animate="visible"
@@ -215,7 +283,7 @@ export default function UploadPage() {
               <span className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface">
                 <Camera className="h-3.5 w-3.5 text-muted" strokeWidth={1.5} />
               </span>
-              Your Body Photo
+              Upload Self
             </span>
             {selfImageUrl && (
               <button
@@ -227,36 +295,96 @@ export default function UploadPage() {
               </button>
             )}
           </h2>
-          {selfImageUrl ? (
-            <div className="relative rounded-2xl border border-border bg-card overflow-hidden group shadow-card">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={selfImageUrl}
-                alt="Your body photo"
-                className="w-full aspect-[3/4] object-cover"
-              />
-              <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-card/95 border border-border text-foreground px-3 py-1 text-xs font-medium">
-                <Check className="h-3 w-3 text-success" strokeWidth={1.5} />
-                Profile Active
+          <div className="aspect-[3/4] flex flex-col">
+            {selfImageUrl && !pendingSelf.preview ? (
+              <div className="relative flex-1 rounded-2xl border border-border bg-card overflow-hidden group shadow-card">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={selfImageUrl}
+                  alt="Your body photo"
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-card/95 border border-border text-foreground px-3 py-1 text-xs font-medium">
+                  <Check className="h-3 w-3 text-success" strokeWidth={1.5} />
+                  Profile Active
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-error/40 p-8 aspect-[3/4] bg-card shadow-card">
-              <AlertCircle className="h-10 w-10 text-error mb-4" strokeWidth={1.5} />
-              <p className="text-sm font-medium">Self-image required</p>
-              <Button
-                variant="editorial"
-                size="sm"
-                className="mt-4 rounded-full"
-                onClick={() => setShowSelfImageModal(true)}
+            ) : selfUploading || pendingSelf.preview ? (
+              <div className="relative flex-1 rounded-2xl border border-border bg-card overflow-hidden shadow-card">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={pendingSelf.preview}
+                  alt="Your body photo preview"
+                  className="w-full h-full object-cover"
+                />
+                {selfUploading && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-card/70 backdrop-blur-sm">
+                    <Loader2 className="h-6 w-6 text-accent animate-spin" strokeWidth={1.5} />
+                    <p className="text-xs text-foreground font-light">
+                      Uploading self photo…
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div
+                onDrop={handleSelfDrop}
+                onDragOver={(e) => e.preventDefault()}
+                onDragEnter={() => setSelfDragOver(true)}
+                onDragLeave={() => setSelfDragOver(false)}
+                onClick={() => selfInputRef.current?.click()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    selfInputRef.current?.click();
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                aria-label="Upload your self photo"
+                className={cn(
+                  "flex-1 relative flex flex-col items-center justify-center rounded-2xl border border-dashed p-8 cursor-pointer transition-all duration-200 bg-card shadow-card",
+                  selfDragOver
+                    ? "border-accent bg-accent/5"
+                    : "border-border hover:border-accent/40 hover:bg-surface/40"
+                )}
               >
-                Upload Profile Photo
-              </Button>
-            </div>
+                <div className="flex flex-col items-center gap-4 text-center">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full border border-border bg-surface">
+                    <Camera className="h-6 w-6 text-muted" strokeWidth={1.5} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Upload your photo</p>
+                    <p className="text-xs text-muted mt-1.5 font-light">
+                      Drag & drop or click to browse
+                    </p>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground font-light">
+                    JPG, PNG, WEBP up to 5MB
+                  </p>
+                </div>
+                <input
+                  ref={selfInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleSelfFileSelect(file);
+                  }}
+                />
+              </div>
+            )}
+          </div>
+          {selfError && (
+            <p className="mt-2 text-xs text-error flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" />
+              {selfError}
+            </p>
           )}
         </motion.div>
 
-        {/* Clothing Item Input (Upload or Link) */}
+        {/* Upload Item to Match (Upload or Link) */}
         <motion.div
           initial="hidden"
           animate="visible"
@@ -268,10 +396,9 @@ export default function UploadPage() {
               <span className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface">
                 <Shirt className="h-3.5 w-3.5 text-muted" strokeWidth={1.5} />
               </span>
-              Clothing Item
+              Upload Item to Match
             </span>
           </h2>
-
           {/* Selector Tabs */}
           <div className="flex border border-border rounded-xl p-1 bg-surface/50 mb-4">
             <button
@@ -354,7 +481,7 @@ export default function UploadPage() {
                       <Shirt className="h-6 w-6 text-muted" strokeWidth={1.5} />
                     </div>
                     <div>
-                      <p className="text-sm font-medium">Upload clothing item</p>
+                      <p className="text-sm font-medium">Upload item to match</p>
                       <p className="text-xs text-muted mt-1.5 font-light">
                         Drag & drop or click to browse
                       </p>

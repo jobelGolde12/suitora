@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
 
 interface Session {
   user: {
@@ -31,7 +31,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchSession = async () => {
+  const fetchSession = useCallback(async () => {
     try {
       const res = await fetch("/api/auth/get-session", {
         credentials: "include",
@@ -53,37 +53,37 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const refreshSession = async () => {
+  const refreshSession = useCallback(async () => {
     await fetchSession();
-  };
+  }, [fetchSession]);
 
   // Initial session fetch
   useEffect(() => {
-    fetchSession();
-  }, []);
+    void Promise.resolve().then(() => fetchSession());
+  }, [fetchSession]);
 
   // Refresh session every 10 minutes
   useEffect(() => {
     const interval = setInterval(() => {
-      fetchSession();
+      void fetchSession();
     }, 10 * 60 * 1000); // 10 minutes
 
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchSession]);
 
   // Listen for storage events (multi-tab sync)
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === "session_update") {
-        fetchSession();
+        void fetchSession();
       }
     };
 
     window.addEventListener("storage", handleStorageChange);
     return () => window.removeEventListener("storage", handleStorageChange);
-  }, []);
+  }, [fetchSession]);
 
   return (
     <SessionContext.Provider value={{ session, isLoading, refreshSession }}>

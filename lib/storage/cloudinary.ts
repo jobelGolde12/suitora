@@ -23,7 +23,7 @@ export async function uploadToCloudinary(
   buffer: Buffer,
   options: {
     folder?: string;
-    transformation?: Record<string, any>;
+    transformation?: Record<string, unknown>;
   } = {}
 ): Promise<CloudinaryUploadResult> {
   const folder = options.folder || "suitora/uploads";

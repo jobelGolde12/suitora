@@ -12,6 +12,7 @@ import {
   History,
   Settings,
   Sparkles,
+  Shirt,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import {
@@ -25,12 +26,12 @@ import {
   DashboardSkeleton,
 } from "@/components/dashboard";
 import { TrendingCollection } from "@/components/trending";
-import type { Analysis, DashboardStats } from "@/types";
+import type { AnalysisResult, DashboardStats } from "@/types";
 import type { TrendItem } from "@/types/trend";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [recentAnalyses, setRecentAnalyses] = useState<(Analysis & { isFavorite?: boolean })[]>([]);
+  const [recentAnalyses, setRecentAnalyses] = useState<(AnalysisResult & { isFavorite?: boolean })[]>([]);
   const [scoreTrend, setScoreTrend] = useState<number[]>([]);
   const [trendingItems, setTrendingItems] = useState<TrendItem[]>([]);
   const [trendingLoading, setTrendingLoading] = useState(true);
@@ -84,9 +85,28 @@ export default function DashboardPage() {
     averageScore: 0,
     favoriteCount: 0,
     recentActivity: 0,
+    tryOn: {
+      total: 0,
+      completed: 0,
+      failed: 0,
+      skipped: 0,
+      pending: 0,
+      processing: 0,
+      failureRate: null,
+      avgLatencyMs: null,
+    },
   };
 
   const activeScoreTrend = scoreTrend.length > 0 ? scoreTrend : [0];
+  const tryOn = activeStats.tryOn;
+  const tryOnSuccessRate =
+    tryOn.failureRate != null ? Math.round(100 - tryOn.failureRate) : null;
+  const tryOnLatencyLabel =
+    tryOn.avgLatencyMs != null
+      ? tryOn.avgLatencyMs >= 1000
+        ? `${(tryOn.avgLatencyMs / 1000).toFixed(1)}s avg`
+        : `${tryOn.avgLatencyMs}ms avg`
+      : null;
 
   return (
     <PageContainer>
@@ -128,6 +148,40 @@ export default function DashboardPage() {
           value={activeStats.recentActivity}
         />
       </div>
+
+      {tryOn.total > 0 && tryOnSuccessRate != null && (
+        <section className="mb-12">
+          <SectionTitle title="Virtual try-on" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+            <MetricCard
+              icon={Shirt}
+              label={
+                tryOn.failed > 0
+                  ? `Success rate · ${tryOn.failed} soft-failed`
+                  : "Success rate"
+              }
+              value={`${tryOnSuccessRate}%`}
+            />
+            <MetricCard
+              icon={Sparkles}
+              label={
+                tryOnLatencyLabel
+                  ? "Avg. generation time"
+                  : tryOn.processing > 0
+                    ? "Currently generating"
+                    : "Previews completed"
+              }
+              value={
+                tryOnLatencyLabel
+                  ? tryOnLatencyLabel.replace(" avg", "")
+                  : tryOn.processing > 0
+                    ? tryOn.processing
+                    : tryOn.completed
+              }
+            />
+          </div>
+        </section>
+      )}
 
       <section className="mb-12">
         <SectionTitle title="Quick actions" />

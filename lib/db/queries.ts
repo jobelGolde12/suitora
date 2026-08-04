@@ -1,7 +1,43 @@
 import { db, schema } from "@/drizzle";
 import { eq, desc, and, sql, type SQL } from "drizzle-orm";
 import { nanoid } from "@/lib/utils/id";
-import type { UpdateProfilePayload } from "@/types";
+import { getTryOnStats } from "@/lib/ai/tryon/monitoring";
+import type { UpdateProfilePayload, AnalysisResult } from "@/types";
+
+function parseJsonArray<T>(value: string | null): T[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? (parsed as T[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function parseJsonObject(value: string | null): Record<string, unknown> | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Convert a raw `analyses` row into the parsed, API-facing shape. */
+export function toAnalysisResult(
+  row: typeof schema.analyses.$inferSelect
+): AnalysisResult {
+  // The DB stores `status`/`tryOnStatus` as free text; the app only writes the
+  // union values below, so cast to the API-facing union for type safety.
+  const base = row as Omit<AnalysisResult, "recommendations" | "colorAnalysis" | "compatibilityMetadata">;
+  return {
+    ...base,
+    recommendations: parseJsonArray<string>(row.recommendations),
+    colorAnalysis: parseJsonObject(row.colorAnalysis) as AnalysisResult["colorAnalysis"],
+    compatibilityMetadata: parseJsonObject(row.compatibilityMetadata),
+  };
+}
 
 // ─── User Queries ─────────────────────────────────────────────────
 
@@ -71,6 +107,27 @@ export async function getFavoritesByUserId(userId: string) {
     .orderBy(desc(schema.favorites.createdAt));
 }
 
+/** Favorites flagged as being part of the user's wardrobe, newest first. */
+export async function getWardrobeFavoritesByUserId(userId: string) {
+  return db
+    .select({
+      favorite: schema.favorites,
+      analysis: schema.analyses,
+    })
+    .from(schema.favorites)
+    .where(
+      and(
+        eq(schema.favorites.userId, userId),
+        eq(schema.favorites.inWardrobe, true)
+      )
+    )
+    .innerJoin(
+      schema.analyses,
+      eq(schema.favorites.analysisId, schema.analyses.id)
+    )
+    .orderBy(desc(schema.favorites.addedToWardrobeAt));
+}
+
 export async function addFavorite(userId: string, analysisId: string) {
   const [favorite] = await db
     .insert(schema.favorites)
@@ -83,6 +140,46 @@ export async function removeFavorite(id: string) {
   await db
     .delete(schema.favorites)
     .where(eq(schema.favorites.id, id));
+}
+
+export async function updateFavoriteWardrobe(
+  userId: string,
+  analysisId: string,
+  data: {
+    inWardrobe?: boolean;
+    wardrobeTags?: string[];
+    wardrobeFolder?: string | null;
+  }
+) {
+  const setFields: Record<string, unknown> = {};
+
+  if (data.inWardrobe !== undefined) {
+    setFields.inWardrobe = data.inWardrobe;
+    setFields.addedToWardrobeAt = data.inWardrobe
+      ? new Date().toISOString()
+      : null;
+  }
+  if (data.wardrobeTags !== undefined) {
+    setFields.wardrobeTags = JSON.stringify(data.wardrobeTags);
+  }
+  if (data.wardrobeFolder !== undefined) {
+    setFields.wardrobeFolder = data.wardrobeFolder || null;
+  }
+
+  if (Object.keys(setFields).length === 0) return null;
+
+  const [updated] = await db
+    .update(schema.favorites)
+    .set(setFields)
+    .where(
+      and(
+        eq(schema.favorites.userId, userId),
+        eq(schema.favorites.analysisId, analysisId)
+      )
+    )
+    .returning();
+
+  return updated ?? null;
 }
 
 export async function isFavorite(analysisId: string, userId: string) {
@@ -126,7 +223,7 @@ export async function upsertProfile(
   }
 
   // Build update object from the payload, filtering only known profile fields
-  const profileFields: Record<string, any> = {};
+  const profileFields: Record<string, string | number | boolean | null> = {};
   const allowedFields = [
     "phone", "dateOfBirth", "gender",
     "height", "weight", "chestCircumference", "waistCircumference",
@@ -137,14 +234,13 @@ export async function upsertProfile(
   ];
 
   for (const field of allowedFields) {
-    if (field in data && data[field as keyof UpdateProfilePayload] !== undefined) {
-      const value = data[field as keyof UpdateProfilePayload];
-      // Serialize arrays to JSON strings
-      if (Array.isArray(value)) {
-        profileFields[field] = JSON.stringify(value);
-      } else {
-        profileFields[field] = value;
-      }
+    const value = data[field as keyof UpdateProfilePayload];
+    if (value === undefined) continue;
+    // Serialize arrays to JSON strings
+    if (Array.isArray(value)) {
+      profileFields[field] = JSON.stringify(value);
+    } else {
+      profileFields[field] = value;
     }
   }
 
@@ -181,6 +277,53 @@ export async function updateProfileSelfImage(
     .where(eq(schema.userProfiles.userId, userId));
 }
 
+/**
+ * Persist AI-estimated traits from an analysis into `user_profiles.estimated_*`.
+ * Height/weight are only stored when confidence is high. Manual values live in
+ * separate columns, so they are never overwritten.
+ */
+export async function persistAnalysisEstimates(
+  userId: string,
+  estimates: {
+    height?: number | null;
+    heightConfidence?: number | null;
+    weight?: number | null;
+    weightConfidence?: number | null;
+    bodyShape?: string | null;
+    skinTone?: string | null;
+    faceShape?: string | null;
+  }
+) {
+  const existing = await getProfileByUserId(userId);
+  if (!existing) {
+    await createProfile(userId);
+  }
+
+  const setFields: Record<string, unknown> = {
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (estimates.height && (estimates.heightConfidence ?? 0) >= 0.7) {
+    setFields.estimatedHeight = estimates.height;
+    setFields.estimatedHeightConfidence = estimates.heightConfidence;
+  }
+  if (estimates.weight && (estimates.weightConfidence ?? 0) >= 0.7) {
+    setFields.estimatedWeight = estimates.weight;
+    setFields.estimatedWeightConfidence = estimates.weightConfidence;
+  }
+  if (estimates.bodyShape) {
+    setFields.bodyShape = estimates.bodyShape;
+    setFields.bodyShapeConfidence = estimates.heightConfidence ?? 0.7;
+  }
+  if (estimates.skinTone) setFields.skinTone = estimates.skinTone;
+  if (estimates.faceShape) setFields.faceShape = estimates.faceShape;
+
+  await db
+    .update(schema.userProfiles)
+    .set(setFields)
+    .where(eq(schema.userProfiles.userId, userId));
+}
+
 // ─── Stats Queries ────────────────────────────────────────────────
 
 export async function getDashboardStats(userId: string) {
@@ -194,11 +337,14 @@ export async function getDashboardStats(userId: string) {
     .from(schema.analyses)
     .where(eq(schema.analyses.userId, userId));
 
+  const tryOn = await getTryOnStats(userId);
+
   return {
     totalAnalyses: stats?.totalAnalyses ?? 0,
     averageScore: Math.round(stats?.averageScore ?? 0),
     favoriteCount: stats?.favoriteCount ?? 0,
     recentActivity: stats?.recentActivity ?? 0,
+    tryOn,
   };
 }
 
@@ -273,6 +419,39 @@ export async function getTrendItemById(id: string): Promise<TrendItemRow | null>
     .from(schema.trendItems)
     .where(eq(schema.trendItems.id, id));
   return item ?? null;
+}
+
+export async function listSimilarTrendItems(opts: {
+  category: string;
+  styleTags?: string[];
+  limit?: number;
+}): Promise<TrendItemRow[]> {
+  const { category, styleTags, limit = 12 } = opts;
+
+  const rows = await listTrendItems({
+    category,
+    limit: Math.max(limit * 3, 36),
+    availableOnly: true,
+  });
+
+  if (!styleTags?.length) return rows.slice(0, limit);
+
+  const scored = rows
+    .map((row) => {
+      let tags: string[] = [];
+      try {
+        tags = JSON.parse(row.styleTags || "[]");
+      } catch {
+        tags = [];
+      }
+      return { row, overlap: tags.filter((t) => styleTags.includes(t)).length };
+    })
+    .filter((s) => s.overlap > 0)
+    .sort((a, b) => b.overlap - a.overlap);
+
+  if (scored.length === 0) return rows.slice(0, limit);
+
+  return scored.slice(0, limit).map((s) => s.row);
 }
 
 export async function countTrendItems(): Promise<number> {

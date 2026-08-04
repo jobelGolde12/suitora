@@ -210,6 +210,16 @@ flowchart TD
    npx drizzle-kit push
    ```
 
+   > **Migration convention:** Schema lives in `drizzle/schema.ts`. Keep
+   > `drizzle/schema.ts` and `drizzle/migrations/*.sql` in sync — structural
+   > changes go in both. Hand-written, dated SQL files (e.g.
+   > `2026-08-04-add-wardrobe-fields.sql`) are the project convention and are
+   > applied manually. For a live Turso DB, apply the SQL against the remote
+   > database (Turso CLI `turso db shell` or an equivalent client); for local
+   > development, run `npx drizzle-kit push` against `file:./data/suitora.db`.
+   > `npx drizzle-kit generate` is available when a fresh, journaled migration
+   > is preferred.
+
 5. **Start development server**
 
    ```bash

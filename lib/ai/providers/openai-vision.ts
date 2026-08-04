@@ -11,6 +11,52 @@ import type {
 import type { BodyShape, SkinTone, FaceShape, StyleType } from "@/types";
 
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
+const FETCH_TIMEOUT_MS = 30_000;
+const MAX_ATTEMPTS = 3;
+
+const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+
+/**
+ * Fetch with a hard timeout and exponential backoff retries.
+ * Only transient failures (network errors, timeouts, 429/5xx) are retried.
+ */
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  attempts = MAX_ATTEMPTS
+): Promise<Response> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(url, { ...init, signal: controller.signal });
+
+      if (response.ok || !RETRYABLE_STATUS.has(response.status)) {
+        return response;
+      }
+
+      lastError = new Error(`OpenAI API status ${response.status}`);
+    } catch (err) {
+      lastError = err;
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (attempt < attempts - 1) {
+      await new Promise((resolve) =>
+        setTimeout(resolve, 1_000 * 2 ** attempt + Math.random() * 500)
+      );
+    }
+  }
+
+  if (lastError instanceof Error && lastError.name === "AbortError") {
+    throw new Error("OpenAI request timed out");
+  }
+  throw lastError instanceof Error ? lastError : new Error("OpenAI request failed");
+}
 
 interface OpenAIResponse {
   choices: Array<{
@@ -194,7 +240,7 @@ export function createOpenAIProvider(): VisionProvider {
         throw new Error("OPENAI_API_KEY is not configured");
       }
 
-      const response = await fetch(OPENAI_API_URL, {
+      const response = await fetchWithRetry(OPENAI_API_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

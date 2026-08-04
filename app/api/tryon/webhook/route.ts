@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
+import { apiError, apiOk } from "@/lib/api/response";
 import { completeTryOnByJobId } from "@/lib/ai/tryon/lifecycle";
 
 interface RunPodWebhookPayload {
@@ -21,7 +21,7 @@ interface RunPodWebhookPayload {
 export async function POST(req: Request) {
   const secret = process.env.RUNPOD_WEBHOOK_SECRET;
   if (!secret) {
-    return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
+    return apiError("Webhook not configured", 503);
   }
 
   const { searchParams } = new URL(req.url);
@@ -41,12 +41,12 @@ export async function POST(req: Request) {
 
   const supplied = querySecret || headerSecret || bodySecret;
   if (!supplied || !safeEqual(supplied, secret)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return apiError("Unauthorized", 401);
   }
 
   const jobId = payload?.id as string | undefined;
   if (!jobId) {
-    return NextResponse.json({ error: "Missing job id" }, { status: 400 });
+    return apiError("Missing job id", 400);
   }
 
   const status = String(payload?.status || "").toUpperCase();
@@ -59,14 +59,11 @@ export async function POST(req: Request) {
         : output?.image_url || output?.result;
 
     if (!resultUrl) {
-      return NextResponse.json(
-        { error: "Completed job missing output" },
-        { status: 400 }
-      );
+      return apiError("Completed job missing output", 400);
     }
 
     await completeTryOnByJobId(jobId, { status: "completed", resultUrl });
-    return NextResponse.json({ success: true });
+    return apiOk();
   }
 
   if (status === "FAILED" || status === "TIMED_OUT" || status === "CANCELLED") {
@@ -74,11 +71,11 @@ export async function POST(req: Request) {
       status: "failed",
       error: payload?.error || `RunPod job ${status.toLowerCase()}`,
     });
-    return NextResponse.json({ success: true });
+    return apiOk();
   }
 
   // IN_QUEUE / IN_PROGRESS — nothing to do yet.
-  return NextResponse.json({ success: true });
+  return apiOk();
 }
 
 function safeEqual(a: string, b: string): boolean {

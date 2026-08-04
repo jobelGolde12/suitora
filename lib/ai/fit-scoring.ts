@@ -6,7 +6,6 @@
 import type {
   UserBodyProfile,
   ItemProfile,
-  FitScores,
   FitInsights,
   SizeRecommendation,
   CompatibilityMetadata,
@@ -14,13 +13,11 @@ import type {
   MeasurementDelta,
   BodyShape,
   SkinTone,
-  FaceShape,
   StyleTag,
   ItemCategory,
   Silhouette,
   ItemMeasurements,
   BodyMeasurements,
-  CATEGORY_WEIGHTS,
 } from "@/types";
 import { CATEGORY_WEIGHTS as DEFAULT_WEIGHTS, SILHOUETTE_RULES } from "@/types";
 

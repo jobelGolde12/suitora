@@ -75,7 +75,18 @@ export async function loginAction(
 
     // Check failed attempts per email (graduated delays)
     const failedCheck = await failedAttemptsLimiter.limit(email);
-    
+    if (!failedCheck.success) {
+      return {
+        success: false,
+        error: "Too many failed attempts for this account. Please try again later.",
+        rateLimit: {
+          limit: failedCheck.limit,
+          remaining: failedCheck.remaining,
+          reset: failedCheck.reset,
+        },
+      };
+    }
+
     // Attempt sign in
     const result = await auth.api.signInEmail({
       body: {

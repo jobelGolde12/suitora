@@ -121,12 +121,18 @@ export const favorites = sqliteTable("favorites", {
     .notNull()
     .references(() => analyses.id, { onDelete: "cascade" }),
   productId: text("product_id").references(() => products.id, { onDelete: "set null" }),
+  // Wardrobe state — lets users organize saved items into their wardrobe
+  inWardrobe: integer("in_wardrobe", { mode: "boolean" }).notNull().default(false),
+  wardrobeTags: text("wardrobe_tags").notNull().default("[]"),
+  wardrobeFolder: text("wardrobe_folder"),
+  addedToWardrobeAt: text("added_to_wardrobe_at"),
   createdAt: text("created_at")
     .notNull()
     .default(sql`CURRENT_TIMESTAMP`),
 }, (t) => [
   unique("favorites_user_analysis_idx").on(t.userId, t.analysisId),
   index("favorites_user_id_idx").on(t.userId),
+  index("favorites_wardrobe_idx").on(t.userId, t.inWardrobe),
 ]);
 
 export const products = sqliteTable("products", {

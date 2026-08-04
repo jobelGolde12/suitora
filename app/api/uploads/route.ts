@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/drizzle";
 import { nanoid } from "@/lib/utils/id";
+import { apiError, apiOk } from "@/lib/api/response";
+import { uploadRateLimiter } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
   try {
@@ -11,14 +12,19 @@ export async function POST(req: Request) {
     });
 
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return apiError("Unauthorized", 401);
+    }
+
+    const rl = await uploadRateLimiter.limit(session.user.id);
+    if (!rl.success) {
+      return apiError("Upload limit reached. Please try again in an hour.", 429);
     }
 
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
 
     if (!file) {
-      return NextResponse.json({ error: "File is required" }, { status: 400 });
+      return apiError("File is required", 400);
     }
 
     // Convert File to Buffer
@@ -71,14 +77,10 @@ export async function POST(req: Request) {
       createdAt: new Date().toISOString(),
     });
 
-    return NextResponse.json({
-      success: true,
-      url,
-      publicId,
-    });
-  } catch (err: any) {
+    return apiOk({ url, publicId });
+  } catch (err) {
     console.error("Error in POST /api/uploads:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiError("Internal server error", 500);
   }
 }
 
@@ -89,14 +91,14 @@ export async function DELETE(req: Request) {
     });
 
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return apiError("Unauthorized", 401);
     }
 
     const { searchParams } = new URL(req.url);
     const publicId = searchParams.get("publicId");
 
     if (!publicId) {
-      return NextResponse.json({ error: "publicId is required" }, { status: 400 });
+      return apiError("publicId is required", 400);
     }
 
     // Only delete from Cloudinary if configured
@@ -110,9 +112,9 @@ export async function DELETE(req: Request) {
       await deleteFromCloudinary(publicId);
     }
 
-    return NextResponse.json({ success: true });
-  } catch (err: any) {
+    return apiOk();
+  } catch (err) {
     console.error("Error in DELETE /api/uploads:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiError("Internal server error", 500);
   }
 }

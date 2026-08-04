@@ -54,7 +54,11 @@ Make analyses and favorites fully database-backed so every subsequent feature ha
 
 ## Phase 2 — In Progress / Near-Term
 
+> **Status (Aug 2026):** 2.1, 2.2, 2.3, and 2.5 are **DONE**. 2.4 (multi-item comparison) is deferred. See `Todo.md` for the active checklist.
+
 ### 2.1 Real AI Integration (OpenAI Vision / Gemini Vision)
+
+> **DONE (Aug 2026):** `lib/ai/providers/openai-vision.ts` (OpenAI Vision, retry + timeout), `lib/ai/vision.ts` (provider fallback), `lib/ai/mock-analysis.ts` fallback, `lib/ai/size-prediction.ts` + `lib/ai/body-estimation.ts`. Rate limits on `/api/analysis` + `/api/uploads` (`lib/rate-limit.ts`).
 
 **Priority:** Highest after DB alignment
 
@@ -83,6 +87,8 @@ Make analyses and favorites fully database-backed so every subsequent feature ha
 
 ### 2.2 Paste Product URL → Auto-Extract Clothing Image
 
+> **DONE (Aug 2026):** URL input on the upload page; `lib/ai/product-extraction.ts` (`extractProductFromUrlCached`, 24h cache). `POST /api/analysis` accepts a link and persists `productId`.
+
 **Implementation Steps**
 1. Add product URL input on Upload page (alongside image upload)
 2. Server-side scraper / extractor (or use a service):
@@ -99,6 +105,8 @@ Make analyses and favorites fully database-backed so every subsequent feature ha
 ---
 
 ### 2.3 Cloudinary Image Hosting
+
+> **DONE (Aug 2026):** `lib/storage/cloudinary.ts` (upload/delete), `POST /api/uploads` (rate-limited), image URLs persisted on analyses, `next/image` remotePatterns configured.
 
 **Implementation Steps**
 1. Configure env vars (already documented in README)
@@ -131,7 +139,9 @@ Make analyses and favorites fully database-backed so every subsequent feature ha
 
 ### 2.5 Favorite Items & Wardrobe Management
 
-**Current Gap:** Favorites UI exists but is mock-only.
+> **DONE (Aug 2026):** Favorites are DB-backed (`/api/favorites` GET/POST/DELETE/PATCH). Wardrobe state added (`in_wardrobe`, `wardrobe_tags`, `wardrobe_folder`) with an "In Wardrobe" filter on the Favorites page.
+
+**Original implementation steps:**
 
 **Implementation Steps**
 1. Complete DB wiring (Section 0)
@@ -161,6 +171,8 @@ Make analyses and favorites fully database-backed so every subsequent feature ha
 - Surface on Results page and a new “Recommendations” section
 
 ### 3.3 Similar Clothing Suggestions
+
+> **Partially DONE (Aug 2026):** "Items Like This" on the Results page (`/api/trending/similar` + `lib/ai/similar-items.ts`) scores same-category trend items against the user's profile. Embedding/vision-similarity search remains future work.
 
 - Embedding or vision-similarity search against internal catalog or external affiliate feeds
 - “Items like this that may suit you better” section on Results

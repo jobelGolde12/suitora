@@ -127,7 +127,7 @@ function detectSubtype(title: string, category: ItemCategory): string {
 
 // ─── Silhouette Detection ────────────────────────────────────────
 
-function detectSilhouette(title: string, category: ItemCategory): Silhouette {
+export function detectSilhouette(title: string, category: ItemCategory): Silhouette {
   const lower = title.toLowerCase();
 
   if (lower.includes("oversized") || lower.includes("boxy")) return "oversized";
@@ -255,7 +255,7 @@ function extractStyleTags(title: string): StyleTag[] {
 
 // ─── Fabric Stretch Detection ────────────────────────────────────
 
-function detectStretch(title: string): FabricStretch {
+export function detectStretch(title: string): FabricStretch {
   const lower = title.toLowerCase();
 
   if (

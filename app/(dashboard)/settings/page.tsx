@@ -16,7 +16,6 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
-import { Avatar } from "@/components/ui/Avatar";
 import { useToast } from "@/components/ui/Toast";
 import { PageContainer, PageHeader, fadeInUp } from "@/components/dashboard";
 import { ProfileForm } from "@/components/settings/ProfileForm";

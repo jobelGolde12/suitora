@@ -1,7 +1,6 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { cn } from "@/lib/utils/cn";
 import { CheckCircle, AlertCircle, Lightbulb } from "lucide-react";
 import type { FitInsights } from "@/types";
 

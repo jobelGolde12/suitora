@@ -78,8 +78,21 @@ const GENDER_OPTIONS: { value: Gender; label: string }[] = [
 
 // ─── Measurement Field Config ────────────────────────────────────
 
+type NumericProfileKey =
+  | "height"
+  | "weight"
+  | "chestCircumference"
+  | "waistCircumference"
+  | "hipCircumference"
+  | "shoulderWidth"
+  | "inseamLength"
+  | "armLength"
+  | "neckCircumference"
+  | "footLength"
+  | "footWidth";
+
 interface MeasurementField {
-  key: keyof UpdateProfilePayload;
+  key: NumericProfileKey;
   label: string;
   icon: React.ElementType;
   unit: string;
@@ -182,12 +195,27 @@ export function ProfileForm() {
   const [sizePrediction, setSizePrediction] = useState<SizePrediction | null>(null);
   const [sizePredictionOpen, setSizePredictionOpen] = useState(true);
 
-  // Fetch profile on mount
-  useEffect(() => {
-    fetchProfile();
-  }, []);
+  const recalcSizePredictions = useCallback((profileData?: UserProfile) => {
+    const p = profileData || profile;
+    if (!p) return;
 
-  const fetchProfile = async () => {
+    const result = predictSizes({
+      height: p.height ?? undefined,
+      weight: p.weight ?? undefined,
+      chestCircumference: p.chestCircumference ?? undefined,
+      waistCircumference: p.waistCircumference ?? undefined,
+      hipCircumference: p.hipCircumference ?? undefined,
+      shoulderWidth: p.shoulderWidth ?? undefined,
+      inseamLength: p.inseamLength ?? undefined,
+      armLength: p.armLength ?? undefined,
+      neckCircumference: p.neckCircumference ?? undefined,
+      footLength: p.footLength ?? undefined,
+      shoeSize: p.shoeSize ?? undefined,
+    });
+    setSizePrediction(result);
+  }, [profile]);
+
+  const fetchProfile = useCallback(async () => {
     try {
       setLoading(true);
       const res = await fetch("/api/user/profile");
@@ -238,12 +266,17 @@ export function ProfileForm() {
           setName(sessionData.user.name);
         }
       } catch {}
-    } catch (err) {
+    } catch {
       addToast("Failed to load profile", "error");
     } finally {
       setLoading(false);
     }
-  };
+  }, [addToast, recalcSizePredictions]);
+
+  // Fetch profile on mount
+  useEffect(() => {
+    void Promise.resolve().then(() => fetchProfile());
+  }, [fetchProfile]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -269,7 +302,7 @@ export function ProfileForm() {
       MEASUREMENT_FIELDS.forEach((field) => {
         const val = measurements[field.key];
         if (val && !isNaN(Number(val))) {
-          (payload as any)[field.key] = Number(val);
+          payload[field.key] = Number(val);
         }
       });
 
@@ -295,9 +328,7 @@ export function ProfileForm() {
 
     try {
       // Upload image via the upload service (converts to base64)
-      const res = await uploadImage(file, (progress) => {
-        // Progress handled silently for avatar
-      });
+      const res = await uploadImage(file);
 
       // Save to user's profile
       const saveRes = await fetch("/api/user/self-image", {
@@ -341,26 +372,6 @@ export function ProfileForm() {
     } finally {
       setEstimating(false);
     }
-  };
-
-  const recalcSizePredictions = (profileData?: UserProfile) => {
-    const p = profileData || profile;
-    if (!p) return;
-
-    const result = predictSizes({
-      height: p.height ?? undefined,
-      weight: p.weight ?? undefined,
-      chestCircumference: p.chestCircumference ?? undefined,
-      waistCircumference: p.waistCircumference ?? undefined,
-      hipCircumference: p.hipCircumference ?? undefined,
-      shoulderWidth: p.shoulderWidth ?? undefined,
-      inseamLength: p.inseamLength ?? undefined,
-      armLength: p.armLength ?? undefined,
-      neckCircumference: p.neckCircumference ?? undefined,
-      footLength: p.footLength ?? undefined,
-      shoeSize: p.shoeSize ?? undefined,
-    });
-    setSizePrediction(result);
   };
 
   const updateMeasurement = (key: string, value: string) => {
@@ -485,7 +496,6 @@ export function ProfileForm() {
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {MEASUREMENT_FIELDS.map((field) => {
-                  const Icon = field.icon;
                   return (
                     <div key={field.key} className="relative">
                       <Input
@@ -607,7 +617,7 @@ export function ProfileForm() {
                   </div>
                 ) : (
                   <p className="text-sm text-muted font-light italic">
-                    No estimates yet. Upload a photo and click "Estimate".
+                    No estimates yet. Upload a photo and click &ldquo;Estimate&rdquo;.
                   </p>
                 )}
               </div>

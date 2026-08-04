@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { cn } from "@/lib/utils/cn";
 
 interface AvatarProps {
@@ -18,11 +19,21 @@ const sizes = {
 export function Avatar({ src, alt = "", initials, size = "md", className }: AvatarProps) {
   if (src) {
     return (
-      <img
-        src={src}
-        alt={alt}
-        className={cn("rounded-full object-cover ring-2 ring-border", sizes[size], className)}
-      />
+      <span
+        className={cn(
+          "relative block overflow-hidden rounded-full ring-2 ring-border",
+          sizes[size],
+          className
+        )}
+      >
+        <Image
+          src={src}
+          alt={alt}
+          fill
+          sizes="(max-width: 96px) 96px, 20vw"
+          className="object-cover"
+        />
+      </span>
     );
   }
 

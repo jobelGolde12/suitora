@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Upload, AlertCircle, Camera, Check, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { uploadImage } from "@/lib/ai/upload";
@@ -78,9 +78,9 @@ export function SelfImageModal({ onSuccess }: SelfImageModalProps) {
       } else {
         throw new Error(data.error || "Failed to save image");
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      addToast(err.message || "Something went wrong during upload", "error");
+      addToast(err instanceof Error ? err.message : "Something went wrong during upload", "error");
     } finally {
       setIsUploading(false);
     }

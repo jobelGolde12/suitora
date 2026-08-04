@@ -1,11 +1,10 @@
-import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/drizzle";
 import { eq } from "drizzle-orm";
 import { estimateBodyTraits } from "@/lib/ai/body-estimation";
 import { getProfileByUserId, createProfile } from "@/lib/db/queries";
-import { nanoid } from "@/lib/utils/id";
+import { apiError, apiOk } from "@/lib/api/response";
 
 /**
  * POST /api/user/profile/estimate
@@ -19,7 +18,7 @@ export async function POST() {
     });
 
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return apiError("Unauthorized", 401);
     }
 
     // Get the user's self-image URL
@@ -29,17 +28,14 @@ export async function POST() {
       .where(eq(schema.users.id, session.user.id));
 
     if (!user?.selfImageUrl) {
-      return NextResponse.json(
-        { error: "No self-image uploaded. Please upload a photo first." },
-        { status: 400 }
-      );
+      return apiError("No self-image uploaded. Please upload a photo first.", 400);
     }
 
     // Run AI body estimation
     const estimation = await estimateBodyTraits(user.selfImageUrl);
 
     // Ensure profile exists
-    let profile = await getProfileByUserId(session.user.id);
+    const profile = await getProfileByUserId(session.user.id);
     if (!profile) {
       await createProfile(session.user.id);
     }
@@ -61,8 +57,7 @@ export async function POST() {
       })
       .where(eq(schema.userProfiles.userId, session.user.id));
 
-    return NextResponse.json({
-      success: true,
+    return apiOk({
       estimation: {
         height: estimation.height,
         heightConfidence: estimation.heightConfidence,
@@ -73,8 +68,8 @@ export async function POST() {
         faceShape: estimation.faceShape,
       },
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Error in POST /api/user/profile/estimate:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiError("Internal server error", 500);
   }
 }

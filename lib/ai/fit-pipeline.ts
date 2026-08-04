@@ -5,12 +5,8 @@
 
 import type {
   UserBodyProfile,
-  ItemProfile,
   FitAnalysisResult,
-  SkinTone,
-  FaceShape,
   BodyShape,
-  StyleTag,
 } from "@/types";
 import { extractItemProfile } from "./item-attributes";
 import { calculateFitScores } from "./fit-scoring";
@@ -64,7 +60,7 @@ async function extractBodyProfile(userImageUrl: string): Promise<UserBodyProfile
 
 // ─── Measurement Estimation Helpers ──────────────────────────────
 
-function estimateBust(bodyShape: BodyShape, height?: number): number {
+export function estimateBust(bodyShape: BodyShape, height?: number): number {
   const base = (height || 170) * 0.52;
   const adjustments: Record<BodyShape, number> = {
     hourglass: 2,
@@ -77,7 +73,7 @@ function estimateBust(bodyShape: BodyShape, height?: number): number {
   return Math.round(base + (adjustments[bodyShape] || 0));
 }
 
-function estimateWaist(bodyShape: BodyShape, height?: number): number {
+export function estimateWaist(bodyShape: BodyShape, height?: number): number {
   const base = (height || 170) * 0.41;
   const adjustments: Record<BodyShape, number> = {
     hourglass: -2,
@@ -90,7 +86,7 @@ function estimateWaist(bodyShape: BodyShape, height?: number): number {
   return Math.round(base + (adjustments[bodyShape] || 0));
 }
 
-function estimateHips(bodyShape: BodyShape, height?: number): number {
+export function estimateHips(bodyShape: BodyShape, height?: number): number {
   const base = (height || 170) * 0.56;
   const adjustments: Record<BodyShape, number> = {
     hourglass: 2,
@@ -103,7 +99,7 @@ function estimateHips(bodyShape: BodyShape, height?: number): number {
   return Math.round(base + (adjustments[bodyShape] || 0));
 }
 
-function estimateShoulderWidth(height?: number): number {
+export function estimateShoulderWidth(height?: number): number {
   return Math.round((height || 170) * 0.23);
 }
 

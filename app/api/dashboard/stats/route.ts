@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import { getDashboardStats, getAnalysesByUserId, getFavoritesByUserId } from "@/lib/db/queries";
+import { apiError } from "@/lib/api/response";
+import { getDashboardStats, getAnalysesByUserId, getFavoritesByUserId, toAnalysisResult } from "@/lib/db/queries";
 
 export async function GET() {
   try {
@@ -10,7 +11,7 @@ export async function GET() {
     });
 
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return apiError("Unauthorized", 401);
     }
 
     const userId = session.user.id;
@@ -26,7 +27,7 @@ export async function GET() {
     const favoriteAnalysisIds = new Set(favorites.map((f) => f.favorite.analysisId));
 
     const recentAnalysesWithFavorite = recent.map((item) => ({
-      ...item,
+      ...toAnalysisResult(item),
       isFavorite: favoriteAnalysisIds.has(item.id),
     }));
 
@@ -44,8 +45,8 @@ export async function GET() {
       recentAnalyses: recentAnalysesWithFavorite,
       scoreTrend: finalScoreTrend,
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Error in GET /api/dashboard/stats:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiError("Internal server error", 500);
   }
 }

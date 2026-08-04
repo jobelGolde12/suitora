@@ -31,7 +31,7 @@ Date: 2026-07-31
 
 - [x] **Caching**: reuse a completed analysis's `generatedImage` for the same user + product (30-day TTL key via `meta` table or Upstash). *Implemented in `syncTryOnLifecycle` (same userId + productId + 30-day window, checked before any GPU submit).*
 - [x] **Rate limiting**: add `tryOnRateLimiter` via `createLimiter` (e.g., 10 runs/day/user) + RunPod monthly spend alarm. *Implemented: 10/day/user, only applied to the runpod provider.*
-- [ ] **Monitoring**: log jobId, provider, latency, status transitions; surface failure rate in dashboard.
+- [x] **Monitoring**: log jobId, provider, latency, status transitions; surface failure rate in dashboard. *Implemented: `lib/ai/tryon/monitoring.ts` → `audit_logs` + structured `[tryon]` console; `getTryOnStats` on dashboard stats API; "Virtual try-on" metric section on dashboard page.*
 
 ## Review
 

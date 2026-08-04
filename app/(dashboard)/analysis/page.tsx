@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
@@ -32,12 +32,9 @@ function AnalysisPageContent() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!id) {
-      setError("No analysis ID provided.");
-      return;
-    }
+    if (!id) return;
 
-    let intervalId: NodeJS.Timeout;
+    let disposed = false;
 
     const pollAnalysis = async () => {
       try {
@@ -47,12 +44,12 @@ function AnalysisPageContent() {
         if (!res.ok) {
           throw new Error("Failed to fetch analysis state");
         }
-        
+
         const data = await res.json();
-        
+
         if (data.error) {
           setError(data.error);
-          clearInterval(intervalId);
+          disposed = true;
           return;
         }
 
@@ -64,14 +61,14 @@ function AnalysisPageContent() {
             progress: 100,
             message: stageMessages.complete,
           });
-          clearInterval(intervalId);
+          disposed = true;
           // Redirect to results page
           setTimeout(() => {
             router.push(`/results/${id}`);
           }, 800);
         } else if (currentStatus === "failed") {
           setError("Analysis pipeline failed. Please check your photos and try again.");
-          clearInterval(intervalId);
+          disposed = true;
         } else {
           // Update progress state based on polling response
           setProgress({
@@ -80,19 +77,26 @@ function AnalysisPageContent() {
             message: data.message || stageMessages.detecting,
           });
         }
-      } catch (err: any) {
+      } catch (err) {
         console.error(err);
         setError("Network error. Unable to poll analysis state.");
-        clearInterval(intervalId);
+        disposed = true;
       }
     };
 
     // Run first check immediately, then poll
+    const intervalId = setInterval(() => {
+      if (!disposed) pollAnalysis();
+    }, 1500);
     pollAnalysis();
-    intervalId = setInterval(pollAnalysis, 1500);
 
-    return () => clearInterval(intervalId);
+    return () => {
+      disposed = true;
+      clearInterval(intervalId);
+    };
   }, [id, router]);
+
+  const displayError = error ?? (id ? null : "No analysis ID provided.");
 
   const getStageIndex = (stage: string): number =>
     stages.indexOf(stage as (typeof stages)[number]);
@@ -108,7 +112,7 @@ function AnalysisPageContent() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-5 py-16">
       <div className="w-full max-w-md">
-        {error ? (
+        {displayError ? (
           <motion.div
             initial="hidden"
             animate="visible"
@@ -123,7 +127,7 @@ function AnalysisPageContent() {
             <h2 className="font-heading text-2xl font-light tracking-tight mb-2">
               Analysis Failed
             </h2>
-            <p className="text-sm text-muted font-light mb-8">{error}</p>
+            <p className="text-sm text-muted font-light mb-8">{displayError}</p>
             <Button
               variant="editorial"
               className="rounded-full px-6"

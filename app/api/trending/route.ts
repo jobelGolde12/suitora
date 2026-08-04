@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { apiError } from "@/lib/api/response";
 import { listTrendItems } from "@/lib/db/queries";
 import { buildTrendCacheKey, getCached, setCached } from "@/lib/trend/cache";
 import { rowToTrendItem } from "@/lib/trend/normalize";
@@ -60,7 +61,7 @@ export async function GET(request: NextRequest) {
       brand,
     });
 
-    let items = rankTrendItems(
+    const items = rankTrendItems(
       rows.map(rowToTrendItem),
       { currentSeason: season || getCurrentSeason() }
     ).slice(0, limit);
@@ -70,9 +71,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ items, cached: false });
   } catch (err) {
     console.error("Error in GET /api/trending:", err);
-    return NextResponse.json(
-      { error: "Failed to load trending items", items: [] },
-      { status: 500 }
-    );
+    return apiError("Failed to load trending items", 500);
   }
 }

@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db, schema } from "@/drizzle";
 import { eq } from "drizzle-orm";
 import { nanoid } from "@/lib/utils/id";
+import { apiError, apiOk } from "@/lib/api/response";
 
 export async function GET() {
   try {
@@ -12,7 +13,7 @@ export async function GET() {
     });
 
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return apiError("Unauthorized", 401);
     }
 
     const [user] = await db
@@ -21,9 +22,9 @@ export async function GET() {
       .where(eq(schema.users.id, session.user.id));
 
     return NextResponse.json({ selfImageUrl: user?.selfImageUrl || null });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Error in GET /api/user/self-image:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiError("Internal server error", 500);
   }
 }
 
@@ -34,14 +35,14 @@ export async function POST(req: Request) {
     });
 
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return apiError("Unauthorized", 401);
     }
 
     const body = await req.json().catch(() => ({}));
     const { selfImageUrl } = body;
 
     if (!selfImageUrl) {
-      return NextResponse.json({ error: "selfImageUrl is required" }, { status: 400 });
+      return apiError("selfImageUrl is required", 400);
     }
 
     // 1. Update user's selfImageUrl
@@ -67,9 +68,9 @@ export async function POST(req: Request) {
       });
     }
 
-    return NextResponse.json({ success: true, selfImageUrl });
-  } catch (err: any) {
+    return apiOk({ selfImageUrl });
+  } catch (err) {
     console.error("Error in POST /api/user/self-image:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiError("Internal server error", 500);
   }
 }

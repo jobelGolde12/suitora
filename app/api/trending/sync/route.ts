@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
+import { apiError, apiOk } from "@/lib/api/response";
 import { syncTrendItems } from "@/lib/trend/sync";
 
 /**
@@ -24,12 +24,12 @@ export async function POST() {
     if (isVercelCron) {
       const authHeader = headerStore.get("authorization");
       if (authHeader !== `Bearer ${cronSecret}`) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        return apiError("Forbidden", 403);
       }
     } else {
       const session = await auth.api.getSession({ headers: headerStore });
       if (!session?.user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        return apiError("Unauthorized", 401);
       }
     }
 
@@ -40,17 +40,9 @@ export async function POST() {
       `[trend-sync] Completed in ${duration}ms: ${result.itemsUpserted} items upserted, ${result.errors.length} errors`
     );
 
-    return NextResponse.json({
-      ok: true,
-      ...result,
-      duration,
-    });
+    return apiOk({ ...result, duration });
   } catch (err) {
-    const duration = Date.now() - startTime;
     console.error("Error in POST /api/trending/sync:", err);
-    return NextResponse.json(
-      { error: "Synchronization failed", duration },
-      { status: 500 }
-    );
+    return apiError("Synchronization failed", 500);
   }
 }

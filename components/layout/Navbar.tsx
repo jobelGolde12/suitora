@@ -20,15 +20,19 @@ export function Navbar() {
   const pathname = usePathname();
   const isLanding = pathname === "/";
 
+  // Close the mobile menu whenever the route changes. Tracking the previous
+  // pathname during render avoids a setState-in-effect cascade.
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname);
+    setMobileOpen(false);
+  }
+
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
 
   return (
     <header

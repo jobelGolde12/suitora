@@ -4,6 +4,7 @@ import { submitTryOn, resolveTryOn } from "./index";
 import { getTryOnProvider } from "./providers";
 import { uploadToCloudinary } from "@/lib/storage/cloudinary";
 import { tryOnRateLimiter } from "@/lib/rate-limit";
+import { logTryOnEvent } from "./monitoring";
 
 const TRYON_OUTPUT_FOLDER = "suitora/tryon/outputs";
 const TRYON_CACHE_TTL_DAYS = 30;
@@ -63,6 +64,14 @@ export async function syncTryOnLifecycle(
           updatedAt: now,
         })
         .where(eq(schema.analyses.id, analysis.id));
+      await logTryOnEvent({
+        action: "tryon.cache_hit",
+        analysisId: analysis.id,
+        userId: analysis.userId,
+        provider: analysis.tryOnProvider,
+        latencyMs: 0,
+        status: "completed",
+      });
       return;
     }
 
@@ -89,6 +98,14 @@ export async function syncTryOnLifecycle(
             updatedAt: now,
           })
           .where(eq(schema.analyses.id, analysis.id));
+        await logTryOnEvent({
+          action: "tryon.rate_limited",
+          analysisId: analysis.id,
+          userId: analysis.userId,
+          provider: "runpod",
+          status: "skipped",
+          error: "Daily try-on limit reached. Try again tomorrow.",
+        });
         return;
       }
     }
@@ -109,17 +126,36 @@ export async function syncTryOnLifecycle(
           updatedAt: now,
         })
         .where(eq(schema.analyses.id, analysis.id));
+
+      await logTryOnEvent({
+        action: "tryon.submitted",
+        analysisId: analysis.id,
+        userId: analysis.userId,
+        jobId,
+        provider,
+        status: "processing",
+      });
     } catch (err) {
       // Roll back to pending so a transient submit failure can retry on
       // the next poll instead of burning a permanently failed status.
+      const message = (err as Error).message;
       await db
         .update(schema.analyses)
         .set({
           tryOnStatus: "pending",
-          tryOnError: (err as Error).message,
+          tryOnError: message,
           updatedAt: new Date().toISOString(),
         })
         .where(eq(schema.analyses.id, analysis.id));
+
+      await logTryOnEvent({
+        action: "tryon.submit_failed",
+        analysisId: analysis.id,
+        userId: analysis.userId,
+        provider: getTryOnProvider().name,
+        status: "pending",
+        error: message,
+      });
     }
     return;
   }
@@ -201,17 +237,43 @@ async function applyTryOnResolution(
         updatedAt: now,
       })
       .where(eq(schema.analyses.id, analysis.id));
+
+    await logTryOnEvent({
+      action: "tryon.completed",
+      analysisId: analysis.id,
+      userId: analysis.userId,
+      jobId: analysis.tryOnJobId,
+      provider: analysis.tryOnProvider,
+      latencyMs,
+      status: "completed",
+    });
     return;
   }
+
+  const failError = resolution.error || "Try-on generation failed";
+  const failLatencyMs = analysis.tryOnStartedAt
+    ? Math.max(0, Date.now() - new Date(analysis.tryOnStartedAt).getTime())
+    : null;
 
   await db
     .update(schema.analyses)
     .set({
       tryOnStatus: "failed",
-      tryOnError: resolution.error || "Try-on generation failed",
+      tryOnError: failError,
       updatedAt: now,
     })
     .where(eq(schema.analyses.id, analysis.id));
+
+  await logTryOnEvent({
+    action: "tryon.failed",
+    analysisId: analysis.id,
+    userId: analysis.userId,
+    jobId: analysis.tryOnJobId,
+    provider: analysis.tryOnProvider,
+    latencyMs: failLatencyMs,
+    status: "failed",
+    error: failError,
+  });
 }
 
 /**

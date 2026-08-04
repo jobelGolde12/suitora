@@ -4,7 +4,9 @@ import { auth } from "@/lib/auth";
 import { db, schema } from "@/drizzle";
 import { eq, and } from "drizzle-orm";
 import { nanoid } from "@/lib/utils/id";
-import { extractProductFromUrl } from "@/lib/ai/product-extraction";
+import { apiError, apiOk } from "@/lib/api/response";
+import { analysisRateLimiter } from "@/lib/rate-limit";
+import { extractProductFromUrlCached } from "@/lib/ai/product-extraction";
 import { analyzeWithVision } from "@/lib/ai/vision";
 import "@/lib/ai/providers"; // Auto-initialize vision providers
 import { syncTryOnLifecycle } from "@/lib/ai/tryon/lifecycle";
@@ -17,7 +19,12 @@ export async function POST(req: Request) {
     });
 
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return apiError("Unauthorized", 401);
+    }
+
+    const rl = await analysisRateLimiter.limit(session.user.id);
+    if (!rl.success) {
+      return apiError("Daily analysis limit reached. Please try again tomorrow.", 429);
     }
 
     const body = await req.json().catch(() => ({}));
@@ -34,10 +41,7 @@ export async function POST(req: Request) {
     }
 
     if (!finalUserImage) {
-      return NextResponse.json(
-        { error: "User self image is required. Please upload one first." },
-        { status: 400 }
-      );
+      return apiError("User self image is required. Please upload one first.", 400);
     }
 
     let finalProductImage = productImageUpload;
@@ -46,7 +50,7 @@ export async function POST(req: Request) {
     // If product URL is provided, extract the image candidate
     if (productUrl) {
       try {
-        const extracted = await extractProductFromUrl(productUrl);
+        const extracted = await extractProductFromUrlCached(productUrl);
         finalProductImage = extracted.imageUrl;
 
         // Save to products table if doesn't exist
@@ -71,12 +75,13 @@ export async function POST(req: Request) {
           .where(eq(schema.products.sourceUrl, productUrl));
         productId = existing?.id || prodId;
       } catch (err) {
-        return NextResponse.json({ error: `URL extraction failed: ${errorMessage(err)}` }, { status: 400 });
+        console.error("URL extraction failed:", err);
+        return apiError("URL extraction failed. Please try uploading an image instead.", 400);
       }
     }
 
     if (!finalProductImage) {
-      return NextResponse.json({ error: "Product image or URL is required." }, { status: 400 });
+      return apiError("Product image or URL is required.", 400);
     }
 
     const analysisId = `analysis_${nanoid()}`;
@@ -96,10 +101,10 @@ export async function POST(req: Request) {
       updatedAt: new Date().toISOString(),
     });
 
-    return NextResponse.json({ success: true, analysisId });
+    return apiOk({ analysisId });
   } catch (err) {
     console.error("Error in POST /api/analysis:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiError("Internal server error", 500);
   }
 }
 
@@ -110,7 +115,7 @@ export async function GET(req: Request) {
     });
 
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return apiError("Unauthorized", 401);
     }
 
     const { searchParams } = new URL(req.url);
@@ -123,7 +128,7 @@ export async function GET(req: Request) {
       const favoriteAnalysisIds = new Set(favorites.map((f) => f.favorite.analysisId));
 
       const mappedHistory = history.map((item) => ({
-        ...item,
+        ...toAnalysisResult(item),
         isFavorite: favoriteAnalysisIds.has(item.id),
       }));
 
@@ -136,7 +141,7 @@ export async function GET(req: Request) {
       .where(eq(schema.analyses.id, id));
 
     if (!analysis) {
-      return NextResponse.json({ error: "Analysis not found" }, { status: 404 });
+      return apiError("Analysis not found", 404);
     }
 
     // Advance the virtual try-on lifecycle (lazy submit / resolve).
@@ -149,18 +154,13 @@ export async function GET(req: Request) {
       .where(eq(schema.analyses.id, id));
 
     if (!current) {
-      return NextResponse.json({ error: "Analysis not found" }, { status: 404 });
+      return apiError("Analysis not found", 404);
     }
 
     // If analysis is already completed or failed, return it
     if (current.status === "completed" || current.status === "failed") {
       return NextResponse.json({
-        analysis: {
-          ...current,
-          recommendations: current.recommendations ? JSON.parse(current.recommendations) : [],
-          colorAnalysis: current.colorAnalysis ? JSON.parse(current.colorAnalysis) : null,
-          compatibilityMetadata: current.compatibilityMetadata ? JSON.parse(current.compatibilityMetadata) : null,
-        }
+        analysis: toAnalysisResult(current),
       });
     }
 
@@ -200,6 +200,18 @@ export async function GET(req: Request) {
           weightConfidence: visionResult.weightConfidence,
         };
 
+        // Persist high-confidence traits to the user's profile (estimates only,
+        // never overwrites manual measurements).
+        await persistAnalysisEstimates(session.user.id, {
+          height: visionResult.height ?? null,
+          heightConfidence: visionResult.heightConfidence ?? null,
+          weight: visionResult.weight ?? null,
+          weightConfidence: visionResult.weightConfidence ?? null,
+          bodyShape: visionResult.traits.bodyShape,
+          skinTone: visionResult.traits.skinTone,
+          faceShape: visionResult.traits.faceShape,
+        });
+
         // Update DB record with real analysis results
         await db
           .update(schema.analyses)
@@ -231,12 +243,7 @@ export async function GET(req: Request) {
           .where(eq(schema.analyses.id, id));
 
         return NextResponse.json({
-          analysis: {
-            ...updatedAnalysis,
-            recommendations,
-            colorAnalysis,
-            compatibilityMetadata,
-          },
+          analysis: toAnalysisResult(updatedAnalysis),
           progress: 100,
           stage: "complete",
           message: "Analysis complete!"
@@ -254,8 +261,8 @@ export async function GET(req: Request) {
           .where(eq(schema.analyses.id, id));
 
         return NextResponse.json({
-          analysis: { ...current, status: "failed" },
-          error: `Analysis pipeline failed: ${errorMessage(err)}`,
+          analysis: toAnalysisResult({ ...current, status: "failed" }),
+          error: "Analysis failed. Please try again.",
         });
       }
     } else if (elapsedMs > 4500) {
@@ -273,14 +280,14 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json({
-      analysis: current,
+      analysis: toAnalysisResult(current),
       progress,
       stage,
       message,
     });
   } catch (err) {
     console.error("Error in GET /api/analysis:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiError("Internal server error", 500);
   }
 }
 
@@ -291,14 +298,14 @@ export async function DELETE(req: Request) {
     });
 
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return apiError("Unauthorized", 401);
     }
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
     if (!id) {
-      return NextResponse.json({ error: "Analysis ID is required" }, { status: 400 });
+      return apiError("Analysis ID is required", 400);
     }
 
     // Load the row (ownership-scoped) so we can clean up generated assets.
@@ -308,7 +315,7 @@ export async function DELETE(req: Request) {
       .where(and(eq(schema.analyses.id, id), eq(schema.analyses.userId, session.user.id)));
 
     if (!analysis) {
-      return NextResponse.json({ error: "Analysis not found" }, { status: 404 });
+      return apiError("Analysis not found", 404);
     }
 
     // Best-effort cleanup of the generated try-on image (owned by us in
@@ -317,17 +324,13 @@ export async function DELETE(req: Request) {
 
     await db.delete(schema.analyses).where(eq(schema.analyses.id, id));
 
-    return NextResponse.json({ success: true });
+    return apiOk();
   } catch (err) {
     console.error("Error in DELETE /api/analysis:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiError("Internal server error", 500);
   }
 }
 
 // Re-import these from queries to avoid circular dependency
-import { getAnalysesByUserId, getFavoritesByUserId } from "@/lib/db/queries";
+import { getAnalysesByUserId, getFavoritesByUserId, toAnalysisResult, persistAnalysisEstimates } from "@/lib/db/queries";
 import { deleteCloudinaryImageFromUrl } from "@/lib/storage/cloudinary";
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}

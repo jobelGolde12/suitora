@@ -3,12 +3,13 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/drizzle";
 import { eq } from "drizzle-orm";
+import { apiError, apiOk } from "@/lib/api/response";
 import {
   getProfileByUserId,
   upsertProfile,
 } from "@/lib/db/queries";
 import { updateProfileSchema } from "@/lib/utils/validation";
-import type { UpdateProfilePayload, UserProfile } from "@/types";
+import type { UpdateProfilePayload } from "@/types";
 
 /**
  * GET /api/user/profile
@@ -21,7 +22,7 @@ export async function GET() {
     });
 
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return apiError("Unauthorized", 401);
     }
 
     let profile = await getProfileByUserId(session.user.id);
@@ -42,9 +43,9 @@ export async function GET() {
     };
 
     return NextResponse.json({ profile: parsed });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Error in GET /api/user/profile:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiError("Internal server error", 500);
   }
 }
 
@@ -59,7 +60,7 @@ export async function PUT(req: Request) {
     });
 
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return apiError("Unauthorized", 401);
     }
 
     const body = await req.json();
@@ -70,7 +71,7 @@ export async function PUT(req: Request) {
       const message = validated.error.issues
         .map((i) => `${i.path.join(".")}: ${i.message}`)
         .join(", ");
-      return NextResponse.json({ error: `Invalid input: ${message}` }, { status: 400 });
+      return apiError(`Invalid input: ${message}`, 400);
     }
 
     const profileData: UpdateProfilePayload = validated.data;
@@ -86,7 +87,7 @@ export async function PUT(req: Request) {
     const updated = await upsertProfile(session.user.id, profileData);
 
     if (!updated) {
-      return NextResponse.json({ error: "Failed to update profile" }, { status: 500 });
+      return apiError("Failed to update profile", 500);
     }
 
     // Parse JSON string fields
@@ -98,14 +99,14 @@ export async function PUT(req: Request) {
       avoidColors: safeParseJson(updated.avoidColors),
     };
 
-    return NextResponse.json({ profile: parsed });
-  } catch (err: any) {
+    return apiOk({ profile: parsed });
+  } catch (err) {
     console.error("Error in PUT /api/user/profile:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiError("Internal server error", 500);
   }
 }
 
-function safeParseJson(value: string | null | undefined): any[] {
+function safeParseJson(value: string | null | undefined): unknown[] {
   if (!value) return [];
   try {
     return JSON.parse(value);

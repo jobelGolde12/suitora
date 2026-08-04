@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
+import { ImageOff } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { CategoryBadge } from "@/components/ui/CategoryBadge";
 import { fadeInUp } from "@/components/dashboard/motion";
@@ -17,6 +19,7 @@ interface TrendingCardProps {
 
 export function TrendingCard({ item, delay = 0, className }: TrendingCardProps) {
   const priceLabel = formatLocalPrice(item.price, item.currency);
+  const [imageFailed, setImageFailed] = useState(false);
 
   return (
     <motion.div
@@ -34,14 +37,24 @@ export function TrendingCard({ item, delay = 0, className }: TrendingCardProps) 
         )}
       >
         <div className="relative h-56 sm:h-64 md:h-72 overflow-hidden bg-surface">
-          <Image
-            src={item.imageUrl}
-            alt={`${item.title}${item.brand ? ` by ${item.brand}` : ""}`}
-            fill
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
-            unoptimized
-          />
+          {imageFailed ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-surface text-muted">
+              <ImageOff className="h-6 w-6" strokeWidth={1.5} />
+              <span className="text-[10px] uppercase tracking-[0.2em] font-light">
+                Image unavailable
+              </span>
+            </div>
+          ) : (
+            <Image
+              src={item.imageUrl}
+              alt={`${item.title}${item.brand ? ` by ${item.brand}` : ""}`}
+              fill
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+              className="object-cover transition-transform duration-500 group-hover:scale-105"
+              unoptimized
+              onError={() => setImageFailed(true)}
+            />
+          )}
           <div className="absolute top-3 left-3">
             <CategoryBadge category={item.category} />
           </div>

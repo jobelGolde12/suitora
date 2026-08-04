@@ -16,8 +16,6 @@ import type {
   SkinTone,
   FaceShape,
   StyleTag,
-  ItemCategory,
-  Silhouette,
   ItemProfile,
   UserBodyProfile,
 } from "@/types";

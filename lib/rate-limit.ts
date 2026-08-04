@@ -35,6 +35,10 @@ export const registerEmailLimiter = createLimiter("ratelimit:register-email", [3
 // Try-on generation limiters
 export const tryOnRateLimiter = createLimiter("ratelimit:tryon", [10, "24 h"]);
 
+// AI analysis + upload limiters
+export const analysisRateLimiter = createLimiter("ratelimit:analysis", [20, "1 d"]);
+export const uploadRateLimiter = createLimiter("ratelimit:upload", [10, "1 h"]);
+
 export type RateLimitResult = {
   success: boolean;
   limit: number;
