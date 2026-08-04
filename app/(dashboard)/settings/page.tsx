@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   User,
@@ -16,7 +15,9 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
+import { useSession } from "@/components/providers/SessionProvider";
 import { PageContainer, PageHeader, fadeInUp } from "@/components/dashboard";
 import { ProfileForm } from "@/components/settings/ProfileForm";
 import { cn } from "@/lib/utils/cn";
@@ -33,28 +34,27 @@ const tabs: { id: SettingsTab; label: string; icon: React.ElementType }[] = [
 
 export default function SettingsPage() {
   const { addToast } = useToast();
-  const router = useRouter();
+  const { logout } = useSession();
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-  const handleLogout = async () => {
+  const handleLogoutConfirm = async () => {
     setIsLoggingOut(true);
+    setShowConfirmModal(false);
+
     try {
-      await fetch("/api/auth/sign-out", {
-        method: "POST",
-        credentials: "include",
-      });
-      // Notify other tabs
-      if (typeof window !== "undefined") {
-        localStorage.setItem("session_update", Date.now().toString());
+      const success = await logout();
+      if (!success) {
+        addToast("Signed out locally, but server logout failed", "warning");
       }
-      router.push("/login");
     } catch {
-      addToast("Failed to sign out", "error");
+      addToast("An error occurred during logout", "error");
     } finally {
       setIsLoggingOut(false);
+      window.location.href = "/login";
     }
   };
 
@@ -243,16 +243,11 @@ export default function SettingsPage() {
           <div className="pt-4 mt-4 border-t border-border">
             <button
               type="button"
-              onClick={handleLogout}
-              disabled={isLoggingOut}
-              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-error hover:bg-error/5 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+              onClick={() => setShowConfirmModal(true)}
+              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-error hover:bg-error/5 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              {isLoggingOut ? (
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-error border-t-transparent" />
-              ) : (
-                <LogOut className="h-4 w-4" strokeWidth={1.5} />
-              )}
-              {isLoggingOut ? "Signing out..." : "Sign Out"}
+              <LogOut className="h-4 w-4" strokeWidth={1.5} />
+              Sign Out
             </button>
           </div>
         </nav>
@@ -263,6 +258,18 @@ export default function SettingsPage() {
           </Card>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={handleLogoutConfirm}
+        title="Sign out"
+        description="Are you sure you want to log out? You will need to sign in again to access your account."
+        confirmLabel="Logout"
+        cancelLabel="Cancel"
+        variant="danger"
+        isLoading={isLoggingOut}
+      />
     </PageContainer>
   );
 }

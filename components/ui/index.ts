@@ -7,3 +7,4 @@ export { Avatar } from "./Avatar";
 export { ScoreCircle } from "./ScoreCircle";
 export { Skeleton, CardSkeleton, AnalysisResultSkeleton } from "./Skeleton";
 export { ToastProvider, useToast } from "./Toast";
+export { ConfirmModal } from "./ConfirmModal";

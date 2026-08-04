@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
+import { logoutAction } from "@/lib/auth/actions";
 
 interface Session {
   user: {
@@ -15,12 +16,14 @@ interface SessionContextType {
   session: Session | null;
   isLoading: boolean;
   refreshSession: () => Promise<void>;
+  logout: () => Promise<boolean>;
 }
 
 const SessionContext = createContext<SessionContextType>({
   session: null,
   isLoading: true,
   refreshSession: async () => {},
+  logout: async () => false,
 });
 
 export function useSession() {
@@ -38,7 +41,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       });
       if (res.ok) {
         const data = await res.json();
-        // Better Auth returns session directly or nested
         const sess = data?.session || data;
         if (sess?.user) {
           setSession(sess);
@@ -59,21 +61,52 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     await fetchSession();
   }, [fetchSession]);
 
-  // Initial session fetch
+  const logout = useCallback(async (): Promise<boolean> => {
+    let apiSuccess = false;
+
+    try {
+      const result = await logoutAction();
+      apiSuccess = result.success;
+    } catch {
+      // Continue with local cleanup even if the server action fails
+    }
+
+    Object.keys(localStorage).forEach((key) => {
+      if (key.includes("session") || key.includes("token") || key.includes("auth")) {
+        localStorage.removeItem(key);
+      }
+    });
+
+    sessionStorage.clear();
+
+    document.cookie.split(";").forEach((cookie) => {
+      const name = cookie.split("=")[0].trim();
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; secure;`;
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; samesite=strict;`;
+    });
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem("session_update", Date.now().toString());
+    }
+
+    setSession(null);
+
+    return apiSuccess;
+  }, []);
+
   useEffect(() => {
     void Promise.resolve().then(() => fetchSession());
   }, [fetchSession]);
 
-  // Refresh session every 10 minutes
   useEffect(() => {
     const interval = setInterval(() => {
       void fetchSession();
-    }, 10 * 60 * 1000); // 10 minutes
+    }, 10 * 60 * 1000);
 
     return () => clearInterval(interval);
   }, [fetchSession]);
 
-  // Listen for storage events (multi-tab sync)
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === "session_update") {
@@ -86,7 +119,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [fetchSession]);
 
   return (
-    <SessionContext.Provider value={{ session, isLoading, refreshSession }}>
+    <SessionContext.Provider value={{ session, isLoading, refreshSession, logout }}>
       {children}
     </SessionContext.Provider>
   );
