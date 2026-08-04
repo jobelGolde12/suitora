@@ -1,0 +1,500 @@
+/* ============================================================================
+   Try It On — scoped design tokens + component styles
+
+   Editorial aesthetic, preserved exactly (no theme drift):
+   warm cream background, off-white dashed surfaces, muted caramel/tan accent,
+   circular beige icon badges, serif display heading, letter-spaced uppercase
+   eyebrow, quiet gray sans body. No new hues, no fonts, no gradients, no
+   glassmorphism, no dark mode.
+
+   Everything is scoped under `.try-on` so the global theme is left untouched.
+   ========================================================================== */
+
+.try-on {
+  /* ── Color tokens ─────────────────────────────────────────── */
+  --t-bg: #F2F0EB;
+  --t-surface: #F7F6F2;
+  --t-border-dashed: #DAD3C8;
+  --t-ink: #2B2926;
+  --t-ink-muted: #8A857C;
+  --t-ink-faint: #B3ADA3;
+  --t-accent: #B4835C;
+  --t-badge: #E7DFD5;
+  --t-error: #B4593C;
+
+  /* Derived tints (used instead of color-mix for wide support). */
+  --t-accent-40: rgba(180, 131, 92, 0.4);   /* hover border */
+  --t-accent-6: rgba(180, 131, 92, 0.06);   /* dragover fill */
+  --t-accent-12: rgba(180, 131, 92, 0.12);  /* focus glow / tint */
+  --t-error-10: rgba(180, 89, 60, 0.1);     /* error banner fill */
+  --t-error-30: rgba(180, 89, 60, 0.3);     /* error banner border */
+
+  /* ── Radii ────────────────────────────────────────────────── */
+  --t-r-lg: 20px;
+  --t-r-md: 12px;
+  --t-r-full: 999px;
+
+  /* ── Spacing (8pt scale) ──────────────────────────────────── */
+  --t-space-1: 8px;
+  --t-space-2: 16px;
+  --t-space-3: 24px;
+  --t-space-4: 32px;
+  --t-space-5: 40px;
+  --t-space-6: 48px;
+
+  /* ── Motion ───────────────────────────────────────────────── */
+  --t-dur: 200ms;
+  --t-dur-fast: 160ms;
+  --t-dur-slow: 240ms;
+  --t-ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Page shell ───────────────────────────────────────────────────── */
+.try-on { background: var(--t-bg); }
+.try-on .tryon-page {
+  max-width: 1160px;
+  margin-inline: auto;
+  padding-inline: clamp(24px, 4vw, 32px);
+  padding-top: var(--t-space-6);
+  padding-bottom: 80px;
+}
+
+/* ── Section header (shared baseline with card edge) ─────────────── */
+.try-on .tryon-eyebrow {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--t-accent);
+  font-weight: 500;
+  margin: 0 0 12px;
+}
+.try-on .tryon-title {
+  font-family: var(--font-heading);
+  font-size: clamp(2.2rem, 4vw, 3rem);
+  line-height: 1.05;
+  font-weight: 300;
+  letter-spacing: -0.01em;
+  color: var(--t-ink);
+  margin: 0 0 14px;
+  text-wrap: balance;
+}
+.try-on .tryon-subtitle {
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--t-ink-muted);
+  font-weight: 300;
+  max-width: 56ch;
+  margin: 0;
+}
+
+/* ── Level two-column grid ───────────────────────────────────────── */
+.try-on .tryon-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  align-items: stretch;
+  margin-top: var(--t-space-6);
+}
+.try-on .tryon-col {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  row-gap: 16px;
+  align-items: stretch;
+  min-height: 0;
+}
+
+/* Row 1 — column header (icon badge + label) */
+.try-on .tryon-col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 40px;
+}
+.try-on .tryon-col-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--t-ink);
+  letter-spacing: -0.01em;
+  min-width: 0;
+}
+.try-on .tryon-badge {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--t-badge);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--t-accent);
+}
+.try-on .tryon-badge svg { width: 20px; height: 20px; stroke-width: 1.5; }
+
+.try-on .tryon-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  color: var(--t-accent);
+  border: 1px solid transparent;
+  border-radius: var(--t-r-full);
+  background: transparent;
+  cursor: pointer;
+  transition: border-color var(--t-dur) var(--t-ease), background var(--t-dur) var(--t-ease);
+}
+.try-on .tryon-ghost:hover { border-color: var(--t-accent-40); background: var(--t-accent-6); }
+.try-on .tryon-ghost:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+.try-on .tryon-ghost svg { width: 14px; height: 14px; stroke-width: 1.5; }
+
+/* Row 2 — balancing hint (left) · segmented control (right) */
+.try-on .tryon-hint {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--t-ink-muted);
+  font-weight: 300;
+  padding: 0 6px;
+}
+.try-on .tryon-hint svg { width: 15px; height: 15px; color: var(--t-ink-faint); stroke-width: 1.5; flex-shrink: 0; }
+
+.try-on .tryon-segmented { height: 44px; }
+.try-on .tryon-seg-track {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 100%;
+  background: #ECE7DF;
+  border-radius: var(--t-r-full);
+  padding: 4px;
+}
+.try-on .tryon-seg-indicator {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  height: 36px;
+  border-radius: var(--t-r-full);
+  background: #FBFAF7;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  transition: transform var(--t-dur) cubic-bezier(0.4, 0, 0.2, 1);
+}
+.try-on .tryon-seg-btn {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--t-ink-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--t-r-full);
+  padding: 0 8px;
+  transition: color var(--t-dur) var(--t-ease);
+}
+.try-on .tryon-seg-btn.is-active { color: var(--t-ink); font-weight: 500; }
+.try-on .tryon-seg-btn svg { width: 16px; height: 16px; stroke-width: 1.5; }
+.try-on .tryon-seg-btn:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+
+/* Row 3 — equal-height slot */
+.try-on .tryon-slot { position: relative; min-height: 0; }
+
+/* ── Dropzone (default / hover / dragover / focus) ──────────────────── */
+.try-on .tryon-zone {
+  position: relative;
+  height: 100%;
+  min-height: 440px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--t-space-4);
+  gap: var(--t-space-2);
+  text-align: center;
+  border: 1.5px dashed var(--t-border-dashed);
+  border-radius: var(--t-r-lg);
+  background: var(--t-surface);
+  cursor: pointer;
+  transition:
+    border-color var(--t-dur-fast) var(--t-ease),
+    background-color var(--t-dur-fast) var(--t-ease),
+    transform var(--t-dur-fast) var(--t-ease);
+}
+.try-on .tryon-zone:hover { border-color: var(--t-accent-40); background: #FAF7F2; }
+.try-on .tryon-zone:hover .tryon-badge-xl { transform: scale(1.06); }
+.try-on .tryon-zone.dragover {
+  border-style: solid;
+  border-color: var(--t-accent);
+  background: var(--t-accent-6);
+  transform: scale(1.01);
+}
+.try-on .tryon-zone:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+
+.try-on .tryon-zone-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+.try-on .tryon-badge-xl {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--t-badge);
+  color: var(--t-accent);
+  transition: transform var(--t-dur) var(--t-ease);
+}
+.try-on .tryon-badge-xl svg { width: 28px; height: 28px; stroke-width: 1.5; }
+.try-on .tryon-zone-title { margin: 12px 0 0; font-size: 16px; font-weight: 600; color: var(--t-ink); }
+.try-on .tryon-zone-helper { margin: 8px 0 0; font-size: 13.5px; color: var(--t-ink-muted); font-weight: 300; }
+.try-on .tryon-zone-meta { margin: 16px 0 0; font-size: 12px; color: var(--t-ink-faint); font-weight: 300; letter-spacing: 0.02em; }
+
+/* ── Loading overlay inside a zone ─────────────────────────────────── */
+.try-on .tryon-zone-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(247, 246, 242, 0.86);
+  border-radius: var(--t-r-lg);
+}
+.try-on .tryon-zone-loading svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 1.5;
+  color: var(--t-accent);
+  animation: tryon-spin 1s linear infinite;
+}
+.try-on .tryon-zone-loading span { font-size: 13px; color: var(--t-ink-muted); font-weight: 300; }
+@keyframes tryon-spin { to { transform: rotate(360deg); } }
+
+/* ── Inline dismissible error banner ───────────────────────────────── */
+.try-on .tryon-error {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  z-index: 5;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--t-r-md);
+  background: var(--t-error-10);
+  border: 1px solid var(--t-error-30);
+  color: var(--t-error);
+  font-size: 13px;
+  font-weight: 500;
+}
+.try-on .tryon-error .tryon-error-ico { width: 14px; height: 14px; stroke-width: 1.5; flex-shrink: 0; margin-top: 1px; }
+.try-on .tryon-error-text { flex: 1; line-height: 1.4; }
+.try-on .tryon-error .tryon-error-dismiss {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--t-error);
+  cursor: pointer;
+  border-radius: var(--t-r-full);
+}
+.try-on .tryon-error .tryon-error-dismiss:hover { background: var(--t-error-10); }
+.try-on .tryon-error .tryon-error-dismiss svg { width: 14px; height: 14px; stroke-width: 1.5; }
+
+/* ── Preview card (reserved height → CLS = 0) ──────────────────────── */
+.try-on .tryon-preview {
+  position: relative;
+  height: 100%;
+  min-height: 440px;
+  border-radius: var(--t-r-lg);
+  border: 1px solid var(--t-border-dashed);
+  background: var(--t-surface);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.try-on .tryon-preview-media { position: relative; flex: 1; min-height: 0; background: var(--t-surface); }
+.try-on .tryon-preview-media img { width: 100%; height: 100%; object-fit: cover; }
+.try-on .tryon-preview-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--t-ink-faint);
+}
+.try-on .tryon-preview-placeholder svg { width: 28px; height: 28px; stroke-width: 1.5; }
+.try-on .tryon-preview-badge-success {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--t-r-full);
+  background: var(--t-surface);
+  border: 1px solid var(--t-border-dashed);
+  color: var(--t-ink);
+  font-size: 12px;
+  font-weight: 500;
+}
+.try-on .tryon-preview-badge-success svg { width: 13px; height: 13px; color: var(--t-accent); stroke-width: 1.5; }
+.try-on .tryon-preview-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 56px;
+  padding: 0 16px;
+  border-top: 1px solid var(--t-border-dashed);
+  background: var(--t-surface);
+}
+.try-on .tryon-preview-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.try-on .tryon-preview-name { font-size: 12.5px; color: var(--t-ink); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.try-on .tryon-preview-size { font-size: 11.5px; color: var(--t-ink-faint); font-weight: 300; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.try-on .tryon-preview-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.try-on .tryon-preview-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  font-size: 12px;
+  color: var(--t-ink-muted);
+  border: 1px solid var(--t-border-dashed);
+  border-radius: var(--t-r-full);
+  background: transparent;
+  cursor: pointer;
+  transition: border-color var(--t-dur) var(--t-ease), color var(--t-dur) var(--t-ease);
+}
+.try-on .tryon-preview-btn:hover { border-color: var(--t-accent); color: var(--t-accent); }
+.try-on .tryon-preview-btn:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+.try-on .tryon-preview-btn svg { width: 13px; height: 13px; stroke-width: 1.5; }
+
+/* ── Paste-URL card ─────────────────────────────────────────────────── */
+.try-on .tryon-url {
+  height: 100%;
+  min-height: 440px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+  padding: var(--t-space-4);
+  text-align: center;
+  border: 1.5px dashed var(--t-border-dashed);
+  border-radius: var(--t-r-lg);
+  background: var(--t-surface);
+}
+.try-on .tryon-url-center .tryon-badge-xl { margin: 0 auto 16px; }
+.try-on .tryon-url-title { font-size: 16px; font-weight: 600; color: var(--t-ink); margin: 0 0 6px; }
+.try-on .tryon-url-sub { font-size: 13.5px; color: var(--t-ink-muted); font-weight: 300; margin: 0; }
+.try-on .tryon-url-row { display: flex; gap: 10px; text-align: left; }
+.try-on .tryon-url-input {
+  flex: 1;
+  height: 44px;
+  padding: 0 16px;
+  font-size: 14px;
+  color: var(--t-ink);
+  background: var(--t-surface);
+  border: 1px solid var(--t-border-dashed);
+  border-radius: var(--t-r-md);
+  min-width: 0;
+  transition: border-color var(--t-dur) var(--t-ease), box-shadow var(--t-dur) var(--t-ease);
+}
+.try-on .tryon-url-input::placeholder { color: var(--t-ink-faint); }
+.try-on .tryon-url-input:focus { outline: none; border-color: var(--t-accent); box-shadow: 0 0 0 3px var(--t-accent-12); }
+.try-on .tryon-url-input[aria-invalid="true"] { border-color: var(--t-error); box-shadow: 0 0 0 3px var(--t-error-10); }
+.try-on .tryon-url-fetch {
+  height: 44px;
+  padding: 0 20px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--t-surface);
+  background: var(--t-accent);
+  border: none;
+  border-radius: var(--t-r-full);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition: transform var(--t-dur) var(--t-ease), box-shadow var(--t-dur-slow) var(--t-ease);
+}
+.try-on .tryon-url-fetch:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 16px var(--t-accent-40); }
+.try-on .tryon-url-fetch:disabled { opacity: 0.5; cursor: not-allowed; }
+.try-on .tryon-url-fetch:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+.try-on .tryon-url-fetch svg { width: 15px; height: 15px; stroke-width: 1.5; }
+.try-on .tryon-url-fetch svg.tryon-spin,
+.try-on .tryon-cta-btn svg.tryon-spin { animation: tryon-spin 1s linear infinite; }
+.try-on .tryon-url-error { margin: 4px 0 0; font-size: 12.5px; color: var(--t-error); font-weight: 500; }
+
+/* ── Primary CTA ───────────────────────────────────────────────────── */
+.try-on .tryon-cta { display: flex; justify-content: center; margin-top: var(--t-space-6); }
+.try-on .tryon-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 28px;
+  border-radius: var(--t-r-full);
+  background: var(--t-accent);
+  color: var(--t-surface);
+  font-size: 15px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition:
+    opacity var(--t-dur-slow) var(--t-ease),
+    transform var(--t-dur) var(--t-ease),
+    box-shadow var(--t-dur-slow) var(--t-ease);
+}
+.try-on .tryon-cta-btn svg { width: 16px; height: 16px; stroke-width: 1.5; }
+.try-on .tryon-cta-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 24px var(--t-accent-40); }
+.try-on .tryon-cta-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.try-on .tryon-cta-btn:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+
+/* ── Responsive: single column ≤900px ──────────────────────────────── */
+@media (max-width: 900px) {
+  .try-on .tryon-grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    margin-top: var(--t-space-5);
+  }
+  .try-on .tryon-zone,
+  .try-on .tryon-preview,
+  .try-on .tryon-url {
+    min-height: 320px;
+  }
+}
+
+/* ── Reduced motion ────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .try-on *,
+  .try-on *::before,
+  .try-on *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}

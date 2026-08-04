@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import {
   Camera,
   Shirt,
@@ -13,11 +13,11 @@ import {
   Link as LinkIcon,
   Upload as UploadIcon,
   Loader2,
+  Info,
+  Download,
+  RefreshCw,
 } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { PageContainer, PageHeader, fadeInUp, UploadSkeleton } from "@/components/dashboard";
-import { cn } from "@/lib/utils/cn";
+import { UploadSkeleton } from "@/components/dashboard";
 import { MAX_FILE_SIZE, ACCEPTED_IMAGE_TYPES } from "@/lib/utils/validation";
 import { uploadImage } from "@/lib/ai/upload";
 import { SelfImageModal } from "@/components/upload/SelfImageModal";
@@ -35,6 +35,13 @@ interface AnalysisRequest {
   userImageUrl: string;
   productImageUpload?: string;
   productUrl?: string;
+}
+
+/** Human-readable byte size for the preview meta row. */
+function formatBytes(bytes?: number): string {
+  if (!bytes || bytes <= 0) return "";
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export default function UploadPage() {
@@ -240,226 +247,367 @@ export default function UploadPage() {
     }
   };
 
+  // URL / link flow state
+  const [urlConfirmed, setUrlConfirmed] = useState(false);
+  const [fetchingUrl, setFetchingUrl] = useState(false);
+
+  const handleSelfRemove = useCallback(() => {
+    setSelfImageUrl(null);
+    setPendingSelf({ file: null, preview: "" });
+    setSelfError("");
+  }, []);
+
+  const handleSelfPaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      const file = e.clipboardData?.files?.[0];
+      if (file && file.type.startsWith("image/")) {
+        e.preventDefault();
+        handleSelfFileSelect(file);
+      }
+    },
+    [handleSelfFileSelect]
+  );
+
+  const handleSelfDragEnter = useCallback(() => setSelfDragOver(true), []);
+  const handleSelfDragLeave = useCallback(() => setSelfDragOver(false), []);
+
+  const handleFetchProduct = useCallback(() => {
+    if (!productUrl) {
+      setProductUrlError("Please enter a product URL");
+      setUrlConfirmed(false);
+      return;
+    }
+    if (!/^https?:\/\//i.test(productUrl)) {
+      setProductUrlError("URL must start with http:// or https://");
+      setUrlConfirmed(false);
+      return;
+    }
+    if (fetchingUrl) return;
+    setProductUrlError("");
+    setUrlConfirmed(true);
+    setFetchingUrl(true);
+    // The analysis backend performs the real product extraction on submit; a
+    // brief spinner keeps the affordance legible, then the preview card shows.
+    window.setTimeout(() => setFetchingUrl(false), 450);
+  }, [productUrl, fetchingUrl]);
+
+  const resetUrl = useCallback(() => {
+    setProductUrlError("");
+    setUrlConfirmed(false);
+  }, []);
+
   const canProceed =
     !!selfImageUrl &&
     (productInputMode === "upload"
       ? !!clothingPhoto.preview && !clothingPhoto.error
-      : !!productUrl && !productUrlError);
+      : !!productUrl && !productUrlError && urlConfirmed);
 
   if (isLoadingSelfImage) {
     return <UploadSkeleton />;
   }
 
+  const showClothingZone = productInputMode === "upload";
+  const showLinkPreview = productInputMode === "link" && urlConfirmed && !!productUrl;
+
   return (
-    <PageContainer narrow>
-      {/* Self Image Modal (Change Photo) */}
-      <AnimatePresence>
-        {showSelfImageModal && (
-          <SelfImageModal
-            onSuccess={(url) => {
-              setSelfImageUrl(url);
-              setShowSelfImageModal(false);
-            }}
-          />
-        )}
-      </AnimatePresence>
-
-      <PageHeader
-        label="Create"
-        title="Try It On"
-        description="Select a clothing item and see how well it fits your body profile."
-      />
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 mb-12">
-        {/* Upload Self */}
-        <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={fadeInUp}
-          custom={1}
-        >
-          <h2 className="text-sm font-medium mb-4 flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface">
-                <Camera className="h-3.5 w-3.5 text-muted" strokeWidth={1.5} />
-              </span>
-              Upload Self
-            </span>
-            {selfImageUrl && (
-              <button
-                type="button"
-                onClick={() => setShowSelfImageModal(true)}
-                className="text-xs text-accent hover:text-accent-light transition-colors font-light"
-              >
-                Change Photo
-              </button>
-            )}
-          </h2>
-          <div className="aspect-[3/4] flex flex-col">
-            {selfImageUrl && !pendingSelf.preview ? (
-              <div className="relative flex-1 rounded-2xl border border-border bg-card overflow-hidden group shadow-card">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={selfImageUrl}
-                  alt="Your body photo"
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-card/95 border border-border text-foreground px-3 py-1 text-xs font-medium">
-                  <Check className="h-3 w-3 text-success" strokeWidth={1.5} />
-                  Profile Active
-                </div>
-              </div>
-            ) : selfUploading || pendingSelf.preview ? (
-              <div className="relative flex-1 rounded-2xl border border-border bg-card overflow-hidden shadow-card">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={pendingSelf.preview}
-                  alt="Your body photo preview"
-                  className="w-full h-full object-cover"
-                />
-                {selfUploading && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-card/70 backdrop-blur-sm">
-                    <Loader2 className="h-6 w-6 text-accent animate-spin" strokeWidth={1.5} />
-                    <p className="text-xs text-foreground font-light">
-                      Uploading self photo…
-                    </p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div
-                onDrop={handleSelfDrop}
-                onDragOver={(e) => e.preventDefault()}
-                onDragEnter={() => setSelfDragOver(true)}
-                onDragLeave={() => setSelfDragOver(false)}
-                onClick={() => selfInputRef.current?.click()}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    selfInputRef.current?.click();
-                  }
-                }}
-                role="button"
-                tabIndex={0}
-                aria-label="Upload your self photo"
-                className={cn(
-                  "flex-1 relative flex flex-col items-center justify-center rounded-2xl border border-dashed p-8 cursor-pointer transition-all duration-200 bg-card shadow-card",
-                  selfDragOver
-                    ? "border-accent bg-accent/5"
-                    : "border-border hover:border-accent/40 hover:bg-surface/40"
-                )}
-              >
-                <div className="flex flex-col items-center gap-4 text-center">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full border border-border bg-surface">
-                    <Camera className="h-6 w-6 text-muted" strokeWidth={1.5} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Upload your photo</p>
-                    <p className="text-xs text-muted mt-1.5 font-light">
-                      Drag & drop or click to browse
-                    </p>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground font-light">
-                    JPG, PNG, WEBP up to 5MB
-                  </p>
-                </div>
-                <input
-                  ref={selfInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleSelfFileSelect(file);
-                  }}
-                />
-              </div>
-            )}
-          </div>
-          {selfError && (
-            <p className="mt-2 text-xs text-error flex items-center gap-1">
-              <AlertCircle className="h-3 w-3" />
-              {selfError}
-            </p>
+    <div className="try-on min-h-screen">
+      <div className="tryon-page">
+        <AnimatePresence>
+          {showSelfImageModal && (
+            <SelfImageModal
+              onSuccess={(url) => {
+                setSelfImageUrl(url);
+                setShowSelfImageModal(false);
+              }}
+            />
           )}
-        </motion.div>
+        </AnimatePresence>
 
-        {/* Upload Item to Match (Upload or Link) */}
-        <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={fadeInUp}
-          custom={2}
-        >
-          <h2 className="text-sm font-medium mb-4 flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface">
-                <Shirt className="h-3.5 w-3.5 text-muted" strokeWidth={1.5} />
-              </span>
-              Upload Item to Match
-            </span>
-          </h2>
-          {/* Selector Tabs */}
-          <div className="flex border border-border rounded-xl p-1 bg-surface/50 mb-4">
-            <button
-              type="button"
-              onClick={() => setProductInputMode("upload")}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-2 text-xs font-medium rounded-lg transition-all",
-                productInputMode === "upload"
-                  ? "bg-card text-foreground shadow-sm border border-border/40"
-                  : "text-muted hover:text-foreground"
-              )}
-            >
-              <UploadIcon className="h-3.5 w-3.5" strokeWidth={1.5} />
-              Upload Image
-            </button>
-            <button
-              type="button"
-              onClick={() => setProductInputMode("link")}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-2 text-xs font-medium rounded-lg transition-all",
-                productInputMode === "link"
-                  ? "bg-card text-foreground shadow-sm border border-border/40"
-                  : "text-muted hover:text-foreground"
-              )}
-            >
-              <LinkIcon className="h-3.5 w-3.5" strokeWidth={1.5} />
-              Paste URL/Link
-            </button>
-          </div>
+        <header className="tryon-header">
+          <span className="tryon-eyebrow">Create</span>
+          <h1 className="tryon-title">Try It On</h1>
+          <p className="tryon-subtitle">
+            Select a clothing item and see how well it fits your body profile.
+          </p>
+        </header>
 
-          <div className="aspect-[3/4] flex flex-col">
-            {productInputMode === "upload" ? (
-              clothingPhoto.preview ? (
-                <div className="relative flex-1 rounded-2xl border border-border bg-card overflow-hidden group shadow-card">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={clothingPhoto.preview}
-                    alt="Clothing item"
-                    className="w-full h-full object-cover"
-                  />
+        <div className="tryon-grid">
+          {/* ── Upload Self ─────────────────────────────── */}
+          <div className="tryon-col">
+            <div className="tryon-col-head">
+              <div className="tryon-col-label">
+                <span className="tryon-badge">
+                  <Camera aria-hidden="true" />
+                </span>
+                <span id="self-zone-label">Upload Self</span>
+              </div>
+              {selfImageUrl && !pendingSelf.preview && (
+                <button
+                  type="button"
+                  className="tryon-ghost"
+                  onClick={() => setShowSelfImageModal(true)}
+                >
+                  <RefreshCw aria-hidden="true" /> Change Photo
+                </button>
+              )}
+            </div>
+
+            <div className="tryon-hint" aria-hidden="true">
+              <Info /> Full-body, well-lit photos work best
+            </div>
+
+            <div className="tryon-slot" onPaste={handleSelfPaste}>
+              {selfError && (
+                <div className="tryon-error" role="alert">
+                  <AlertCircle className="tryon-error-ico" aria-hidden="true" />
+                  <span className="tryon-error-text">{selfError}</span>
                   <button
                     type="button"
-                    onClick={removeImage}
-                    className="absolute top-3 right-3 h-9 w-9 rounded-full bg-card/90 border border-border text-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-surface focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    aria-label="Remove clothing photo"
+                    className="tryon-error-dismiss"
+                    onClick={() => setSelfError("")}
+                    aria-label="Dismiss error"
                   >
-                    <X className="h-4 w-4" strokeWidth={1.5} />
+                    <X aria-hidden="true" />
                   </button>
-                  {!clothingPhoto.error && (
-                    <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-card/95 border border-border text-foreground px-3 py-1 text-xs font-medium">
-                      <Check className="h-3 w-3 text-success" strokeWidth={1.5} />
-                      Ready to Analyze
+                </div>
+              )}
+
+              {selfImageUrl && !pendingSelf.preview ? (
+                <div className="tryon-preview">
+                  <div className="tryon-preview-media">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={selfImageUrl} alt="Your body photo" />
+                    <div className="tryon-preview-badge-success">
+                      <Check aria-hidden="true" /> Profile Active
                     </div>
-                  )}
+                  </div>
+                  <div className="tryon-preview-foot">
+                    <div className="tryon-preview-info">
+                      <p className="tryon-preview-name">Saved self photo</p>
+                      <p className="tryon-preview-size">Body photo</p>
+                    </div>
+                    <div className="tryon-preview-actions">
+                      <button
+                        type="button"
+                        className="tryon-preview-btn"
+                        onClick={() => setShowSelfImageModal(true)}
+                      >
+                        <RefreshCw aria-hidden="true" /> Replace
+                      </button>
+                      <button
+                        type="button"
+                        className="tryon-preview-btn"
+                        onClick={handleSelfRemove}
+                      >
+                        <X aria-hidden="true" /> Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : selfUploading || pendingSelf.preview ? (
+                <div className="tryon-preview">
+                  <div className="tryon-preview-media">
+                    {pendingSelf.preview && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={pendingSelf.preview} alt="Self photo preview" />
+                    )}
+                    {selfUploading && (
+                      <div className="tryon-zone-loading">
+                        <Loader2 aria-hidden="true" />
+                        <span>Uploading photo…</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div
-                  onDrop={handleDrop}
-                  onDragOver={handleDragOver}
-                  onDragEnter={() => setDragOver("clothing")}
-                  onDragLeave={() => setDragOver(null)}
+                  className={"tryon-zone" + (selfDragOver ? " dragover" : "")}
+                  role="button"
+                  tabIndex={0}
+                  aria-labelledby="self-zone-label"
+                  onClick={() => selfInputRef.current?.click()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      selfInputRef.current?.click();
+                    }
+                  }}
+                  onDrop={handleSelfDrop}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDragEnter={handleSelfDragEnter}
+                  onDragLeave={handleSelfDragLeave}
+                >
+                  <span className="tryon-zone-stack">
+                    <span className="tryon-badge-xl">
+                      {selfDragOver ? (
+                        <Download aria-hidden="true" />
+                      ) : (
+                        <Camera aria-hidden="true" />
+                      )}
+                    </span>
+                    <span className="tryon-zone-title">Upload your photo</span>
+                    <span className="tryon-zone-helper">
+                      Drag &amp; drop, click to browse, or paste from clipboard
+                    </span>
+                    <span className="tryon-zone-meta">
+                      JPG, PNG, WEBP · up to 5MB
+                    </span>
+                  </span>
+                  <input
+                    ref={selfInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="sr-only"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleSelfFileSelect(file);
+                      e.target.value = "";
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── Upload Item to Match ───────────────────── */}
+          <div className="tryon-col">
+            <div className="tryon-col-head">
+              <div className="tryon-col-label">
+                <span className="tryon-badge">
+                  <Shirt aria-hidden="true" />
+                </span>
+                <span id="item-zone-label">Upload Item to Match</span>
+              </div>
+            </div>
+
+            <div className="tryon-segmented">
+              <div
+                className="tryon-seg-track"
+                role="group"
+                aria-label="Upload method"
+              >
+                <span
+                  className="tryon-seg-indicator"
+                  style={{
+                    transform: `translateX(${productInputMode === "link" ? "100%" : "0%"})`,
+                  }}
+                />
+                <button
+                  type="button"
+                  className={"tryon-seg-btn" + (productInputMode === "upload" ? " is-active" : "")}
+                  onClick={() => setProductInputMode("upload")}
+                >
+                  <UploadIcon aria-hidden="true" /> Upload Image
+                </button>
+                <button
+                  type="button"
+                  className={"tryon-seg-btn" + (productInputMode === "link" ? " is-active" : "")}
+                  onClick={() => setProductInputMode("link")}
+                >
+                  <LinkIcon aria-hidden="true" /> Paste URL
+                </button>
+              </div>
+            </div>
+
+            <div className="tryon-slot">
+              {clothingPhoto.error && showClothingZone && (
+                <div className="tryon-error" role="alert">
+                  <AlertCircle className="tryon-error-ico" aria-hidden="true" />
+                  <span className="tryon-error-text">{clothingPhoto.error}</span>
+                  <button
+                    type="button"
+                    className="tryon-error-dismiss"
+                    onClick={() =>
+                      setClothingPhoto((p) => ({ ...p, error: undefined }))
+                    }
+                    aria-label="Dismiss error"
+                  >
+                    <X aria-hidden="true" />
+                  </button>
+                </div>
+              )}
+
+              {showLinkPreview ? (
+                <div className="tryon-preview">
+                  <div className="tryon-preview-media">
+                    <div className="tryon-preview-placeholder">
+                      <LinkIcon aria-hidden="true" />
+                      <span>Product link added</span>
+                    </div>
+                    <div className="tryon-preview-badge-success">
+                      <Check aria-hidden="true" /> Ready to Analyze
+                    </div>
+                  </div>
+                  <div className="tryon-preview-foot">
+                    <div className="tryon-preview-info">
+                      <p className="tryon-preview-name">{productUrl}</p>
+                      <p className="tryon-preview-size">Online product</p>
+                    </div>
+                    <div className="tryon-preview-actions">
+                      <button
+                        type="button"
+                        className="tryon-preview-btn"
+                        onClick={resetUrl}
+                      >
+                        <RefreshCw aria-hidden="true" /> Replace
+                      </button>
+                      <button
+                        type="button"
+                        className="tryon-preview-btn"
+                        onClick={() => {
+                          resetUrl();
+                          setProductUrl("");
+                        }}
+                      >
+                        <X aria-hidden="true" /> Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : showClothingZone && clothingPhoto.preview ? (
+                <div className="tryon-preview">
+                  <div className="tryon-preview-media">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={clothingPhoto.preview} alt="Clothing item" />
+                    {!clothingPhoto.error && (
+                      <div className="tryon-preview-badge-success">
+                        <Check aria-hidden="true" /> Ready to Analyze
+                      </div>
+                    )}
+                  </div>
+                  <div className="tryon-preview-foot">
+                    <div className="tryon-preview-info">
+                      <p className="tryon-preview-name">
+                        {clothingPhoto.file?.name ?? "Clothing item"}
+                      </p>
+                      <p className="tryon-preview-size">
+                        {formatBytes(clothingPhoto.file?.size)}
+                      </p>
+                    </div>
+                    <div className="tryon-preview-actions">
+                      <button
+                        type="button"
+                        className="tryon-preview-btn"
+                        onClick={() => clothingInputRef.current?.click()}
+                      >
+                        <RefreshCw aria-hidden="true" /> Replace
+                      </button>
+                      <button
+                        type="button"
+                        className="tryon-preview-btn"
+                        onClick={removeImage}
+                      >
+                        <X aria-hidden="true" /> Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : showClothingZone ? (
+                <div
+                  className={"tryon-zone" + (dragOver === "clothing" ? " dragover" : "")}
+                  role="button"
+                  tabIndex={0}
+                  aria-labelledby="item-zone-label"
                   onClick={() => clothingInputRef.current?.click()}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
@@ -467,93 +615,114 @@ export default function UploadPage() {
                       clothingInputRef.current?.click();
                     }
                   }}
-                  role="button"
-                  tabIndex={0}
-                  className={cn(
-                    "flex-1 relative flex flex-col items-center justify-center rounded-2xl border border-dashed p-8 cursor-pointer transition-all duration-200 bg-card shadow-card",
-                    dragOver === "clothing"
-                      ? "border-accent bg-accent/5"
-                      : "border-border hover:border-accent/40 hover:bg-surface/40"
-                  )}
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragEnter={() => setDragOver("clothing")}
+                  onDragLeave={() => setDragOver(null)}
                 >
-                  <div className="flex flex-col items-center gap-4 text-center">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-full border border-border bg-surface">
-                      <Shirt className="h-6 w-6 text-muted" strokeWidth={1.5} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Upload item to match</p>
-                      <p className="text-xs text-muted mt-1.5 font-light">
-                        Drag & drop or click to browse
-                      </p>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground font-light">
-                      JPG, PNG, WEBP up to 5MB
-                    </p>
-                  </div>
+                  <span className="tryon-zone-stack">
+                    <span className="tryon-badge-xl">
+                      {dragOver === "clothing" ? (
+                        <Download aria-hidden="true" />
+                      ) : (
+                        <Shirt aria-hidden="true" />
+                      )}
+                    </span>
+                    <span className="tryon-zone-title">Upload item to match</span>
+                    <span className="tryon-zone-helper">
+                      Drag &amp; drop or click to browse
+                    </span>
+                    <span className="tryon-zone-meta">
+                      JPG, PNG, WEBP · up to 5MB
+                    </span>
+                  </span>
                   <input
                     ref={clothingInputRef}
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
-                    className="hidden"
+                    className="sr-only"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) handleFileSelect(file);
+                      e.target.value = "";
                     }}
                   />
                 </div>
-              )
-            ) : (
-              <div className="flex-1 rounded-2xl border border-border bg-card p-6 flex flex-col justify-center gap-4 shadow-card">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full border border-border bg-surface mx-auto mb-2">
-                  <LinkIcon className="h-6 w-6 text-muted" strokeWidth={1.5} />
+              ) : (
+                <div className="tryon-url">
+                  <div className="tryon-url-center">
+                    <span className="tryon-badge-xl">
+                      <LinkIcon aria-hidden="true" />
+                    </span>
+                    <p className="tryon-url-title">Paste E-Commerce Link</p>
+                    <p className="tryon-url-sub">
+                      Paste a product URL from Zara, H&amp;M, or other stores.
+                    </p>
+                  </div>
+                  <div className="tryon-url-row">
+                    <input
+                      className="tryon-url-input"
+                      value={productUrl}
+                      placeholder="https://example.com/product/..."
+                      aria-label="Product URL"
+                      aria-invalid={!!productUrlError}
+                      onChange={(e) => {
+                        setProductUrl(e.target.value);
+                        setProductUrlError("");
+                        setUrlConfirmed(false);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleFetchProduct();
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="tryon-url-fetch"
+                      onClick={handleFetchProduct}
+                      disabled={fetchingUrl}
+                    >
+                      {fetchingUrl ? (
+                        <Loader2 className="tryon-spin" aria-hidden="true" />
+                      ) : (
+                        <ArrowRight aria-hidden="true" />
+                      )}
+                      {fetchingUrl ? "Fetching" : "Fetch"}
+                    </button>
+                  </div>
+                  {productUrlError && (
+                    <p className="tryon-url-error" role="alert">
+                      {productUrlError}
+                    </p>
+                  )}
                 </div>
-                <div className="space-y-1 text-center">
-                  <p className="text-sm font-medium">Paste E-Commerce Link</p>
-                  <p className="text-xs text-muted font-light">
-                    Paste a product URL from Zara, H&M, or other stores.
-                  </p>
-                </div>
-                <Input
-                  placeholder="https://example.com/product/..."
-                  value={productUrl}
-                  onChange={(e) => {
-                    setProductUrl(e.target.value);
-                    setProductUrlError("");
-                  }}
-                  error={productUrlError}
-                  className="rounded-full mt-2"
-                />
-              </div>
-            )}
+              )}
+            </div>
           </div>
-          {clothingPhoto.error && productInputMode === "upload" && (
-            <p className="mt-2 text-xs text-error flex items-center gap-1">
-              <AlertCircle className="h-3 w-3" />
-              {clothingPhoto.error}
-            </p>
-          )}
-        </motion.div>
-      </div>
+        </div>
 
-      <motion.div
-        initial="hidden"
-        animate="visible"
-        variants={fadeInUp}
-        custom={3}
-        className="flex justify-center"
-      >
-        <Button
-          size="lg"
-          variant="editorial"
-          disabled={!canProceed || isAnalyzing}
-          loading={isAnalyzing}
-          onClick={handleAnalyze}
-          className="min-w-[220px] rounded-full px-8"
-        >
-          Analyze Compatibility
-          <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
-        </Button>
-      </motion.div>
-    </PageContainer>
+        <div className="tryon-cta">
+          <button
+            type="button"
+            className="tryon-cta-btn"
+            disabled={!canProceed || isAnalyzing}
+            onClick={handleAnalyze}
+          >
+            {isAnalyzing ? (
+              <Loader2 className="tryon-spin" aria-hidden="true" />
+            ) : null}
+            {isAnalyzing ? "Working…" : "See How It Fits"}
+            {!isAnalyzing && <ArrowRight aria-hidden="true" />}
+          </button>
+        </div>
+
+        <span className="sr-only" aria-live="polite" aria-atomic="true">
+          {isAnalyzing
+            ? "Preparing your analysis"
+            : selfImageUrl && (showLinkPreview || clothingPhoto.preview)
+            ? "Both photos ready"
+            : ""}
+        </span>
+      </div>
+    </div>
   );
 }

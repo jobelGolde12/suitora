@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./tryon-tokens.css";
 
 @theme inline {
   --color-background: #F8F5F1;
