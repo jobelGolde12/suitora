@@ -14,6 +14,7 @@ import {
   X,
   ChevronLeft,
   Sparkles,
+  Camera,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
@@ -197,6 +198,14 @@ export function Sidebar() {
         </div>
 
         <NavLinks pathname={pathname} onNavigate={closeMobile} />
+
+        {/* Guidance hint pinned to the bottom of the mobile menu */}
+        <div className="mt-auto border-t border-border px-4 py-4">
+          <p className="flex items-center gap-2 text-xs text-muted font-light">
+            <Camera className="h-3.5 w-3.5 shrink-0 text-accent" strokeWidth={1.5} />
+            Full-body, well-lit photos work best
+          </p>
+        </div>
       </aside>
     </>
   );

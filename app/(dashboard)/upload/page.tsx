@@ -323,8 +323,8 @@ export default function UploadPage() {
           )}
         </AnimatePresence>
 
-        <header className="tryon-header">
-          <span className="tryon-eyebrow">Create</span>
+        <header className="tryon-header mt-5">
+          <span className="tryon-eyebrow"></span>
           <h1 className="tryon-title">Try It On</h1>
           <p className="tryon-subtitle">
             Select a clothing item and see how well it fits your body profile.

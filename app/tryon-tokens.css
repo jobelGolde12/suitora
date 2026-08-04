@@ -487,6 +487,8 @@
   .try-on .tryon-url {
     min-height: 320px;
   }
+  /* Move the guidance off the top-left where the floating hamburger overlaps it. */
+  .try-on .tryon-hint { display: none; }
 }
 
 /* ── Reduced motion ────────────────────────────────────────────────── */

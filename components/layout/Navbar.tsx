@@ -43,7 +43,7 @@ export function Navbar() {
           : "bg-transparent"
       )}
     >
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 sm:px-8 lg:px-12">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between pl-14 pr-6 md:px-8 lg:px-12">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 group">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-accent/30 bg-accent/10 overflow-hidden">
@@ -90,10 +90,10 @@ export function Navbar() {
           </Link>
         </div>
 
-        {/* Mobile Menu Button */}
+        {/* Mobile Menu Button — floats at the top-left on small screens */}
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="md:hidden flex items-center justify-center h-10 w-10 rounded-full hover:bg-surface transition-colors"
+          className="md:hidden absolute left-4 top-3 z-20 flex h-10 w-10 items-center justify-center rounded-full hover:bg-surface transition-colors"
           aria-label="Toggle menu"
         >
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
