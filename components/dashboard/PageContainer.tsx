@@ -13,7 +13,7 @@ export function PageContainer({ children, className, narrow }: PageContainerProp
     <div className="min-h-screen bg-background">
       <div
         className={cn(
-          "mx-auto px-5 py-10 sm:px-8 lg:px-10 pb-24 md:pb-12",
+          "mx-auto px-5 pt-24 pb-28 sm:px-8 md:pt-10 lg:px-10 md:pb-12",
           narrow ? "max-w-4xl" : "max-w-6xl",
           className
         )}

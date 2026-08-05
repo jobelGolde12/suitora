@@ -37,13 +37,30 @@ export async function GET() {
       .map((a) => a.overallScore)
       .reverse(); // oldest first
 
+    const bestScore =
+      trendAnalyses.length > 0
+        ? Math.max(...trendAnalyses.map((a) => a.overallScore))
+        : null;
+
+    const trendDates = trendAnalyses
+      .map((a) => a.createdAt)
+      .reverse(); // aligns with scoreTrend
+
     // Fallback if trend is empty
     const finalScoreTrend = scoreTrend.length > 0 ? scoreTrend : [70, 75, 80];
+
+    const userName =
+      session.user.name?.trim() ||
+      (session.user.email ? session.user.email.split("@")[0] : null) ||
+      null;
 
     return NextResponse.json({
       stats,
       recentAnalyses: recentAnalysesWithFavorite,
       scoreTrend: finalScoreTrend,
+      trendDates,
+      bestScore,
+      userName,
     });
   } catch (err) {
     console.error("Error in GET /api/dashboard/stats:", err);

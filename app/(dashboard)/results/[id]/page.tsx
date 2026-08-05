@@ -21,6 +21,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { ScoreCircle } from "@/components/ui/ScoreCircle";
 import { SimilarItems } from "@/components/trending/SimilarItems";
+import { ColorPaletteCard } from "@/components/results/ColorPaletteCard";
 import { useToast } from "@/components/ui/Toast";
 import {
   PageContainer,
@@ -526,6 +527,15 @@ export default function ResultsPage() {
               </Card>
             </motion.div>
           )}
+
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={fadeInUp}
+            custom={4.5}
+          >
+            <ColorPaletteCard skinTone={result.skinTone} />
+          </motion.div>
 
           {result.recommendations && result.recommendations.length > 0 && (
             <motion.div

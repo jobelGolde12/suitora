@@ -8,6 +8,8 @@ export { EmptyState } from "./EmptyState";
 export { Sparkline } from "./Sparkline";
 export { ScoreBar } from "./ScoreBar";
 export { PageContainer } from "./PageContainer";
+export { ScoreTrendCard } from "./ScoreTrendCard";
+export { ContextualTips } from "./ContextualTips";
 export {
   DashboardSkeleton,
   HistorySkeleton,

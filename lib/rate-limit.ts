@@ -38,6 +38,7 @@ export const tryOnRateLimiter = createLimiter("ratelimit:tryon", [10, "24 h"]);
 // AI analysis + upload limiters
 export const analysisRateLimiter = createLimiter("ratelimit:analysis", [20, "1 d"]);
 export const uploadRateLimiter = createLimiter("ratelimit:upload", [10, "1 h"]);
+export const stylistRateLimiter = createLimiter("ratelimit:stylist", [30, "1 h"]);
 
 export type RateLimitResult = {
   success: boolean;

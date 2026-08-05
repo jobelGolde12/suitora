@@ -5,3 +5,4 @@ export { MeasurementComparison } from "./MeasurementComparison";
 export { SizeRecommendationCard } from "./SizeRecommendationCard";
 export { InsightsList } from "./InsightsList";
 export { CategoryHeroImage } from "./CategoryHeroImage";
+export { ColorPaletteCard } from "./ColorPaletteCard";

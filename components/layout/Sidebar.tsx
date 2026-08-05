@@ -1,31 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  Upload,
-  History,
-  Heart,
-  Settings,
-  Menu,
-  X,
-  ChevronLeft,
-  Sparkles,
-  Camera,
-} from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-
-const sidebarLinks = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Try It On", href: "/upload", icon: Upload },
-  { label: "Trending", href: "/trending", icon: Sparkles },
-  { label: "History", href: "/history", icon: History },
-  { label: "Favorites", href: "/favorites", icon: Heart },
-  { label: "Settings", href: "/settings", icon: Settings },
-];
+import { dashboardLinks } from "@/lib/navigation";
 
 function BrandMark({ collapsed }: { collapsed?: boolean }) {
   return (
@@ -53,15 +34,13 @@ function BrandMark({ collapsed }: { collapsed?: boolean }) {
 function NavLinks({
   pathname,
   collapsed,
-  onNavigate,
 }: {
   pathname: string;
   collapsed?: boolean;
-  onNavigate?: () => void;
 }) {
   return (
     <nav className="flex-1 space-y-1 p-3" aria-label="Main">
-      {sidebarLinks.map((link) => {
+      {dashboardLinks.map((link) => {
         const Icon = link.icon;
         const isActive =
           pathname === link.href || pathname.startsWith(link.href + "/");
@@ -70,7 +49,6 @@ function NavLinks({
           <Link
             key={link.href}
             href={link.href}
-            onClick={onNavigate}
             className={cn(
               "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
               "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
@@ -97,116 +75,44 @@ function NavLinks({
 export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  // Lock body scroll when mobile drawer is open
-  useEffect(() => {
-    if (!mobileOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [mobileOpen]);
-
-  const closeMobile = () => setMobileOpen(false);
 
   return (
-    <>
-      {/* Mobile overlay */}
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-foreground/20 backdrop-blur-sm md:hidden"
-          onClick={() => setMobileOpen(false)}
-          aria-hidden
-        />
+    <aside
+      className={cn(
+        "fixed left-0 top-0 z-50 hidden h-full flex-col border-r border-border bg-card transition-all duration-300 md:flex",
+        collapsed ? "w-16" : "w-60"
       )}
-
-      {/* Mobile menu toggle — opens and closes */}
-      <button
-        onClick={() => setMobileOpen((open) => !open)}
+      data-collapsed={collapsed}
+      aria-label="Sidebar"
+    >
+      <div
         className={cn(
-          "fixed top-6 left-6 z-[60] flex h-12 w-12 items-center justify-center rounded-full",
-          "border border-border bg-card text-foreground shadow-elevated md:hidden",
-          "transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]",
-          "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          "flex h-16 items-center border-b border-border px-4",
+          collapsed && "justify-center px-2"
         )}
-        aria-label={mobileOpen ? "Close menu" : "Open menu"}
-        aria-expanded={mobileOpen}
-        aria-controls="mobile-sidebar"
       >
-        {mobileOpen ? <X className="h-5 w-5" strokeWidth={1.5} /> : <Menu className="h-5 w-5" strokeWidth={1.5} />}
-      </button>
+        <BrandMark collapsed={collapsed} />
+      </div>
 
-      {/* Desktop sidebar */}
-      <aside
-        className={cn(
-          "fixed left-0 top-0 z-50 hidden h-full flex-col border-r border-border bg-card transition-all duration-300 md:flex",
-          collapsed ? "w-16" : "w-60"
-        )}
-        data-collapsed={collapsed}
-        aria-label="Sidebar"
-      >
-        <div
+      <NavLinks pathname={pathname} collapsed={collapsed} />
+
+      <div className="border-t border-border p-3">
+        <button
+          onClick={() => setCollapsed(!collapsed)}
           className={cn(
-            "flex h-16 items-center border-b border-border px-4",
-            collapsed && "justify-center px-2"
+            "flex w-full items-center justify-center rounded-xl px-3 py-2 text-xs text-muted",
+            "hover:text-foreground hover:bg-surface transition-all duration-200",
+            "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           )}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          <BrandMark collapsed={collapsed} />
-        </div>
-
-        <NavLinks pathname={pathname} collapsed={collapsed} />
-
-        <div className="border-t border-border p-3">
-          <button
-            onClick={() => setCollapsed(!collapsed)}
-            className={cn(
-              "flex w-full items-center justify-center rounded-xl px-3 py-2 text-xs text-muted",
-              "hover:text-foreground hover:bg-surface transition-all duration-200",
-              "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            )}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            <ChevronLeft
-              className={cn("h-4 w-4 transition-transform duration-200", collapsed && "rotate-180")}
-              strokeWidth={1.5}
-            />
-            {!collapsed && <span className="ml-2">Collapse</span>}
-          </button>
-        </div>
-      </aside>
-
-      {/* Mobile sidebar drawer */}
-      <aside
-        id="mobile-sidebar"
-        className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-card transition-transform duration-300 md:hidden",
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
-        )}
-        aria-hidden={!mobileOpen}
-      >
-        <div className="flex h-16 items-center justify-between border-b border-border px-4">
-          <BrandMark />
-          <button
-            onClick={() => setMobileOpen(false)}
-            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-surface transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label="Close menu"
-          >
-            <X className="h-4 w-4" strokeWidth={1.5} />
-          </button>
-        </div>
-
-        <NavLinks pathname={pathname} onNavigate={closeMobile} />
-
-        {/* Guidance hint pinned to the bottom of the mobile menu */}
-        <div className="mt-auto border-t border-border px-4 py-4">
-          <p className="flex items-center gap-2 text-xs text-muted font-light">
-            <Camera className="h-3.5 w-3.5 shrink-0 text-accent" strokeWidth={1.5} />
-            Full-body, well-lit photos work best
-          </p>
-        </div>
-      </aside>
-    </>
+          <ChevronLeft
+            className={cn("h-4 w-4 transition-transform duration-200", collapsed && "rotate-180")}
+            strokeWidth={1.5}
+          />
+          {!collapsed && <span className="ml-2">Collapse</span>}
+        </button>
+      </div>
+    </aside>
   );
 }

@@ -13,6 +13,8 @@ import {
   Settings,
   Sparkles,
   Shirt,
+  MessageCircle,
+  GitCompareArrows,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import {
@@ -23,6 +25,8 @@ import {
   QuickActionCard,
   AnalysisListItem,
   EmptyState,
+  ScoreTrendCard,
+  ContextualTips,
   DashboardSkeleton,
 } from "@/components/dashboard";
 import { TrendingCollection } from "@/components/trending";
@@ -33,6 +37,9 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentAnalyses, setRecentAnalyses] = useState<(AnalysisResult & { isFavorite?: boolean })[]>([]);
   const [scoreTrend, setScoreTrend] = useState<number[]>([]);
+  const [trendDates, setTrendDates] = useState<string[]>([]);
+  const [bestScore, setBestScore] = useState<number | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
   const [trendingItems, setTrendingItems] = useState<TrendItem[]>([]);
   const [trendingLoading, setTrendingLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
@@ -48,6 +55,9 @@ export default function DashboardPage() {
           setStats(data.stats);
           setRecentAnalyses(data.recentAnalyses || []);
           setScoreTrend(data.scoreTrend || []);
+          setTrendDates(data.trendDates || []);
+          setBestScore(data.bestScore ?? null);
+          setUserName(data.userName || null);
         }
       } catch (err) {
         console.error("Error loading dashboard stats:", err);
@@ -112,7 +122,7 @@ export default function DashboardPage() {
     <PageContainer>
       <PageHeader
         label="Overview"
-        title="Welcome back"
+        title={userName ? `Welcome back, ${userName}` : "Welcome back"}
         description="Your fashion compatibility at a glance — start a new analysis or revisit your recent results."
         action={
           <Link href="/upload">
@@ -123,6 +133,16 @@ export default function DashboardPage() {
           </Link>
         }
       />
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5 mb-12">
+        <ScoreTrendCard
+          data={activeScoreTrend}
+          dates={trendDates}
+          bestScore={bestScore}
+          className="lg:col-span-2"
+        />
+        <ContextualTips stats={activeStats} />
+      </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-12">
         <MetricCard
@@ -185,12 +205,24 @@ export default function DashboardPage() {
 
       <section className="mb-12">
         <SectionTitle title="Quick actions" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <QuickActionCard
             href="/upload"
             icon={Camera}
             title="Upload Photo"
             description="Start a new analysis"
+          />
+          <QuickActionCard
+            href="/stylist"
+            icon={MessageCircle}
+            title="AI Stylist"
+            description="Get personalized advice"
+          />
+          <QuickActionCard
+            href="/compare"
+            icon={GitCompareArrows}
+            title="Compare"
+            description="Stack your results side by side"
           />
           <QuickActionCard
             href="/trending"

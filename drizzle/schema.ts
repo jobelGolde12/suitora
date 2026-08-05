@@ -291,3 +291,20 @@ export const trendSyncLogs = sqliteTable("trend_sync_logs", {
     .default(sql`CURRENT_TIMESTAMP`),
 });
 
+/** Persistent AI Stylist conversation history (per user). */
+export const stylistMessages = sqliteTable(
+  "stylist_messages",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: text("role").notNull(), // "user" | "assistant"
+    content: text("content").notNull(),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (t) => [index("stylist_messages_user_created_idx").on(t.userId, t.createdAt)]
+);
+

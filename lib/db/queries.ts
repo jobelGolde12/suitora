@@ -75,6 +75,7 @@ export async function deleteUserRecord(userId: string) {
   await db.delete(schema.uploads).where(eq(schema.uploads.userId, userId));
   await db.delete(schema.settings).where(eq(schema.settings.userId, userId));
   await db.delete(schema.userProfiles).where(eq(schema.userProfiles.userId, userId));
+  await db.delete(schema.stylistMessages).where(eq(schema.stylistMessages.userId, userId));
   await db.delete(schema.sessions).where(eq(schema.sessions.userId, userId));
   await db.delete(schema.accounts).where(eq(schema.accounts.userId, userId));
   await db.delete(schema.users).where(eq(schema.users.id, userId));
@@ -613,5 +614,60 @@ export async function getLastTrendSyncAt(): Promise<Date | null> {
     .from(schema.trendSyncLogs);
   if (row?.lastSync == null) return null;
   return new Date(row.lastSync * 1000);
+}
+
+// ─── Stylist Queries ──────────────────────────────────────────────
+
+export type StylistMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: string;
+};
+
+/** Most recent stylist messages, oldest-first (chronological). */
+export async function getStylistMessages(userId: string, limit = 100) {
+  const rows = await db
+    .select()
+    .from(schema.stylistMessages)
+    .where(eq(schema.stylistMessages.userId, userId))
+    .orderBy(desc(schema.stylistMessages.createdAt))
+    .limit(limit);
+  return rows.reverse() as StylistMessage[];
+}
+
+export async function addStylistMessage(
+  userId: string,
+  role: "user" | "assistant",
+  content: string
+): Promise<StylistMessage> {
+  const [row] = await db
+    .insert(schema.stylistMessages)
+    .values({
+      id: nanoid(),
+      userId,
+      role,
+      content,
+      createdAt: new Date().toISOString(),
+    })
+    .returning();
+  return row as StylistMessage;
+}
+
+/** Count of user messages in the current calendar month (UTC). */
+export async function countStylistMessagesThisMonth(userId: string): Promise<number> {
+  const now = new Date();
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+  const rows = await db
+    .select({ id: schema.stylistMessages.id })
+    .from(schema.stylistMessages)
+    .where(
+      and(
+        eq(schema.stylistMessages.userId, userId),
+        eq(schema.stylistMessages.role, "user"),
+        sql`${schema.stylistMessages.createdAt} >= ${monthStart}`
+      )
+    );
+  return rows.length;
 }
 
