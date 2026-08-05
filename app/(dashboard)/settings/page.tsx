@@ -11,6 +11,8 @@ import {
   LogOut,
   Check,
   Ruler,
+  Download,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -39,7 +41,9 @@ export default function SettingsPage() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const handleLogoutConfirm = async () => {
     setIsLoggingOut(true);
@@ -63,6 +67,27 @@ export default function SettingsPage() {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     setIsSaving(false);
     addToast("Settings saved successfully", "success");
+  };
+
+  const handleDownloadData = () => {
+    window.location.href = "/api/user/data";
+  };
+
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    setShowDeleteModal(false);
+
+    try {
+      const res = await fetch("/api/user", { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete account");
+      await logout();
+    } catch {
+      addToast("Failed to delete account. Please try again.", "error");
+      setIsDeleting(false);
+      return;
+    }
+
+    window.location.href = "/";
   };
 
   const renderContent = () => {
@@ -259,6 +284,38 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      <div className="mt-10 pt-8 border-t border-border">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between rounded-3xl border border-error/20 bg-error/5 p-6">
+          <div>
+            <h3 className="font-heading text-lg font-medium tracking-tight text-error">
+              Danger Zone
+            </h3>
+            <p className="text-sm text-muted font-light mt-1 leading-relaxed">
+              Download a copy of your data or permanently delete your account
+              and all associated photos, analyses, and favorites.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 shrink-0">
+            <Button
+              variant="secondary"
+              onClick={handleDownloadData}
+              className="rounded-full"
+            >
+              <Download className="h-4 w-4" strokeWidth={1.5} />
+              Download my data
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => setShowDeleteModal(true)}
+              className="rounded-full"
+            >
+              <Trash2 className="h-4 w-4" strokeWidth={1.5} />
+              Delete account
+            </Button>
+          </div>
+        </div>
+      </div>
+
       <ConfirmModal
         isOpen={showConfirmModal}
         onClose={() => setShowConfirmModal(false)}
@@ -269,6 +326,18 @@ export default function SettingsPage() {
         cancelLabel="Cancel"
         variant="danger"
         isLoading={isLoggingOut}
+      />
+
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDeleteAccount}
+        title="Delete account"
+        description="This permanently deletes your account, photos, analyses, favorites, and all associated data. This action cannot be undone."
+        confirmLabel="Delete my account"
+        cancelLabel="Cancel"
+        variant="danger"
+        isLoading={isDeleting}
       />
     </PageContainer>
   );

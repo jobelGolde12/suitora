@@ -57,6 +57,56 @@ export async function getUserByEmail(email: string) {
   return user;
 }
 
+export async function getUploadsByUserId(userId: string) {
+  return db
+    .select()
+    .from(schema.uploads)
+    .where(eq(schema.uploads.userId, userId));
+}
+
+/**
+ * Permanently delete a user and every row that references them. Child tables
+ * cascade on delete, but rows are removed explicitly (in dependency order)
+ * so the deletion is deterministic and auditable.
+ */
+export async function deleteUserRecord(userId: string) {
+  await db.delete(schema.favorites).where(eq(schema.favorites.userId, userId));
+  await db.delete(schema.analyses).where(eq(schema.analyses.userId, userId));
+  await db.delete(schema.uploads).where(eq(schema.uploads.userId, userId));
+  await db.delete(schema.settings).where(eq(schema.settings.userId, userId));
+  await db.delete(schema.userProfiles).where(eq(schema.userProfiles.userId, userId));
+  await db.delete(schema.sessions).where(eq(schema.sessions.userId, userId));
+  await db.delete(schema.accounts).where(eq(schema.accounts.userId, userId));
+  await db.delete(schema.users).where(eq(schema.users.id, userId));
+}
+
+/** Assemble a GDPR-style JSON payload of everything the user has stored. */
+export async function getUserDataExport(userId: string) {
+  const [user] = await db
+    .select()
+    .from(schema.users)
+    .where(eq(schema.users.id, userId));
+
+  const [profile, analyses, favorites, uploads] = await Promise.all([
+    getProfileByUserId(userId),
+    getAnalysesByUserId(userId, 5000),
+    getFavoritesByUserId(userId),
+    getUploadsByUserId(userId),
+  ]);
+
+  return {
+    user: user ?? null,
+    profile,
+    analyses: analyses.map((row) => toAnalysisResult(row)),
+    favorites: favorites.map(({ favorite, analysis }) => ({
+      ...favorite,
+      wardrobeTags: parseJsonArray<string>(favorite.wardrobeTags),
+      analysis: toAnalysisResult(analysis),
+    })),
+    uploads,
+  };
+}
+
 // ─── Analysis Queries ────────────────────────────────────────────
 
 export async function getAnalysesByUserId(userId: string, limit = 20) {

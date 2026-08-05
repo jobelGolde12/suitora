@@ -3,6 +3,8 @@ import { z } from "zod";
 const serverEnvSchema = z.object({
   BETTER_AUTH_SECRET: z.string().min(16, "BETTER_AUTH_SECRET must be at least 16 characters"),
   BETTER_AUTH_URL: z.string().url("BETTER_AUTH_URL must be a valid URL").optional(),
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
   TURSO_DATABASE_URL: z.string().min(1, "TURSO_DATABASE_URL is required").optional(),
   TURSO_AUTH_TOKEN: z.string().min(1, "TURSO_AUTH_TOKEN is required").optional(),
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),

@@ -43,3 +43,8 @@ premium-editorial-ui
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# AI agents
+/.commandcode
+/.crush
+/.mimocode

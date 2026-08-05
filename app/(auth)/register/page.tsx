@@ -139,6 +139,27 @@ export default function RegisterPage() {
           </button>
         </div>
 
+        <label className="flex items-start gap-2.5 cursor-pointer">
+          <input
+            type="checkbox"
+            {...register("agreeToTerms")}
+            className="mt-0.5 h-4 w-4 rounded border-border text-accent focus:ring-accent"
+          />
+          <span className="text-sm text-muted font-light leading-relaxed">
+            I agree to the{" "}
+            <Link href="/privacy-policy" className="text-accent hover:text-accent-light font-medium transition-colors">
+              Privacy Policy
+            </Link>{" "}
+            and{" "}
+            <Link href="/terms-of-service" className="text-accent hover:text-accent-light font-medium transition-colors">
+              Terms of Service
+            </Link>
+          </span>
+        </label>
+        {errors.agreeToTerms && (
+          <p className="text-xs text-error">{errors.agreeToTerms.message}</p>
+        )}
+
         <Button type="submit" loading={isLoading} variant="editorial" className="w-full rounded-full h-12">
           Create Account
           <ArrowRight className="h-4 w-4" />

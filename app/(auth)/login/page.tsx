@@ -6,15 +6,17 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion, AnimatePresence } from "framer-motion";
-import { Eye, EyeOff, ArrowRight, CheckCircle, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, ArrowRight, CheckCircle, AlertCircle, Globe } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { loginSchema, type LoginFormData } from "@/lib/utils/validation";
 import { loginAction } from "@/lib/auth/actions";
+import { authClient } from "@/lib/auth/client";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const router = useRouter();
 
@@ -50,6 +52,21 @@ export default function LoginPage() {
       setMessage({ type: "error", text: "Network error. Please check your connection and try again." });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setIsGoogleLoading(true);
+    setMessage(null);
+
+    try {
+      await authClient.signIn.social({
+        provider: "google",
+        callbackURL: "/dashboard",
+      });
+    } catch {
+      setMessage({ type: "error", text: "Google sign-in failed. Please try again." });
+      setIsGoogleLoading(false);
     }
   };
 
@@ -141,10 +158,37 @@ export default function LoginPage() {
         </Button>
       </form>
 
+      <div className="mt-6 flex items-center gap-3">
+        <div className="flex-1 border-t border-border" />
+        <span className="text-xs text-muted font-light">or continue with</span>
+        <div className="flex-1 border-t border-border" />
+      </div>
+
+      <Button
+        type="button"
+        onClick={handleGoogleSignIn}
+        loading={isGoogleLoading}
+        disabled
+        variant="secondary"
+        className="w-full rounded-full mt-4 h-12 cursor-not-allowed disabled:opacity-60"
+      >
+        <Globe className="h-5 w-5" />
+        Sign in with Google
+      </Button>
+
       <p className="mt-8 text-center text-sm text-muted font-light">
         Don&apos;t have an account?{" "}
         <Link href="/register" className="text-accent hover:text-accent-light font-medium transition-colors">
           Sign up
+        </Link>
+      </p>
+
+      <p className="mt-4 text-center text-xs text-muted font-light">
+        <Link
+          href="/privacy-policy"
+          className="hover:text-accent transition-colors"
+        >
+          Privacy Policy
         </Link>
       </p>
     </motion.div>

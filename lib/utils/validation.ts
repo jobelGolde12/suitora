@@ -34,6 +34,9 @@ export const registerSchema = z
       .min(8, "Password must be at least 8 characters")
       .max(128, "Password must be less than 128 characters"),
     confirmPassword: z.string(),
+    agreeToTerms: z.literal(true, {
+      message: "You must agree to the Terms and Privacy Policy",
+    }),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",

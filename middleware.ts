@@ -2,7 +2,14 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 // Public routes that don't require authentication
-const publicRoutes = ["/login", "/register", "/forgot-password", "/"];
+const publicRoutes = [
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/privacy-policy",
+  "/terms-of-service",
+  "/",
+];
 
 // API routes that don't require authentication
 const publicApiRoutes = ["/api/auth"];
@@ -51,8 +58,9 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - robots.txt / sitemap.xml (SEO files)
      * - public folder
      */
-    "/((?!_next/static|_next/image|favicon.ico|public/).*)",
+    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|public/).*)",
   ],
 };

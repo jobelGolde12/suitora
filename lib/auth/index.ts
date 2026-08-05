@@ -49,6 +49,16 @@ export const auth = betterAuth({
   },
   trustedOrigins: getTrustedOrigins(),
   plugins: [nextCookies()],
+  socialProviders: {
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID || "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+    },
+  },
+  accountLinking: {
+    trustedProviders: ["google"],
+    allowDifferentEmails: false,
+  },
 });
 
 export type Session = typeof auth.$Infer.Session;
