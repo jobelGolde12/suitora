@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/Badge";
 import { ScoreCircle } from "@/components/ui/ScoreCircle";
 import { SimilarItems } from "@/components/trending/SimilarItems";
 import { ColorPaletteCard } from "@/components/results/ColorPaletteCard";
+import { OutfitItemStrip } from "@/components/outfits";
 import { useToast } from "@/components/ui/Toast";
 import {
   PageContainer,
@@ -31,6 +32,7 @@ import {
   ResultsSkeleton,
 } from "@/components/dashboard";
 import { cn } from "@/lib/utils/cn";
+import { getResultsSeasonalLine } from "@/lib/season";
 import type {
   AnalysisResult,
   BodyShape,
@@ -41,6 +43,7 @@ import type {
   UserProfile,
   FitPreference,
 } from "@/types";
+import type { TrendOutfit, TrendOutfitItem } from "@/types/trend";
 
 const FIT_OPTIONS: { value: FitPreference; label: string }[] = [
   { value: "tight", label: "Tight" },
@@ -95,6 +98,8 @@ export default function ResultsPage() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isFavorited, setIsFavorited] = useState(false);
+  const [inWardrobe, setInWardrobe] = useState(false);
+  const [wearWithItems, setWearWithItems] = useState<TrendOutfitItem[]>([]);
   const [selectedView, setSelectedView] = useState<"tryon" | "original">("tryon");
 
   // Fetch the user's saved profile so manual measurements take precedence
@@ -139,14 +144,17 @@ export default function ResultsPage() {
           intervalId = null;
         }
 
-        // 3. Get favorites to see if this one is favorited
+        // 3. Get favorites to see if this one is favorited / in wardrobe
         const favsRes = await fetch("/api/favorites", {
           credentials: "include",
         });
         if (favsRes.ok) {
           const favsData = await favsRes.json();
-          const isFav = favsData.favorites?.some((fav: FavoriteItem) => fav.analysisId === id);
-          setIsFavorited(!!isFav);
+          const fav = (favsData.favorites as FavoriteItem[] | undefined)?.find(
+            (f) => f.analysisId === id
+          );
+          setIsFavorited(!!fav);
+          setInWardrobe(!!fav?.inWardrobe);
         }
       } catch (err) {
         console.error("Error loading results:", err);
@@ -162,6 +170,31 @@ export default function ResultsPage() {
       if (intervalId) clearInterval(intervalId);
     };
   }, [id, addToast, router]);
+
+  useEffect(() => {
+    if (!id || !inWardrobe) return;
+    let cancelled = false;
+    fetch("/api/wardrobe/outfits?limit=6", { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        const outfits = (data?.outfits ?? []) as TrendOutfit[];
+        const match = outfits.find((o) =>
+          o.items.some((item) => item.analysisId === id)
+        );
+        const companions =
+          match?.items.filter((item) => item.analysisId !== id) ?? [];
+        setWearWithItems(companions.slice(0, 4));
+      })
+      .catch(() => {
+        if (!cancelled) setWearWithItems([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, inWardrobe]);
+
+  const displayWearWith = inWardrobe ? wearWithItems : [];
 
   const handleFavorite = async () => {
     if (!id) return;
@@ -245,6 +278,10 @@ export default function ResultsPage() {
 
   const tryOnAvailable = !!result.generatedImage;
   const tryOnGenerating = result.tryOnStatus === "processing";
+  const itemCategory =
+    (result.compatibilityMetadata as { itemProfile?: { category?: string } } | null)
+      ?.itemProfile?.category ?? null;
+  const seasonalLine = getResultsSeasonalLine(itemCategory);
 
   return (
     <PageContainer>
@@ -372,9 +409,32 @@ export default function ResultsPage() {
                   <ScoreBar label="Style match" score={result.styleScore || 0} />
                   <ScoreBar label="Color harmony" score={result.colorScore || 0} />
                 </div>
+                {seasonalLine && (
+                  <p className="text-sm text-muted font-light text-center max-w-md mx-auto">
+                    {seasonalLine}
+                  </p>
+                )}
               </CardContent>
             </Card>
           </motion.div>
+
+          {displayWearWith.length > 0 && (
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={fadeInUp}
+              custom={2.5}
+            >
+              <Card>
+                <CardHeader>
+                  <CardTitle>Wear it with</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <OutfitItemStrip items={displayWearWith} />
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
         </div>
 
         <div className="lg:col-span-2 space-y-6">

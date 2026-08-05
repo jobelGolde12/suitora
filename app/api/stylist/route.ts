@@ -10,12 +10,16 @@ import {
   getFavoritesByUserId,
   getProfileByUserId,
   getStylistMessages,
+  getWardrobeFavoritesByUserId,
+  getWardrobeFoldersByUserId,
+  parseJsonObject,
 } from "@/lib/db/queries";
 import {
   generateStylistReply,
   type StylistContext,
   type StylistMessageInput,
 } from "@/lib/ai/stylist";
+import { getCurrentSeason } from "@/lib/season";
 import type { FitPreference, SkinTone, StyleTag } from "@/types";
 
 const STYLIST_MONTHLY_LIMIT = Number(process.env.STYLIST_MONTHLY_LIMIT || 10);
@@ -34,21 +38,69 @@ function parseJsonArray(value: string | null | undefined): string[] {
   }
 }
 
+function extractCategory(meta: Record<string, unknown> | null): string | null {
+  const itemProfile = meta?.itemProfile as { category?: string } | undefined;
+  return itemProfile?.category ?? null;
+}
+
 async function buildContext(userId: string): Promise<StylistContext> {
-  const [profile, analyses, favorites, stats] = await Promise.all([
-    getProfileByUserId(userId),
-    getAnalysesByUserId(userId, 10),
-    getFavoritesByUserId(userId),
-    getDashboardStats(userId),
-  ]);
+  const [profile, analyses, favorites, stats, wardrobeRows, folders] =
+    await Promise.all([
+      getProfileByUserId(userId),
+      getAnalysesByUserId(userId, 50),
+      getFavoritesByUserId(userId),
+      getDashboardStats(userId),
+      getWardrobeFavoritesByUserId(userId),
+      getWardrobeFoldersByUserId(userId),
+    ]);
 
   const scores = analyses.map((a) => a.overallScore);
   const skinTone = SKIN_TONES.includes(profile?.skinTone as SkinTone)
     ? (profile?.skinTone as SkinTone)
     : null;
-  const fitPreference = FIT_PREFERENCES.includes(profile?.fitPreference as FitPreference)
+  const fitPreference = FIT_PREFERENCES.includes(
+    profile?.fitPreference as FitPreference
+  )
     ? (profile?.fitPreference as FitPreference)
     : null;
+
+  const categoryScores = new Map<string, number[]>();
+  for (const a of analyses) {
+    const cat = extractCategory(parseJsonObject(a.compatibilityMetadata));
+    if (!cat) continue;
+    const list = categoryScores.get(cat) ?? [];
+    list.push(a.overallScore);
+    categoryScores.set(cat, list);
+  }
+
+  let bestCategory: string | null = null;
+  let worstCategory: string | null = null;
+  let bestAvg = -Infinity;
+  let worstAvg = Infinity;
+  for (const [cat, vals] of categoryScores) {
+    if (vals.length < 1) continue;
+    const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
+    if (avg > bestAvg) {
+      bestAvg = avg;
+      bestCategory = cat;
+    }
+    if (avg < worstAvg) {
+      worstAvg = avg;
+      worstCategory = cat;
+    }
+  }
+
+  const favoriteCategories = Array.from(
+    new Set(
+      favorites
+        .map(({ analysis }) =>
+          extractCategory(parseJsonObject(analysis.compatibilityMetadata))
+        )
+        .filter((c): c is string => !!c)
+    )
+  ).slice(0, 8);
+
+  const season = getCurrentSeason();
 
   return {
     bodyShape: profile?.bodyShape ?? null,
@@ -59,26 +111,44 @@ async function buildContext(userId: string): Promise<StylistContext> {
     averageScore: stats.averageScore,
     bestScore: scores.length > 0 ? Math.max(...scores) : null,
     favoriteCount: favorites.length,
-    recentScores: scores,
+    recentScores: scores.slice(0, 10),
+    wardrobeCount: wardrobeRows.length,
+    folderNames: folders.map((f) => f.name),
+    favoriteCategories,
+    currentSeason: season.label,
+    bestCategory,
+    worstCategory,
   };
 }
 
 /**
- * GET /api/stylist
+ * GET /api/stylist?limit=&offset=
  * Returns the user's persisted conversation history plus monthly usage.
  */
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) return apiError("Unauthorized", 401);
 
+    const { searchParams } = new URL(req.url);
+    const limit = Math.min(
+      Math.max(parseInt(searchParams.get("limit") || "50", 10) || 50, 1),
+      100
+    );
+    const offset = Math.max(
+      parseInt(searchParams.get("offset") || "0", 10) || 0,
+      0
+    );
+
     const [messages, used] = await Promise.all([
-      getStylistMessages(session.user.id, 50),
+      getStylistMessages(session.user.id, limit, offset),
       countStylistMessagesThisMonth(session.user.id),
     ]);
 
     return apiOk({
       messages,
+      limit,
+      offset,
       usage: {
         used,
         limit: STYLIST_MONTHLY_LIMIT,
@@ -151,6 +221,6 @@ export async function POST(req: Request) {
     });
   } catch (err) {
     console.error("Error in POST /api/stylist:", err);
-    return apiError("Failed to get a stylist reply", 500);
+    return apiError("Failed to generate stylist reply", 500);
   }
 }

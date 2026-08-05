@@ -15,6 +15,7 @@ import type { DashboardStats } from "@/types";
 
 interface ContextualTipsProps {
   stats: DashboardStats;
+  wardrobeCount?: number;
 }
 
 interface Tip {
@@ -23,8 +24,9 @@ interface Tip {
   href?: string;
 }
 
-export function ContextualTips({ stats }: ContextualTipsProps) {
-  const { totalAnalyses, averageScore, favoriteCount, recentActivity, tryOn } = stats;
+export function ContextualTips({ stats, wardrobeCount }: ContextualTipsProps) {
+  const { totalAnalyses, averageScore, favoriteCount, recentActivity, tryOn } =
+    stats;
   const tips: Tip[] = [];
 
   if (totalAnalyses === 0) {
@@ -66,11 +68,25 @@ export function ContextualTips({ stats }: ContextualTipsProps) {
       text: "Save your best finds to favorites and build your personal wardrobe.",
       href: "/favorites",
     });
+  } else if (favoriteCount >= 3 && (wardrobeCount ?? 0) === 0) {
+    tips.push({
+      icon: Shirt,
+      text: "You have favorites — add a few to your wardrobe to unlock outfit ideas.",
+      href: "/wardrobe",
+    });
   } else if (favoriteCount >= 3) {
     tips.push({
       icon: Heart,
       text: `You've saved ${favoriteCount} favorites — revisit them for styling ideas.`,
       href: "/favorites",
+    });
+  }
+
+  if ((wardrobeCount ?? 0) === 0 && favoriteCount > 0) {
+    tips.push({
+      icon: Shirt,
+      text: "Your wardrobe is empty — organize favorites into folders for better outfit suggestions.",
+      href: "/wardrobe",
     });
   }
 
@@ -111,7 +127,7 @@ export function ContextualTips({ stats }: ContextualTipsProps) {
         Suggestions
       </p>
       <ul className="space-y-3">
-        {tips.map((tip, i) => {
+        {tips.slice(0, 5).map((tip, i) => {
           const content = (
             <li
               key={i}

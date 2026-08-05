@@ -10,6 +10,7 @@ export { ScoreBar } from "./ScoreBar";
 export { PageContainer } from "./PageContainer";
 export { ScoreTrendCard } from "./ScoreTrendCard";
 export { ContextualTips } from "./ContextualTips";
+export { SeasonalTipCard } from "./SeasonalTipCard";
 export {
   DashboardSkeleton,
   HistorySkeleton,

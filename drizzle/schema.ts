@@ -308,3 +308,35 @@ export const stylistMessages = sqliteTable(
   (t) => [index("stylist_messages_user_created_idx").on(t.userId, t.createdAt)]
 );
 
+/** Named folders for organizing wardrobe items (favorites flagged in_wardrobe). */
+export const wardrobeFolders = sqliteTable(
+  "wardrobe_folders",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (t) => [index("wardrobe_folders_user_id_idx").on(t.userId)]
+);
+
+/** Saved outfit snapshots from the wardrobe outfit recommender. */
+export const favoriteOutfits = sqliteTable(
+  "favorite_outfits",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    outfit: text("outfit").notNull(),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (t) => [index("favorite_outfits_user_id_idx").on(t.userId)]
+);
+

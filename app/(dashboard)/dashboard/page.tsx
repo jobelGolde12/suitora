@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   BarChart3,
   Clock,
-  Heart,
   TrendingUp,
   Plus,
   Camera,
@@ -27,19 +26,26 @@ import {
   EmptyState,
   ScoreTrendCard,
   ContextualTips,
+  SeasonalTipCard,
   DashboardSkeleton,
 } from "@/components/dashboard";
+import { OutfitSuggestions } from "@/components/wardrobe/OutfitSuggestions";
 import { TrendingCollection } from "@/components/trending";
-import type { AnalysisResult, DashboardStats } from "@/types";
+import { getCurrentSeason } from "@/lib/season";
+import type { AnalysisResult, DashboardStats, SkinTone } from "@/types";
 import type { TrendItem } from "@/types/trend";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [recentAnalyses, setRecentAnalyses] = useState<(AnalysisResult & { isFavorite?: boolean })[]>([]);
+  const [recentAnalyses, setRecentAnalyses] = useState<
+    (AnalysisResult & { isFavorite?: boolean })[]
+  >([]);
   const [scoreTrend, setScoreTrend] = useState<number[]>([]);
   const [trendDates, setTrendDates] = useState<string[]>([]);
   const [bestScore, setBestScore] = useState<number | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
+  const [skinTone, setSkinTone] = useState<SkinTone | null>(null);
+  const [wardrobeCount, setWardrobeCount] = useState(0);
   const [trendingItems, setTrendingItems] = useState<TrendItem[]>([]);
   const [trendingLoading, setTrendingLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,17 +53,30 @@ export default function DashboardPage() {
   useEffect(() => {
     async function loadStats() {
       try {
-        const res = await fetch("/api/dashboard/stats", {
-          credentials: "include",
-        });
-        if (res.ok) {
-          const data = await res.json();
+        const [statsRes, wardrobeRes, profileRes] = await Promise.all([
+          fetch("/api/dashboard/stats", { credentials: "include" }),
+          fetch("/api/wardrobe", { credentials: "include" }),
+          fetch("/api/user/profile", { credentials: "include" }),
+        ]);
+
+        if (statsRes.ok) {
+          const data = await statsRes.json();
           setStats(data.stats);
           setRecentAnalyses(data.recentAnalyses || []);
           setScoreTrend(data.scoreTrend || []);
           setTrendDates(data.trendDates || []);
           setBestScore(data.bestScore ?? null);
           setUserName(data.userName || null);
+        }
+
+        if (wardrobeRes.ok) {
+          const data = await wardrobeRes.json();
+          setWardrobeCount((data?.items ?? []).length);
+        }
+
+        if (profileRes.ok) {
+          const data = await profileRes.json();
+          setSkinTone((data?.profile?.skinTone as SkinTone) ?? null);
         }
       } catch (err) {
         console.error("Error loading dashboard stats:", err);
@@ -82,8 +101,8 @@ export default function DashboardPage() {
       }
     }
 
-    loadStats();
-    loadTrending();
+    void loadStats();
+    void loadTrending();
   }, []);
 
   if (isLoading) {
@@ -118,12 +137,15 @@ export default function DashboardPage() {
         : `${tryOn.avgLatencyMs}ms avg`
       : null;
 
+  const season = getCurrentSeason();
+  const greeting = userName ? `Welcome back, ${userName}` : "Welcome back";
+
   return (
     <PageContainer>
       <PageHeader
         label="Overview"
-        title={userName ? `Welcome back, ${userName}` : "Welcome back"}
-        description="Your fashion compatibility at a glance — start a new analysis or revisit your recent results."
+        title={greeting}
+        description={`${season.label} edit — your fashion compatibility at a glance. Start a new analysis or revisit recent results.`}
         action={
           <Link href="/upload">
             <Button variant="editorial" className="rounded-full px-6">
@@ -141,7 +163,10 @@ export default function DashboardPage() {
           bestScore={bestScore}
           className="lg:col-span-2"
         />
-        <ContextualTips stats={activeStats} />
+        <div className="space-y-4">
+          <ContextualTips stats={activeStats} wardrobeCount={wardrobeCount} />
+          <SeasonalTipCard skinTone={skinTone} />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-12">
@@ -158,9 +183,9 @@ export default function DashboardPage() {
           sparklineData={activeScoreTrend}
         />
         <MetricCard
-          icon={Heart}
-          label="Favorites"
-          value={activeStats.favoriteCount}
+          icon={Shirt}
+          label="Wardrobe"
+          value={wardrobeCount || activeStats.favoriteCount}
         />
         <MetricCard
           icon={Clock}
@@ -213,6 +238,12 @@ export default function DashboardPage() {
             description="Start a new analysis"
           />
           <QuickActionCard
+            href="/wardrobe"
+            icon={Shirt}
+            title="Wardrobe"
+            description="Organize pieces & outfits"
+          />
+          <QuickActionCard
             href="/stylist"
             icon={MessageCircle}
             title="AI Stylist"
@@ -244,6 +275,8 @@ export default function DashboardPage() {
           />
         </div>
       </section>
+
+      <OutfitSuggestions wardrobeCount={wardrobeCount} />
 
       <section className="mb-12">
         <SectionTitle title="Recent analyses" href="/history" />

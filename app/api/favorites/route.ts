@@ -7,6 +7,7 @@ import { nanoid } from "@/lib/utils/id";
 import { apiError, apiOk } from "@/lib/api/response";
 import {
   getFavoritesByUserId,
+  getWardrobeFolderById,
   toAnalysisResult,
   updateFavoriteWardrobe,
 } from "@/lib/db/queries";
@@ -138,14 +139,29 @@ export async function PATCH(req: Request) {
           .filter((t): t is string => typeof t === "string")
           .map((t) => t.trim())
           .filter(Boolean)
-          .slice(0, 12)
+          .slice(0, 5)
       : undefined;
+
+    let nextFolder: string | null | undefined;
+    if (wardrobeFolder === null) {
+      nextFolder = null;
+    } else if (typeof wardrobeFolder === "string") {
+      const folderId = wardrobeFolder.trim();
+      if (!folderId) {
+        nextFolder = null;
+      } else {
+        const folder = await getWardrobeFolderById(session.user.id, folderId);
+        if (!folder) {
+          return apiError("Folder not found", 404);
+        }
+        nextFolder = folder.id;
+      }
+    }
 
     const updated = await updateFavoriteWardrobe(session.user.id, analysisId, {
       inWardrobe: typeof inWardrobe === "boolean" ? inWardrobe : undefined,
       wardrobeTags: tags,
-      wardrobeFolder:
-        typeof wardrobeFolder === "string" ? wardrobeFolder : undefined,
+      wardrobeFolder: nextFolder,
     });
 
     const favorite = updated ?? existing;

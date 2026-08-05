@@ -70,6 +70,8 @@ export async function getUploadsByUserId(userId: string) {
  * so the deletion is deterministic and auditable.
  */
 export async function deleteUserRecord(userId: string) {
+  await db.delete(schema.favoriteOutfits).where(eq(schema.favoriteOutfits.userId, userId));
+  await db.delete(schema.wardrobeFolders).where(eq(schema.wardrobeFolders.userId, userId));
   await db.delete(schema.favorites).where(eq(schema.favorites.userId, userId));
   await db.delete(schema.analyses).where(eq(schema.analyses.userId, userId));
   await db.delete(schema.uploads).where(eq(schema.uploads.userId, userId));
@@ -110,13 +112,18 @@ export async function getUserDataExport(userId: string) {
 
 // ─── Analysis Queries ────────────────────────────────────────────
 
-export async function getAnalysesByUserId(userId: string, limit = 20) {
+export async function getAnalysesByUserId(
+  userId: string,
+  limit = 20,
+  offset = 0
+) {
   return db
     .select()
     .from(schema.analyses)
     .where(eq(schema.analyses.userId, userId))
     .orderBy(desc(schema.analyses.createdAt))
-    .limit(limit);
+    .limit(limit)
+    .offset(offset);
 }
 
 export async function getAnalysisById(id: string) {
@@ -241,6 +248,140 @@ export async function isFavorite(analysisId: string, userId: string) {
       sql`${schema.favorites.analysisId} = ${analysisId} AND ${schema.favorites.userId} = ${userId}`
     );
   return !!favorite;
+}
+
+// ─── Wardrobe Folder Queries ──────────────────────────────────────
+
+export async function getWardrobeFoldersByUserId(userId: string) {
+  return db
+    .select()
+    .from(schema.wardrobeFolders)
+    .where(eq(schema.wardrobeFolders.userId, userId))
+    .orderBy(desc(schema.wardrobeFolders.createdAt));
+}
+
+export async function getWardrobeFolderById(userId: string, folderId: string) {
+  const [folder] = await db
+    .select()
+    .from(schema.wardrobeFolders)
+    .where(
+      and(
+        eq(schema.wardrobeFolders.id, folderId),
+        eq(schema.wardrobeFolders.userId, userId)
+      )
+    );
+  return folder ?? null;
+}
+
+export async function createWardrobeFolder(userId: string, name: string) {
+  const [folder] = await db
+    .insert(schema.wardrobeFolders)
+    .values({
+      id: nanoid(),
+      userId,
+      name,
+      createdAt: new Date().toISOString(),
+    })
+    .returning();
+  return folder;
+}
+
+export async function updateWardrobeFolder(
+  userId: string,
+  folderId: string,
+  name: string
+) {
+  const [updated] = await db
+    .update(schema.wardrobeFolders)
+    .set({ name })
+    .where(
+      and(
+        eq(schema.wardrobeFolders.id, folderId),
+        eq(schema.wardrobeFolders.userId, userId)
+      )
+    )
+    .returning();
+  return updated ?? null;
+}
+
+/** Delete a folder and clear wardrobe_folder on any assigned favorites. */
+export async function deleteWardrobeFolder(userId: string, folderId: string) {
+  const existing = await getWardrobeFolderById(userId, folderId);
+  if (!existing) return false;
+
+  await db
+    .update(schema.favorites)
+    .set({ wardrobeFolder: null })
+    .where(
+      and(
+        eq(schema.favorites.userId, userId),
+        eq(schema.favorites.wardrobeFolder, folderId)
+      )
+    );
+
+  await db
+    .delete(schema.wardrobeFolders)
+    .where(
+      and(
+        eq(schema.wardrobeFolders.id, folderId),
+        eq(schema.wardrobeFolders.userId, userId)
+      )
+    );
+
+  return true;
+}
+
+export async function getWardrobeFolderItemCounts(userId: string) {
+  return db
+    .select({
+      folderId: schema.favorites.wardrobeFolder,
+      itemCount: sql<number>`COUNT(*)`,
+    })
+    .from(schema.favorites)
+    .where(
+      and(
+        eq(schema.favorites.userId, userId),
+        eq(schema.favorites.inWardrobe, true),
+        sql`${schema.favorites.wardrobeFolder} IS NOT NULL`
+      )
+    )
+    .groupBy(schema.favorites.wardrobeFolder);
+}
+
+// ─── Favorite Outfit Queries ──────────────────────────────────────
+
+export async function getFavoriteOutfitsByUserId(userId: string) {
+  return db
+    .select()
+    .from(schema.favoriteOutfits)
+    .where(eq(schema.favoriteOutfits.userId, userId))
+    .orderBy(desc(schema.favoriteOutfits.createdAt));
+}
+
+export async function addFavoriteOutfit(userId: string, outfitJson: string) {
+  const [row] = await db
+    .insert(schema.favoriteOutfits)
+    .values({
+      id: nanoid(),
+      userId,
+      outfit: outfitJson,
+      createdAt: new Date().toISOString(),
+    })
+    .returning();
+  return row;
+}
+
+export async function removeFavoriteOutfit(userId: string, id: string) {
+  const result = await db
+    .delete(schema.favoriteOutfits)
+    .where(
+      and(
+        eq(schema.favoriteOutfits.id, id),
+        eq(schema.favoriteOutfits.userId, userId)
+      )
+    )
+    .returning();
+  return result.length > 0;
 }
 
 // ─── Stats Queries ────────────────────────────────────────────────
@@ -626,13 +767,18 @@ export type StylistMessage = {
 };
 
 /** Most recent stylist messages, oldest-first (chronological). */
-export async function getStylistMessages(userId: string, limit = 100) {
+export async function getStylistMessages(
+  userId: string,
+  limit = 100,
+  offset = 0
+) {
   const rows = await db
     .select()
     .from(schema.stylistMessages)
     .where(eq(schema.stylistMessages.userId, userId))
     .orderBy(desc(schema.stylistMessages.createdAt))
-    .limit(limit);
+    .limit(limit)
+    .offset(offset);
   return rows.reverse() as StylistMessage[];
 }
 

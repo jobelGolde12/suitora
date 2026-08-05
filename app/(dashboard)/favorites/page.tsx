@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Heart, Shirt, Trash2, BarChart3 } from "lucide-react";
+import { Heart, Pencil, Shirt, Trash2, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { CategoryBadge } from "@/components/ui/CategoryBadge";
@@ -16,10 +16,14 @@ import {
   FavoritesSkeleton,
 } from "@/components/dashboard";
 import { TrendingFilters } from "@/components/trending";
+import { OutfitSuggestions } from "@/components/wardrobe/OutfitSuggestions";
+import {
+  ItemFolderModal,
+  type WardrobeFolderOption,
+} from "@/components/wardrobe/ItemFolderModal";
 import { cn } from "@/lib/utils/cn";
 import { formatRelativeTime, formatScore, getScoreColor } from "@/lib/utils/format";
 import type { AnalysisResult, FavoriteItem } from "@/types";
-import { OutfitSuggestions } from "@/components/wardrobe/OutfitSuggestions";
 
 type FavoriteAnalysis = AnalysisResult & {
   isFavorite: boolean;
@@ -27,6 +31,7 @@ type FavoriteAnalysis = AnalysisResult & {
   inWardrobe: boolean;
   wardrobeTags: string[];
   wardrobeFolder?: string | null;
+  wardrobeFolderName?: string | null;
 };
 
 function extractCategory(analysis: AnalysisResult): string | null {
@@ -44,22 +49,37 @@ function extractCategory(analysis: AnalysisResult): string | null {
 export default function FavoritesPage() {
   const { addToast } = useToast();
   const [favorites, setFavorites] = useState<FavoriteAnalysis[]>([]);
+  const [folders, setFolders] = useState<WardrobeFolderOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState("all");
   const [view, setView] = useState<"all" | "wardrobe">("all");
+  const [editing, setEditing] = useState<FavoriteAnalysis | null>(null);
 
   useEffect(() => {
-    fetch("/api/favorites", { credentials: "include" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        const favorited = ((data?.favorites ?? []) as FavoriteItem[]).map((fav) => ({
-          ...fav.analysis,
-          isFavorite: true,
-          category: extractCategory(fav.analysis),
-          inWardrobe: fav.inWardrobe,
-          wardrobeTags: fav.wardrobeTags,
-          wardrobeFolder: fav.wardrobeFolder,
-        }));
+    Promise.all([
+      fetch("/api/favorites", { credentials: "include" }),
+      fetch("/api/wardrobe/folders", { credentials: "include" }),
+    ])
+      .then(async ([favRes, folderRes]) => {
+        const favData = favRes.ok ? await favRes.json() : null;
+        const folderData = folderRes.ok ? await folderRes.json() : null;
+        const folderList = (folderData?.folders ?? []) as WardrobeFolderOption[];
+        setFolders(folderList);
+        const nameById = new Map(folderList.map((f) => [f.id, f.name]));
+
+        const favorited = ((favData?.favorites ?? []) as FavoriteItem[]).map(
+          (fav) => ({
+            ...fav.analysis,
+            isFavorite: true,
+            category: extractCategory(fav.analysis),
+            inWardrobe: fav.inWardrobe,
+            wardrobeTags: fav.wardrobeTags,
+            wardrobeFolder: fav.wardrobeFolder,
+            wardrobeFolderName: fav.wardrobeFolder
+              ? (nameById.get(fav.wardrobeFolder) ?? null)
+              : null,
+          })
+        );
         setFavorites(favorited);
       })
       .catch((err) => {
@@ -71,7 +91,8 @@ export default function FavoritesPage() {
 
   const filteredFavorites = useMemo(() => {
     return favorites.filter((f) => {
-      const matchesCategory = activeCategory === "all" || f.category === activeCategory;
+      const matchesCategory =
+        activeCategory === "all" || f.category === activeCategory;
       const matchesView = view === "all" || f.inWardrobe;
       return matchesCategory && matchesView;
     });
@@ -96,23 +117,50 @@ export default function FavoritesPage() {
   };
 
   const handleToggleWardrobe = async (analysis: FavoriteAnalysis) => {
-    const next = !analysis.inWardrobe;
+    if (!analysis.inWardrobe) {
+      setEditing(analysis);
+      return;
+    }
+
+    const next = false;
     setFavorites((prev) =>
-      prev.map((f) => (f.id === analysis.id ? { ...f, inWardrobe: next } : f))
+      prev.map((f) =>
+        f.id === analysis.id
+          ? {
+              ...f,
+              inWardrobe: next,
+              wardrobeFolder: null,
+              wardrobeFolderName: null,
+            }
+          : f
+      )
     );
     try {
       const res = await fetch("/api/favorites", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ analysisId: analysis.id, inWardrobe: next }),
+        body: JSON.stringify({
+          analysisId: analysis.id,
+          inWardrobe: next,
+          wardrobeFolder: null,
+        }),
       });
       if (!res.ok) throw new Error("Failed to update wardrobe");
-      addToast(next ? "Added to wardrobe" : "Removed from wardrobe", "success");
+      addToast("Removed from wardrobe", "success");
     } catch (err) {
       console.error(err);
       setFavorites((prev) =>
-        prev.map((f) => (f.id === analysis.id ? { ...f, inWardrobe: !next } : f))
+        prev.map((f) =>
+          f.id === analysis.id
+            ? {
+                ...f,
+                inWardrobe: true,
+                wardrobeFolder: analysis.wardrobeFolder,
+                wardrobeFolderName: analysis.wardrobeFolderName,
+              }
+            : f
+        )
       );
       addToast("Failed to update wardrobe", "error");
     }
@@ -129,11 +177,18 @@ export default function FavoritesPage() {
         title="Favorites"
         description={`Analyses you've saved for later (${favorites.length} items).`}
         action={
-          <Link href="/history">
-            <Button variant="editorial" className="rounded-full px-6">
-              Browse History
-            </Button>
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/wardrobe">
+              <Button variant="secondary" className="rounded-full px-6">
+                Wardrobe
+              </Button>
+            </Link>
+            <Link href="/history">
+              <Button variant="editorial" className="rounded-full px-6">
+                Browse History
+              </Button>
+            </Link>
+          </div>
         }
       />
 
@@ -190,7 +245,9 @@ export default function FavoritesPage() {
       ) : filteredFavorites.length === 0 ? (
         <EmptyState
           icon={view === "wardrobe" ? Shirt : Heart}
-          title={view === "wardrobe" ? "Wardrobe is empty" : "No favorites in this category"}
+          title={
+            view === "wardrobe" ? "Wardrobe is empty" : "No favorites in this category"
+          }
           description={
             view === "wardrobe"
               ? "Toggle the wardrobe icon on a saved item to keep it organized here."
@@ -251,15 +308,36 @@ export default function FavoritesPage() {
                   </div>
                 )}
                 {analysis.inWardrobe && (
-                  <div className="absolute bottom-3 right-3 rounded-full bg-accent/90 text-background border border-accent px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.15em]">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setEditing(analysis);
+                    }}
+                    className="absolute bottom-3 right-3 rounded-full bg-accent/90 text-background border border-accent px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.15em] hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-label="Edit wardrobe folder and tags"
+                  >
                     In Wardrobe
-                  </div>
+                  </button>
+                )}
+                {analysis.inWardrobe && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setEditing(analysis);
+                    }}
+                    className="absolute top-3 right-[6.5rem] h-9 w-9 rounded-full border border-border bg-card/90 text-foreground flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-accent/10 hover:text-accent"
+                    aria-label="Edit folder and tags"
+                  >
+                    <Pencil className="h-4 w-4" strokeWidth={1.5} />
+                  </button>
                 )}
                 <button
                   type="button"
                   onClick={(e) => {
                     e.preventDefault();
-                    handleToggleWardrobe(analysis);
+                    void handleToggleWardrobe(analysis);
                   }}
                   className={cn(
                     "absolute top-3 right-14 h-9 w-9 rounded-full border bg-card/90 text-foreground flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -279,7 +357,7 @@ export default function FavoritesPage() {
                   type="button"
                   onClick={(e) => {
                     e.preventDefault();
-                    handleRemove(analysis.id);
+                    void handleRemove(analysis.id);
                   }}
                   className="absolute top-3 right-3 h-9 w-9 rounded-full bg-card/90 border border-border text-foreground flex items-center justify-center hover:bg-error/10 hover:text-error transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   aria-label="Remove from favorites"
@@ -291,7 +369,9 @@ export default function FavoritesPage() {
               <Link href={`/results/${analysis.id}`}>
                 <div className="p-5">
                   <div className="flex items-center gap-2 mb-2">
-                    <Badge variant={analysis.overallScore >= 70 ? "success" : "warning"}>
+                    <Badge
+                      variant={analysis.overallScore >= 70 ? "success" : "warning"}
+                    >
                       {analysis.overallScore >= 70 ? "Good Match" : "Average"}
                     </Badge>
                     <Heart className="h-3 w-3 text-accent fill-accent" />
@@ -306,7 +386,8 @@ export default function FavoritesPage() {
                       Style {formatScore(analysis.styleScore ?? 0)}
                     </span>
                   </div>
-                  {analysis.wardrobeTags.length > 0 && (
+                  {(analysis.wardrobeTags.length > 0 ||
+                    analysis.wardrobeFolderName) && (
                     <div className="flex flex-wrap gap-1.5 mt-2.5">
                       {analysis.wardrobeTags.slice(0, 3).map((tag) => (
                         <span
@@ -316,9 +397,9 @@ export default function FavoritesPage() {
                           {tag}
                         </span>
                       ))}
-                      {analysis.wardrobeFolder && (
+                      {analysis.wardrobeFolderName && (
                         <span className="rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-[10px] text-accent font-light">
-                          {analysis.wardrobeFolder}
+                          {analysis.wardrobeFolderName}
                         </span>
                       )}
                     </div>
@@ -332,6 +413,32 @@ export default function FavoritesPage() {
           ))}
         </div>
       )}
+
+      <ItemFolderModal
+        isOpen={!!editing}
+        onClose={() => setEditing(null)}
+        analysisId={editing?.id ?? ""}
+        initialFolderId={editing?.wardrobeFolder}
+        initialTags={editing?.wardrobeTags ?? []}
+        folders={folders}
+        onFoldersChange={setFolders}
+        onSaved={(data) => {
+          if (!editing) return;
+          setFavorites((prev) =>
+            prev.map((f) =>
+              f.id === editing.id
+                ? {
+                    ...f,
+                    inWardrobe: data.inWardrobe,
+                    wardrobeFolder: data.wardrobeFolder,
+                    wardrobeFolderName: data.wardrobeFolderName,
+                    wardrobeTags: data.wardrobeTags,
+                  }
+                : f
+            )
+          );
+        }}
+      />
     </PageContainer>
   );
 }

@@ -1,15 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Send, Sparkles, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { ArrowUpRight, Loader2, Send, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useToast } from "@/components/ui/Toast";
+import { detectActionChips, inferFollowUpChips } from "@/lib/ai/stylist-chips";
 
 interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
   createdAt: string;
+  followUps?: string[];
+  actions?: Array<{ label: string; href: string }>;
 }
 
 interface Usage {
@@ -22,7 +26,7 @@ const SUGGESTED_PROMPTS = [
   "What colors suit my skin tone best?",
   "How should I dress for my body shape?",
   "Suggest a weekend outfit for me",
-  "How do I choose the right size when shopping online?",
+  "What can I build from my wardrobe?",
 ];
 
 const isMobile = () =>
@@ -42,7 +46,16 @@ export function StylistChat() {
     fetch("/api/stylist", { credentials: "include" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        setMessages(data?.messages ?? []);
+        const loaded = ((data?.messages ?? []) as ChatMessage[]).map((m) =>
+          m.role === "assistant"
+            ? {
+                ...m,
+                followUps: inferFollowUpChips(m.content),
+                actions: detectActionChips(m.content),
+              }
+            : m
+        );
+        setMessages(loaded);
         setUsage(data?.usage ?? null);
       })
       .catch(() => addToast("Failed to load your stylist history", "error"))
@@ -84,13 +97,16 @@ export function StylistChat() {
         throw new Error(data?.error || "Failed to get a reply");
       }
 
+      const reply = typeof data.message === "string" ? data.message : "";
       setMessages((prev) => [
         ...prev,
         {
           id: `reply-${++localIdRef.current}`,
           role: "assistant",
-          content: data.message,
+          content: reply,
           createdAt: new Date().toISOString(),
+          followUps: inferFollowUpChips(reply),
+          actions: detectActionChips(reply),
         },
       ]);
       setUsage(data.usage ?? null);
@@ -105,12 +121,11 @@ export function StylistChat() {
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    handleSend(input);
+    void handleSend(input);
   };
 
   return (
     <div className="flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-card">
-      {/* Header */}
       <div className="flex items-center gap-3 border-b border-border px-5 py-4">
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/10 border border-accent/30">
           <Sparkles className="h-4 w-4 text-accent" strokeWidth={1.5} />
@@ -118,16 +133,20 @@ export function StylistChat() {
         <div className="min-w-0">
           <p className="text-sm font-medium">Suitora Stylist</p>
           <p className="text-xs text-muted font-light">
-            {isLoading ? "Loading…" : `${usage?.remaining ?? 0} messages left this month`}
+            {isLoading
+              ? "Loading…"
+              : `${usage?.remaining ?? 0} messages left this month`}
           </p>
         </div>
       </div>
 
-      {/* Messages */}
       <div
         ref={scrollRef}
         className="flex-1 space-y-4 overflow-y-auto px-5 py-6"
-        style={{ minHeight: isMobile() ? "calc(100dvh - 340px)" : "440px", maxHeight: isMobile() ? "calc(100dvh - 340px)" : "560px" }}
+        style={{
+          minHeight: isMobile() ? "calc(100dvh - 340px)" : "440px",
+          maxHeight: isMobile() ? "calc(100dvh - 340px)" : "560px",
+        }}
         aria-live="polite"
       >
         {isLoading ? (
@@ -149,7 +168,7 @@ export function StylistChat() {
                 <button
                   key={prompt}
                   type="button"
-                  onClick={() => handleSend(prompt)}
+                  onClick={() => void handleSend(prompt)}
                   disabled={isSending}
                   className="rounded-full border border-border bg-card px-4 py-2 text-xs text-muted transition-colors duration-200 hover:border-accent/40 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                 >
@@ -163,8 +182,8 @@ export function StylistChat() {
             <div
               key={msg.id}
               className={cn(
-                "flex",
-                msg.role === "user" ? "justify-end" : "justify-start"
+                "flex flex-col gap-2",
+                msg.role === "user" ? "items-end" : "items-start"
               )}
             >
               <div
@@ -177,6 +196,35 @@ export function StylistChat() {
               >
                 <p className="font-light whitespace-pre-wrap">{msg.content}</p>
               </div>
+
+              {msg.role === "assistant" &&
+                !isSending &&
+                ((msg.actions && msg.actions.length > 0) ||
+                  (msg.followUps && msg.followUps.length > 0)) && (
+                  <div className="flex max-w-[95%] flex-wrap gap-2">
+                    {msg.actions?.map((action) => (
+                      <Link
+                        key={action.href + action.label}
+                        href={action.href}
+                        className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-3 py-1.5 text-[11px] font-medium text-accent transition-colors hover:bg-accent/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {action.label}
+                        <ArrowUpRight className="h-3 w-3" strokeWidth={1.5} />
+                      </Link>
+                    ))}
+                    {msg.followUps?.map((chip) => (
+                      <button
+                        key={chip}
+                        type="button"
+                        onClick={() => void handleSend(chip)}
+                        disabled={isSending}
+                        className="rounded-full border border-border bg-card px-3 py-1.5 text-[11px] text-muted transition-colors hover:border-accent/40 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                      >
+                        {chip}
+                      </button>
+                    ))}
+                  </div>
+                )}
             </div>
           ))
         )}
@@ -193,13 +241,14 @@ export function StylistChat() {
                   />
                 ))}
               </span>
-              <span className="text-xs text-muted font-light">Stylist is thinking…</span>
+              <span className="text-xs text-muted font-light">
+                Stylist is thinking…
+              </span>
             </div>
           </div>
         )}
       </div>
 
-      {/* Input */}
       <form onSubmit={onSubmit} className="border-t border-border p-4">
         <div className="flex items-end gap-2">
           <textarea
@@ -208,7 +257,7 @@ export function StylistChat() {
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                handleSend(input);
+                void handleSend(input);
               }
             }}
             rows={1}

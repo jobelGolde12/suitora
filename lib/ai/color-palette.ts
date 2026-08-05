@@ -123,6 +123,9 @@ const SKIN_TONE_TO_SEASON: Record<SkinTone, SeasonalType> = {
 
 /** Derive a seasonal palette from a detected skin undertone. */
 export function deriveSeasonalPalette(skinTone: SkinTone | null | undefined): SeasonalPalette {
-  const season = skinTone ? SKIN_TONE_TO_SEASON[skinTone] : "spring";
-  return SEASONAL_PALETTES[season];
+  const mapped =
+    skinTone && skinTone in SKIN_TONE_TO_SEASON
+      ? SKIN_TONE_TO_SEASON[skinTone as SkinTone]
+      : "spring";
+  return SEASONAL_PALETTES[mapped] ?? SEASONAL_PALETTES.spring;
 }

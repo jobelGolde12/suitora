@@ -27,7 +27,7 @@ export default function ComparePage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/analysis", { credentials: "include" })
+    fetch("/api/analysis?limit=24", { credentials: "include" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => setAnalyses((data?.analyses ?? []) as (AnalysisResult & { isFavorite: boolean })[]))
       .catch((err) => {

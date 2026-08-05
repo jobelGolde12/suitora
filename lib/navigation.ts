@@ -7,6 +7,7 @@ import {
   Sparkles,
   MessageCircle,
   GitCompareArrows,
+  Shirt,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -25,6 +26,7 @@ export const dashboardLinks: DashboardLink[] = [
   { label: "Trending", href: "/trending", icon: Sparkles },
   { label: "History", href: "/history", icon: History },
   { label: "Favorites", href: "/favorites", icon: Heart },
+  { label: "Wardrobe", href: "/wardrobe", icon: Shirt },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 

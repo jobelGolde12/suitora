@@ -51,6 +51,12 @@ export interface OutfitScore {
 export interface RecommendOutfitsOptions {
   /** Max outfits to return (capped at 12). */
   limit?: number;
+  /**
+   * Optional seed for variety (e.g. regenerate). When set, foundations are
+   * shuffled with a deterministic PRNG before scoring so callers can request
+   * a different set from the same wardrobe.
+   */
+  seed?: number;
 }
 
 // ─── Role mapping ────────────────────────────────────────────────
@@ -500,6 +506,10 @@ export function recommendOutfits(
 
   if (foundations.length === 0) return [];
 
+  if (options.seed != null) {
+    seededShuffle(foundations, options.seed);
+  }
+
   const finished: TrendOutfit[] = foundations
     .map((foundation) => {
       const outfitItems = augment(foundation, pool);
@@ -535,4 +545,17 @@ export function recommendOutfits(
     .slice(0, limit);
 
   return finished;
+}
+
+/** Deterministic Fisher–Yates shuffle (mutates in place). */
+function seededShuffle<T>(arr: T[], seed: number): void {
+  let s = seed >>> 0;
+  const next = () => {
+    s = (Math.imul(1664525, s) + 1013904223) >>> 0;
+    return s / 0x100000000;
+  };
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(next() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
 }

@@ -121,9 +121,18 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
-    // If ID is not provided, fetch user's full history of analyses
+    // If ID is not provided, fetch user's analyses (paginated)
     if (!id) {
-      const history = await getAnalysesByUserId(session.user.id, 50);
+      const limit = Math.min(
+        Math.max(parseInt(searchParams.get("limit") || "50", 10) || 50, 1),
+        100
+      );
+      const offset = Math.max(
+        parseInt(searchParams.get("offset") || "0", 10) || 0,
+        0
+      );
+
+      const history = await getAnalysesByUserId(session.user.id, limit, offset);
       const favorites = await getFavoritesByUserId(session.user.id);
       const favoriteAnalysisIds = new Set(favorites.map((f) => f.favorite.analysisId));
 
@@ -132,7 +141,7 @@ export async function GET(req: Request) {
         isFavorite: favoriteAnalysisIds.has(item.id),
       }));
 
-      return NextResponse.json({ analyses: mappedHistory });
+      return NextResponse.json({ analyses: mappedHistory, limit, offset });
     }
 
     const [analysis] = await db
