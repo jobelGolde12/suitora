@@ -1,6 +1,12 @@
 import { drizzle } from "drizzle-orm/libsql";
 import { createClient } from "@libsql/client";
 import * as schema from "./schema";
+import { validateEnv } from "@/lib/env";
+
+// Fail-fast: validates server env (and, in production at runtime, the critical
+// infrastructure vars). Runs on first import of this module, i.e. at boot when
+// any DB-touching code loads. Skipped during `next build`.
+validateEnv();
 
 const tursoDbUrl = process.env.TURSO_DATABASE_URL;
 const tursoAuthToken = process.env.TURSO_AUTH_TOKEN;

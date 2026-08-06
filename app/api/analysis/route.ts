@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { requireUser } from "@/lib/auth/session";
 import { db, schema } from "@/drizzle";
 import { eq, and } from "drizzle-orm";
 import { nanoid } from "@/lib/utils/id";
-import { apiError, apiOk } from "@/lib/api/response";
-import { analysisRateLimiter } from "@/lib/rate-limit";
+import { apiError, apiOk, apiRateLimitError } from "@/lib/api/response";
+import { parseBody, validateQuery } from "@/lib/api/request";
+import { createAnalysisSchema, analysisQuerySchema } from "@/lib/validation";
+import { assertSafeHttpUrl } from "@/lib/security/ssrf";
+import { analysisRateLimiter, enforceRateLimit } from "@/lib/rate-limit";
 import { extractProductFromUrlCached } from "@/lib/ai/product-extraction";
 import { analyzeWithVision } from "@/lib/ai/vision";
 import "@/lib/ai/providers"; // Auto-initialize vision providers
@@ -14,30 +16,32 @@ import { mapCategoryToTryOn } from "@/lib/ai/tryon";
 
 export async function POST(req: Request) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user) {
+    const user = await requireUser();
+    if (!user) {
       return apiError("Unauthorized", 401);
     }
 
-    const rl = await analysisRateLimiter.limit(session.user.id);
+    const rl = await enforceRateLimit(analysisRateLimiter, user.id);
     if (!rl.success) {
-      return apiError("Daily analysis limit reached. Please try again tomorrow.", 429);
+      const retryAfter = Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000));
+      return apiRateLimitError(
+        "Daily analysis limit reached. Please try again tomorrow.",
+        retryAfter
+      );
     }
 
-    const body = await req.json().catch(() => ({}));
-    const { productUrl, productImageUpload, userImageUrl, category } = body;
+    const parsed = await parseBody(createAnalysisSchema, req);
+    if (parsed.error) return parsed.error;
+    const { productUrl, productImageUpload, userImageUrl, category } = parsed.data;
 
     // Fetch user's self image if not provided
     let finalUserImage = userImageUrl;
     if (!finalUserImage) {
-      const [user] = await db
+      const [foundUser] = await db
         .select({ selfImageUrl: schema.users.selfImageUrl })
         .from(schema.users)
-        .where(eq(schema.users.id, session.user.id));
-      finalUserImage = user?.selfImageUrl;
+        .where(eq(schema.users.id, user.id));
+      finalUserImage = foundUser?.selfImageUrl ?? undefined;
     }
 
     if (!finalUserImage) {
@@ -47,9 +51,10 @@ export async function POST(req: Request) {
     let finalProductImage = productImageUpload;
     let productId: string | null = null;
 
-    // If product URL is provided, extract the image candidate
+    // If product URL is provided, extract the image candidate (SSRF-guarded)
     if (productUrl) {
       try {
+        await assertSafeHttpUrl(productUrl);
         const extracted = await extractProductFromUrlCached(productUrl);
         finalProductImage = extracted.imageUrl;
 
@@ -89,7 +94,7 @@ export async function POST(req: Request) {
     // Create a pending analysis record
     await db.insert(schema.analyses).values({
       id: analysisId,
-      userId: session.user.id,
+      userId: user.id,
       productId: productId,
       userImage: finalUserImage,
       productImage: finalProductImage,
@@ -110,30 +115,22 @@ export async function POST(req: Request) {
 
 export async function GET(req: Request) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user) {
+    const user = await requireUser();
+    if (!user) {
       return apiError("Unauthorized", 401);
     }
 
     const { searchParams } = new URL(req.url);
-    const id = searchParams.get("id");
+    const q = validateQuery(analysisQuerySchema, searchParams);
+    if (q.error) return q.error;
+    const id = q.data.id;
+    const limit = q.data.limit ?? 50;
+    const offset = q.data.offset ?? 0;
 
     // If ID is not provided, fetch user's analyses (paginated)
     if (!id) {
-      const limit = Math.min(
-        Math.max(parseInt(searchParams.get("limit") || "50", 10) || 50, 1),
-        100
-      );
-      const offset = Math.max(
-        parseInt(searchParams.get("offset") || "0", 10) || 0,
-        0
-      );
-
-      const history = await getAnalysesByUserId(session.user.id, limit, offset);
-      const favorites = await getFavoritesByUserId(session.user.id);
+      const history = await getAnalysesByUserId(user.id, limit, offset);
+      const favorites = await getFavoritesByUserId(user.id);
       const favoriteAnalysisIds = new Set(favorites.map((f) => f.favorite.analysisId));
 
       const mappedHistory = history.map((item) => ({
@@ -144,10 +141,11 @@ export async function GET(req: Request) {
       return NextResponse.json({ analyses: mappedHistory, limit, offset });
     }
 
+    // Ownership-scoped read prevents IDOR across users.
     const [analysis] = await db
       .select()
       .from(schema.analyses)
-      .where(eq(schema.analyses.id, id));
+      .where(and(eq(schema.analyses.id, id), eq(schema.analyses.userId, user.id)));
 
     if (!analysis) {
       return apiError("Analysis not found", 404);
@@ -160,7 +158,7 @@ export async function GET(req: Request) {
     const [current] = await db
       .select()
       .from(schema.analyses)
-      .where(eq(schema.analyses.id, id));
+      .where(and(eq(schema.analyses.id, id), eq(schema.analyses.userId, user.id)));
 
     if (!current) {
       return apiError("Analysis not found", 404);
@@ -211,7 +209,7 @@ export async function GET(req: Request) {
 
         // Persist high-confidence traits to the user's profile (estimates only,
         // never overwrites manual measurements).
-        await persistAnalysisEstimates(session.user.id, {
+        await persistAnalysisEstimates(user.id, {
           height: visionResult.height ?? null,
           heightConfidence: visionResult.heightConfidence ?? null,
           weight: visionResult.weight ?? null,
@@ -302,11 +300,8 @@ export async function GET(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user) {
+    const user = await requireUser();
+    if (!user) {
       return apiError("Unauthorized", 401);
     }
 
@@ -321,7 +316,7 @@ export async function DELETE(req: Request) {
     const [analysis] = await db
       .select()
       .from(schema.analyses)
-      .where(and(eq(schema.analyses.id, id), eq(schema.analyses.userId, session.user.id)));
+      .where(and(eq(schema.analyses.id, id), eq(schema.analyses.userId, user.id)));
 
     if (!analysis) {
       return apiError("Analysis not found", 404);

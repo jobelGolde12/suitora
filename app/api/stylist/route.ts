@@ -1,7 +1,8 @@
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
-import { apiError, apiOk } from "@/lib/api/response";
-import { stylistRateLimiter } from "@/lib/rate-limit";
+import { requireUser } from "@/lib/auth/session";
+import { apiError, apiOk, apiRateLimitError } from "@/lib/api/response";
+import { stylistRateLimiter, enforceRateLimit } from "@/lib/rate-limit";
+import { parseBody } from "@/lib/api/request";
+import { stylistMessageSchema } from "@/lib/validation";
 import {
   addStylistMessage,
   countStylistMessagesThisMonth,
@@ -23,7 +24,6 @@ import { getCurrentSeason } from "@/lib/season";
 import type { FitPreference, SkinTone, StyleTag } from "@/types";
 
 const STYLIST_MONTHLY_LIMIT = Number(process.env.STYLIST_MONTHLY_LIMIT || 10);
-const MAX_MESSAGE_LENGTH = 2000;
 
 const SKIN_TONES: SkinTone[] = ["warm", "cool", "neutral", "olive", "deep"];
 const FIT_PREFERENCES: FitPreference[] = ["tight", "regular", "relaxed", "oversized"];
@@ -127,8 +127,8 @@ async function buildContext(userId: string): Promise<StylistContext> {
  */
 export async function GET(req: Request) {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) return apiError("Unauthorized", 401);
+    const user = await requireUser();
+    if (!user) return apiError("Unauthorized", 401);
 
     const { searchParams } = new URL(req.url);
     const limit = Math.min(
@@ -141,8 +141,8 @@ export async function GET(req: Request) {
     );
 
     const [messages, used] = await Promise.all([
-      getStylistMessages(session.user.id, limit, offset),
-      countStylistMessagesThisMonth(session.user.id),
+      getStylistMessages(user.id, limit, offset),
+      countStylistMessagesThisMonth(user.id),
     ]);
 
     return apiOk({
@@ -168,28 +168,29 @@ export async function GET(req: Request) {
  */
 export async function POST(req: Request) {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) return apiError("Unauthorized", 401);
-    const userId = session.user.id;
+    const user = await requireUser();
+    if (!user) return apiError("Unauthorized", 401);
+    const userId = user.id;
 
-    const rate = await stylistRateLimiter.limit(userId);
+    const rate = await enforceRateLimit(stylistRateLimiter, userId);
     if (!rate.success) {
-      return apiError("Too many stylist requests. Please try again later.", 429);
+      const retryAfter = Math.max(1, Math.ceil((rate.reset - Date.now()) / 1000));
+      return apiRateLimitError(
+        "Too many stylist requests. Please try again later.",
+        retryAfter
+      );
     }
 
-    const body = await req.json();
-    const message = typeof body?.message === "string" ? body.message.trim() : "";
-    if (!message) return apiError("Message is required", 400);
-    if (message.length > MAX_MESSAGE_LENGTH) {
-      return apiError(`Message must be under ${MAX_MESSAGE_LENGTH} characters`, 400);
-    }
+    const parsed = await parseBody(stylistMessageSchema, req);
+    if (parsed.error) return parsed.error;
+    const message = parsed.data.message.trim();
 
     const [used, history, context] = await Promise.all([
       countStylistMessagesThisMonth(userId),
       getStylistMessages(userId, 40),
       buildContext(userId),
     ]);
-    context.name = session.user.name;
+    context.name = user.name;
 
     if (used >= STYLIST_MONTHLY_LIMIT) {
       return apiError(

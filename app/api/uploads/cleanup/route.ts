@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { requireUser } from "@/lib/auth/session";
 import { apiError, apiOk } from "@/lib/api/response";
 import { cleanupExpiredUploads } from "@/lib/retention";
 
@@ -27,8 +27,8 @@ export async function POST() {
         return apiError("Forbidden", 403);
       }
     } else {
-      const session = await auth.api.getSession({ headers: headerStore });
-      if (!session?.user) {
+      const user = await requireUser();
+      if (!user) {
         return apiError("Unauthorized", 401);
       }
     }

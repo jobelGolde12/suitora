@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { apiError, apiOk } from "@/lib/api/response";
-import { auth } from "@/lib/auth";
+import { requireUser } from "@/lib/auth/session";
+import { validateQuery } from "@/lib/api/request";
+import { similarItemsQuerySchema } from "@/lib/validation";
 import { parseJsonObject } from "@/lib/db/queries";
 import { getAnalysisById, getProfileByUserId, listSimilarTrendItems } from "@/lib/db/queries";
 import { rowToTrendItem } from "@/lib/trend/normalize";
@@ -14,27 +16,18 @@ import { buildUserBodyProfileFromProfile, scoreTrendItemsForUser } from "@/lib/a
  */
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
-
-    if (!session?.user) {
+    const user = await requireUser();
+    if (!user) {
       return apiError("Unauthorized", 401);
     }
 
-    const { searchParams } = request.nextUrl;
-    const analysisId = searchParams.get("analysisId");
-    const limit = Math.min(
-      Math.max(parseInt(searchParams.get("limit") || "6", 10) || 6, 1),
-      12
-    );
-
-    if (!analysisId) {
-      return apiError("Missing analysisId", 400);
-    }
+    const q = validateQuery(similarItemsQuerySchema, request.nextUrl.searchParams);
+    if (q.error) return q.error;
+    const { analysisId } = q.data;
+    const limit = q.data.limit ?? 6;
 
     const analysis = await getAnalysisById(analysisId);
-    if (!analysis || analysis.userId !== session.user.id) {
+    if (!analysis || analysis.userId !== user.id) {
       return apiError("Analysis not found", 404);
     }
 
@@ -54,7 +47,7 @@ export async function GET(request: NextRequest) {
       : [];
 
     const rows = await listSimilarTrendItems({ category, styleTags, limit });
-    const profile = await getProfileByUserId(session.user.id);
+    const profile = await getProfileByUserId(user.id);
     const items = profile
       ? scoreTrendItemsForUser(buildUserBodyProfileFromProfile(profile), rows.map(rowToTrendItem))
       : rows.map(rowToTrendItem).map((item) => ({

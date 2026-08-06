@@ -1,9 +1,9 @@
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { requireUser } from "@/lib/auth/session";
 import { db, schema } from "@/drizzle";
 import { eq } from "drizzle-orm";
 import { nanoid } from "@/lib/utils/id";
-import { apiError, apiOk } from "@/lib/api/response";
+import { apiError, apiOk, apiRateLimitError } from "@/lib/api/response";
+import { enforceRateLimit, stylistRateLimiter } from "@/lib/rate-limit";
 import {
   deleteUserRecord,
   getAnalysesByUserId,
@@ -20,15 +20,21 @@ import { deleteCloudinaryImageFromUrl } from "@/lib/storage/cloudinary";
  */
 export async function DELETE() {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user) {
+    const user = await requireUser();
+    if (!user) {
       return apiError("Unauthorized", 401);
     }
 
-    const userId = session.user.id;
+    const rl = await enforceRateLimit(stylistRateLimiter, user.id);
+    if (!rl.success) {
+      const retryAfter = Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000));
+      return apiRateLimitError(
+        "Too many requests. Please try again later.",
+        retryAfter
+      );
+    }
+
+    const userId = user.id;
 
     const [analyses, uploads, profile, users] = await Promise.all([
       getAnalysesByUserId(userId, 5000),
@@ -40,7 +46,7 @@ export async function DELETE() {
         .where(eq(schema.users.id, userId)),
     ]);
 
-    const [user] = users;
+    const [dbUser] = users;
 
     // Collect every Cloudinary asset the user owns before rows are removed.
     const assetUrls = new Set<string>();
@@ -54,8 +60,8 @@ export async function DELETE() {
     }
     if (profile?.selfImageUrl) assetUrls.add(profile.selfImageUrl);
     if (profile?.selfImageThumbnailUrl) assetUrls.add(profile.selfImageThumbnailUrl);
-    if (user?.image) assetUrls.add(user.image);
-    if (user?.selfImageUrl) assetUrls.add(user.selfImageUrl);
+    if (dbUser?.image) assetUrls.add(dbUser.image);
+    if (dbUser?.selfImageUrl) assetUrls.add(dbUser.selfImageUrl);
 
     // Purge Cloudinary assets (best-effort; no-op for non-Cloudinary URLs),
     // then remove the rows.
@@ -70,7 +76,7 @@ export async function DELETE() {
       userId,
       action: "account_deleted",
       details: JSON.stringify({
-        email: session.user.email,
+        email: user.email,
         timestamp: new Date().toISOString(),
       }),
       createdAt: new Date().toISOString(),

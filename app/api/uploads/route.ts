@@ -1,23 +1,24 @@
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { requireUser } from "@/lib/auth/session";
 import { db, schema } from "@/drizzle";
 import { nanoid } from "@/lib/utils/id";
-import { apiError, apiOk } from "@/lib/api/response";
-import { uploadRateLimiter } from "@/lib/rate-limit";
+import { apiError, apiOk, apiRateLimitError } from "@/lib/api/response";
+import { uploadRateLimiter, enforceRateLimit } from "@/lib/rate-limit";
+import { imageFileSchema, ACCEPTED_IMAGE_TYPES } from "@/lib/utils/validation";
 
 export async function POST(req: Request) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user) {
+    const user = await requireUser();
+    if (!user) {
       return apiError("Unauthorized", 401);
     }
 
-    const rl = await uploadRateLimiter.limit(session.user.id);
+    const rl = await enforceRateLimit(uploadRateLimiter, user.id);
     if (!rl.success) {
-      return apiError("Upload limit reached. Please try again in an hour.", 429);
+      const retryAfter = Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000));
+      return apiRateLimitError(
+        "Upload limit reached. Please try again in an hour.",
+        retryAfter
+      );
     }
 
     const formData = await req.formData();
@@ -25,6 +26,16 @@ export async function POST(req: Request) {
 
     if (!file) {
       return apiError("File is required", 400);
+    }
+
+    // Validate image type + size before reading it into memory.
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+      return apiError("Only .jpg, .png, and .webp files are accepted", 400);
+    }
+    const sizeCheck = imageFileSchema.safeParse(file);
+    if (!sizeCheck.success) {
+      const issue = sizeCheck.error.issues[0];
+      return apiError(issue?.message ?? "Invalid file", 400);
     }
 
     // Convert File to Buffer
@@ -67,7 +78,7 @@ export async function POST(req: Request) {
     // Track in uploads table
     await db.insert(schema.uploads).values({
       id: nanoid(),
-      userId: session.user.id,
+      userId: user.id,
       kind: "product_image",
       url,
       width: width || null,
@@ -86,11 +97,8 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user) {
+    const user = await requireUser();
+    if (!user) {
       return apiError("Unauthorized", 401);
     }
 

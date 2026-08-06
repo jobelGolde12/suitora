@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { ZodError } from "zod";
 
 /**
  * Shared API response helpers.
@@ -20,4 +21,30 @@ export function apiOk(
     ...data,
     ...(message ? { message } : {}),
   });
+}
+
+/**
+ * 400 response with structured, field-level validation errors.
+ */
+export function apiValidationError(error: ZodError): NextResponse {
+  const issues = error.issues.map((i) => ({
+    path: i.path.join("."),
+    message: i.message,
+  }));
+  return NextResponse.json(
+    { error: "Invalid request", issues },
+    { status: 400 }
+  );
+}
+
+/**
+ * 429 response with a Retry-After header so clients know when to retry.
+ */
+export function apiRateLimitError(
+  message: string,
+  retryAfterSeconds = 60
+): NextResponse {
+  const response = NextResponse.json({ error: message }, { status: 429 });
+  response.headers.set("Retry-After", String(Math.max(1, Math.ceil(retryAfterSeconds))));
+  return response;
 }

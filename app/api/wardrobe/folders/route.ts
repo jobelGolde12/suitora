@@ -1,13 +1,14 @@
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
-import { apiError, apiOk } from "@/lib/api/response";
+import { requireUser } from "@/lib/auth/session";
+import { apiError, apiOk, apiRateLimitError } from "@/lib/api/response";
+import { parseBody } from "@/lib/api/request";
+import { enforceRateLimit, stylistRateLimiter } from "@/lib/rate-limit";
+import { createFolderSchema } from "@/lib/validation";
 import {
   createWardrobeFolder,
   getWardrobeFolderItemCounts,
   getWardrobeFoldersByUserId,
 } from "@/lib/db/queries";
 
-const MAX_FOLDER_NAME = 48;
 const MAX_FOLDERS = 30;
 
 /**
@@ -16,15 +17,12 @@ const MAX_FOLDERS = 30;
  */
 export async function GET() {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user) {
+    const user = await requireUser();
+    if (!user) {
       return apiError("Unauthorized", 401);
     }
 
-    const userId = session.user.id;
+    const userId = user.id;
     const [folders, counts] = await Promise.all([
       getWardrobeFoldersByUserId(userId),
       getWardrobeFolderItemCounts(userId),
@@ -52,28 +50,30 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user) {
+    const user = await requireUser();
+    if (!user) {
       return apiError("Unauthorized", 401);
     }
 
-    const body = await req.json().catch(() => ({}));
-    const name =
-      typeof body?.name === "string" ? body.name.trim().slice(0, MAX_FOLDER_NAME) : "";
-
-    if (!name) {
-      return apiError("Folder name is required", 400);
+    const rl = await enforceRateLimit(stylistRateLimiter, user.id);
+    if (!rl.success) {
+      const retryAfter = Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000));
+      return apiRateLimitError(
+        "Too many requests. Please try again later.",
+        retryAfter
+      );
     }
 
-    const existing = await getWardrobeFoldersByUserId(session.user.id);
+    const parsed = await parseBody(createFolderSchema, req);
+    if (parsed.error) return parsed.error;
+    const { name } = parsed.data;
+
+    const existing = await getWardrobeFoldersByUserId(user.id);
     if (existing.length >= MAX_FOLDERS) {
       return apiError(`You can have at most ${MAX_FOLDERS} folders`, 400);
     }
 
-    const folder = await createWardrobeFolder(session.user.id, name);
+    const folder = await createWardrobeFolder(user.id, name);
 
     return apiOk({
       folder: {

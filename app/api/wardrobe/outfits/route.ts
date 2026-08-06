@@ -1,6 +1,9 @@
 import { NextRequest } from "next/server";
-import { apiError, apiOk } from "@/lib/api/response";
-import { auth } from "@/lib/auth";
+import { apiError, apiOk, apiRateLimitError } from "@/lib/api/response";
+import { requireUser } from "@/lib/auth/session";
+import { parseBody, validateQuery } from "@/lib/api/request";
+import { enforceRateLimit, stylistRateLimiter } from "@/lib/rate-limit";
+import { outfitsQuerySchema, regenerateOutfitsSchema } from "@/lib/validation";
 import {
   getFavoriteOutfitsByUserId,
   getWardrobeFavoritesByUserId,
@@ -88,33 +91,24 @@ function parseSavedOutfit(row: {
  */
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
-
-    if (!session?.user) {
+    const user = await requireUser();
+    if (!user) {
       return apiError("Unauthorized", 401);
     }
 
-    const limit = Math.min(
-      Math.max(
-        parseInt(request.nextUrl.searchParams.get("limit") || "6", 10) || 6,
-        1
-      ),
-      12
-    );
-    const regenerate =
-      request.nextUrl.searchParams.get("regenerate") === "1" ||
-      request.nextUrl.searchParams.get("regenerate") === "true";
+    const q = validateQuery(outfitsQuerySchema, request.nextUrl.searchParams);
+    if (q.error) return q.error;
+    const limit = q.data.limit ?? 6;
+    const regenerate = q.data.regenerate ?? false;
 
-    const items = await buildWardrobeItems(session.user.id);
+    const items = await buildWardrobeItems(user.id);
     if (items.length === 0) {
       return apiOk({ outfits: [], wardrobeCount: 0, saved: [] });
     }
 
     const seed = regenerate ? Date.now() : undefined;
     const outfits = recommendOutfits(items, { limit, seed });
-    const savedRows = await getFavoriteOutfitsByUserId(session.user.id);
+    const savedRows = await getFavoriteOutfitsByUserId(user.id);
     const saved = savedRows
       .map(parseSavedOutfit)
       .filter((o): o is NonNullable<typeof o> => o != null);
@@ -128,21 +122,25 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
-
-    if (!session?.user) {
+    const user = await requireUser();
+    if (!user) {
       return apiError("Unauthorized", 401);
     }
 
-    const body = await request.json().catch(() => ({}));
-    const limit = Math.min(
-      Math.max(typeof body?.limit === "number" ? body.limit : 6, 1),
-      12
-    );
+    const rl = await enforceRateLimit(stylistRateLimiter, user.id);
+    if (!rl.success) {
+      const retryAfter = Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000));
+      return apiRateLimitError(
+        "Too many requests. Please try again later.",
+        retryAfter
+      );
+    }
 
-    const items = await buildWardrobeItems(session.user.id);
+    const parsed = await parseBody(regenerateOutfitsSchema, request);
+    if (parsed.error) return parsed.error;
+    const limit = parsed.data.limit ?? 6;
+
+    const items = await buildWardrobeItems(user.id);
     if (items.length === 0) {
       return apiOk({ outfits: [], wardrobeCount: 0 });
     }

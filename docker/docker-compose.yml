@@ -42,12 +42,16 @@ services:
 
   # Reverse proxy / load balancer. Run `docker compose up --scale web=3` to
   # horizontally scale web replicas behind a single entrypoint.
+  # Drop your Let's Encrypt/Cloudflare certs (fullchain.pem, privkey.pem) into
+  # ./certs/ (gitignored) and update the server_name in nginx/nginx.conf.
   nginx:
     image: nginx:1.27-alpine
     ports:
-      - "8080:80"
+      - "80:80"
+      - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
     depends_on:
       - web
     restart: always

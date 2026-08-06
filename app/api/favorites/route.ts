@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { requireUser } from "@/lib/auth/session";
 import { db, schema } from "@/drizzle";
 import { eq, and } from "drizzle-orm";
 import { nanoid } from "@/lib/utils/id";
-import { apiError, apiOk } from "@/lib/api/response";
+import { apiError, apiOk, apiRateLimitError } from "@/lib/api/response";
+import { enforceRateLimit, stylistRateLimiter } from "@/lib/rate-limit";
+import { parseBody } from "@/lib/api/request";
+import {
+  favoriteCreateSchema,
+  favoriteUpdateSchema,
+  favoriteDeleteSchema,
+} from "@/lib/validation";
 import {
   getFavoritesByUserId,
   getWardrobeFolderById,
@@ -24,15 +30,12 @@ function parseWardrobeTags(value: string | null): string[] {
 
 export async function GET() {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user) {
+    const user = await requireUser();
+    if (!user) {
       return apiError("Unauthorized", 401);
     }
 
-    const favorites = await getFavoritesByUserId(session.user.id);
+    const favorites = await getFavoritesByUserId(user.id);
 
     const result = favorites.map(({ favorite, analysis }) => ({
       id: favorite.id,
@@ -54,20 +57,23 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user) {
+    const user = await requireUser();
+    if (!user) {
       return apiError("Unauthorized", 401);
     }
 
-    const body = await req.json().catch(() => ({}));
-    const { analysisId } = body;
-
-    if (!analysisId) {
-      return apiError("analysisId is required", 400);
+    const rl = await enforceRateLimit(stylistRateLimiter, user.id);
+    if (!rl.success) {
+      const retryAfter = Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000));
+      return apiRateLimitError(
+        "Too many requests. Please try again later.",
+        retryAfter
+      );
     }
+
+    const parsed = await parseBody(favoriteCreateSchema, req);
+    if (parsed.error) return parsed.error;
+    const { analysisId } = parsed.data;
 
     // Check if already favorited
     const [existing] = await db
@@ -75,7 +81,7 @@ export async function POST(req: Request) {
       .from(schema.favorites)
       .where(
         and(
-          eq(schema.favorites.userId, session.user.id),
+          eq(schema.favorites.userId, user.id),
           eq(schema.favorites.analysisId, analysisId)
         )
       );
@@ -89,7 +95,7 @@ export async function POST(req: Request) {
       .insert(schema.favorites)
       .values({
         id: favId,
-        userId: session.user.id,
+        userId: user.id,
         analysisId: analysisId,
         createdAt: new Date().toISOString(),
       })
@@ -104,20 +110,23 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user) {
+    const user = await requireUser();
+    if (!user) {
       return apiError("Unauthorized", 401);
     }
 
-    const body = await req.json().catch(() => ({}));
-    const { analysisId, inWardrobe, wardrobeTags, wardrobeFolder } = body;
-
-    if (!analysisId) {
-      return apiError("analysisId is required", 400);
+    const rl = await enforceRateLimit(stylistRateLimiter, user.id);
+    if (!rl.success) {
+      const retryAfter = Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000));
+      return apiRateLimitError(
+        "Too many requests. Please try again later.",
+        retryAfter
+      );
     }
+
+    const parsed = await parseBody(favoriteUpdateSchema, req);
+    if (parsed.error) return parsed.error;
+    const { analysisId, inWardrobe, wardrobeTags, wardrobeFolder } = parsed.data;
 
     // Only allow updating wardrobe fields for an existing favorite.
     const [existing] = await db
@@ -125,7 +134,7 @@ export async function PATCH(req: Request) {
       .from(schema.favorites)
       .where(
         and(
-          eq(schema.favorites.userId, session.user.id),
+          eq(schema.favorites.userId, user.id),
           eq(schema.favorites.analysisId, analysisId)
         )
       );
@@ -136,7 +145,6 @@ export async function PATCH(req: Request) {
 
     const tags = Array.isArray(wardrobeTags)
       ? wardrobeTags
-          .filter((t): t is string => typeof t === "string")
           .map((t) => t.trim())
           .filter(Boolean)
           .slice(0, 5)
@@ -150,7 +158,7 @@ export async function PATCH(req: Request) {
       if (!folderId) {
         nextFolder = null;
       } else {
-        const folder = await getWardrobeFolderById(session.user.id, folderId);
+        const folder = await getWardrobeFolderById(user.id, folderId);
         if (!folder) {
           return apiError("Folder not found", 404);
         }
@@ -158,7 +166,7 @@ export async function PATCH(req: Request) {
       }
     }
 
-    const updated = await updateFavoriteWardrobe(session.user.id, analysisId, {
+    const updated = await updateFavoriteWardrobe(user.id, analysisId, {
       inWardrobe: typeof inWardrobe === "boolean" ? inWardrobe : undefined,
       wardrobeTags: tags,
       wardrobeFolder: nextFolder,
@@ -184,20 +192,27 @@ export async function PATCH(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user) {
+    const user = await requireUser();
+    if (!user) {
       return apiError("Unauthorized", 401);
+    }
+
+    const rl = await enforceRateLimit(stylistRateLimiter, user.id);
+    if (!rl.success) {
+      const retryAfter = Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000));
+      return apiRateLimitError(
+        "Too many requests. Please try again later.",
+        retryAfter
+      );
     }
 
     const { searchParams } = new URL(req.url);
     let analysisId = searchParams.get("analysisId");
 
     if (!analysisId) {
-      const body = await req.json().catch(() => ({}));
-      analysisId = body.analysisId;
+      const parsed = await parseBody(favoriteDeleteSchema, req);
+      if (parsed.error) return parsed.error;
+      analysisId = parsed.data.analysisId ?? null;
     }
 
     if (!analysisId) {
@@ -208,7 +223,7 @@ export async function DELETE(req: Request) {
       .delete(schema.favorites)
       .where(
         and(
-          eq(schema.favorites.userId, session.user.id),
+          eq(schema.favorites.userId, user.id),
           eq(schema.favorites.analysisId, analysisId)
         )
       );

@@ -40,7 +40,9 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: false,
+    // Require email verification for production traffic to prevent account
+    // takeover via unverified registrations. Kept off in dev for convenience.
+    requireEmailVerification: process.env.NODE_ENV === "production",
     // Called whenever a password reset is requested. The reset URL already
     // includes a one-time token and points at /reset-password.
     sendResetPassword: ({ user, url }) =>

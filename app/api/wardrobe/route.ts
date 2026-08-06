@@ -1,5 +1,4 @@
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { requireUser } from "@/lib/auth/session";
 import { apiError, apiOk } from "@/lib/api/response";
 import {
   getWardrobeFavoritesByUserId,
@@ -24,15 +23,12 @@ function parseWardrobeTags(value: string | null): string[] {
  */
 export async function GET() {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user) {
+    const user = await requireUser();
+    if (!user) {
       return apiError("Unauthorized", 401);
     }
 
-    const userId = session.user.id;
+    const userId = user.id;
     const [folders, counts, rows] = await Promise.all([
       getWardrobeFoldersByUserId(userId),
       getWardrobeFolderItemCounts(userId),

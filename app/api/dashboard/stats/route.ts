@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { requireUser } from "@/lib/auth/session";
 import { apiError } from "@/lib/api/response";
 import {
   getDashboardStats,
@@ -11,15 +10,12 @@ import {
 
 export async function GET() {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user) {
+    const user = await requireUser();
+    if (!user) {
       return apiError("Unauthorized", 401);
     }
 
-    const userId = session.user.id;
+    const userId = user.id;
 
     // Fetch independent queries in parallel — reduces worst-case latency to
     // the slowest single query instead of the sum of all query times.
@@ -55,8 +51,8 @@ export async function GET() {
     const finalScoreTrend = scoreTrend.length > 0 ? scoreTrend : [70, 75, 80];
 
     const userName =
-      session.user.name?.trim() ||
-      (session.user.email ? session.user.email.split("@")[0] : null) ||
+      user.name?.trim() ||
+      (user.email ? user.email.split("@")[0] : null) ||
       null;
 
     return NextResponse.json({

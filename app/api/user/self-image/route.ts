@@ -1,27 +1,26 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { requireUser } from "@/lib/auth/session";
 import { db, schema } from "@/drizzle";
 import { eq } from "drizzle-orm";
 import { nanoid } from "@/lib/utils/id";
-import { apiError, apiOk } from "@/lib/api/response";
+import { apiError, apiOk, apiRateLimitError } from "@/lib/api/response";
+import { parseBody } from "@/lib/api/request";
+import { enforceRateLimit, uploadRateLimiter } from "@/lib/rate-limit";
+import { selfImageBodySchema } from "@/lib/validation";
 
 export async function GET() {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user) {
+    const user = await requireUser();
+    if (!user) {
       return apiError("Unauthorized", 401);
     }
 
-    const [user] = await db
+    const [row] = await db
       .select({ selfImageUrl: schema.users.selfImageUrl })
       .from(schema.users)
-      .where(eq(schema.users.id, session.user.id));
+      .where(eq(schema.users.id, user.id));
 
-    return NextResponse.json({ selfImageUrl: user?.selfImageUrl || null });
+    return NextResponse.json({ selfImageUrl: row?.selfImageUrl || null });
   } catch (err) {
     console.error("Error in GET /api/user/self-image:", err);
     return apiError("Internal server error", 500);
@@ -30,26 +29,29 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user) {
+    const user = await requireUser();
+    if (!user) {
       return apiError("Unauthorized", 401);
     }
 
-    const body = await req.json().catch(() => ({}));
-    const { selfImageUrl } = body;
-
-    if (!selfImageUrl) {
-      return apiError("selfImageUrl is required", 400);
+    const rl = await enforceRateLimit(uploadRateLimiter, user.id);
+    if (!rl.success) {
+      const retryAfter = Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000));
+      return apiRateLimitError(
+        "Too many requests. Please try again later.",
+        retryAfter
+      );
     }
+
+    const parsed = await parseBody(selfImageBodySchema, req);
+    if (parsed.error) return parsed.error;
+    const { selfImageUrl } = parsed.data;
 
     // 1. Update user's selfImageUrl
     await db
       .update(schema.users)
       .set({ selfImageUrl, updatedAt: new Date().toISOString() })
-      .where(eq(schema.users.id, session.user.id));
+      .where(eq(schema.users.id, user.id));
 
     // 2. Add uploads record (skip if already tracked by upload service)
     const existingUpload = await db
@@ -61,7 +63,7 @@ export async function POST(req: Request) {
     if (existingUpload.length === 0) {
       await db.insert(schema.uploads).values({
         id: nanoid(),
-        userId: session.user.id,
+        userId: user.id,
         kind: "user_photo",
         url: selfImageUrl,
         createdAt: new Date().toISOString(),

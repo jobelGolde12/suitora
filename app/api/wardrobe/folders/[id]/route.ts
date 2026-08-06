@@ -1,12 +1,12 @@
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
-import { apiError, apiOk } from "@/lib/api/response";
+import { requireUser } from "@/lib/auth/session";
+import { apiError, apiOk, apiRateLimitError } from "@/lib/api/response";
+import { parseBody } from "@/lib/api/request";
+import { enforceRateLimit, stylistRateLimiter } from "@/lib/rate-limit";
+import { updateFolderSchema } from "@/lib/validation";
 import {
   deleteWardrobeFolder,
   updateWardrobeFolder,
 } from "@/lib/db/queries";
-
-const MAX_FOLDER_NAME = 48;
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -18,26 +18,28 @@ interface RouteContext {
  */
 export async function PATCH(req: Request, context: RouteContext) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user) {
+    const user = await requireUser();
+    if (!user) {
       return apiError("Unauthorized", 401);
+    }
+
+    const rl = await enforceRateLimit(stylistRateLimiter, user.id);
+    if (!rl.success) {
+      const retryAfter = Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000));
+      return apiRateLimitError(
+        "Too many requests. Please try again later.",
+        retryAfter
+      );
     }
 
     const { id } = await context.params;
     if (!id) return apiError("Folder id is required", 400);
 
-    const body = await req.json().catch(() => ({}));
-    const name =
-      typeof body?.name === "string" ? body.name.trim().slice(0, MAX_FOLDER_NAME) : "";
+    const parsed = await parseBody(updateFolderSchema, req);
+    if (parsed.error) return parsed.error;
+    const { name } = parsed.data;
 
-    if (!name) {
-      return apiError("Folder name is required", 400);
-    }
-
-    const updated = await updateWardrobeFolder(session.user.id, id, name);
+    const updated = await updateWardrobeFolder(user.id, id, name);
     if (!updated) {
       return apiError("Folder not found", 404);
     }
@@ -57,18 +59,24 @@ export async function PATCH(req: Request, context: RouteContext) {
 
 export async function DELETE(_req: Request, context: RouteContext) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user) {
+    const user = await requireUser();
+    if (!user) {
       return apiError("Unauthorized", 401);
+    }
+
+    const rl = await enforceRateLimit(stylistRateLimiter, user.id);
+    if (!rl.success) {
+      const retryAfter = Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000));
+      return apiRateLimitError(
+        "Too many requests. Please try again later.",
+        retryAfter
+      );
     }
 
     const { id } = await context.params;
     if (!id) return apiError("Folder id is required", 400);
 
-    const deleted = await deleteWardrobeFolder(session.user.id, id);
+    const deleted = await deleteWardrobeFolder(user.id, id);
     if (!deleted) {
       return apiError("Folder not found", 404);
     }

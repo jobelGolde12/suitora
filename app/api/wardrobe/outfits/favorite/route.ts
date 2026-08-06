@@ -1,6 +1,11 @@
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
-import { apiError, apiOk } from "@/lib/api/response";
+import { requireUser } from "@/lib/auth/session";
+import { apiError, apiOk, apiRateLimitError } from "@/lib/api/response";
+import { parseBody } from "@/lib/api/request";
+import { enforceRateLimit, stylistRateLimiter } from "@/lib/rate-limit";
+import {
+  favoriteOutfitDeleteSchema,
+  favoriteOutfitSchema,
+} from "@/lib/validation";
 import {
   addFavoriteOutfit,
   getFavoriteOutfitsByUserId,
@@ -15,12 +20,10 @@ import type { TrendOutfit } from "@/types/trend";
  */
 export async function GET() {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session?.user) return apiError("Unauthorized", 401);
+    const user = await requireUser();
+    if (!user) return apiError("Unauthorized", 401);
 
-    const rows = await getFavoriteOutfitsByUserId(session.user.id);
+    const rows = await getFavoriteOutfitsByUserId(user.id);
     const saved = rows
       .map((row) => {
         try {
@@ -45,41 +48,38 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session?.user) return apiError("Unauthorized", 401);
+    const user = await requireUser();
+    if (!user) return apiError("Unauthorized", 401);
 
-    const body = await req.json().catch(() => ({}));
-    const outfit = body?.outfit as TrendOutfit | undefined;
-    if (
-      !outfit ||
-      typeof outfit !== "object" ||
-      !outfit.id ||
-      !Array.isArray(outfit.items)
-    ) {
-      return apiError("Valid outfit snapshot is required", 400);
+    const rl = await enforceRateLimit(stylistRateLimiter, user.id);
+    if (!rl.success) {
+      const retryAfter = Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000));
+      return apiRateLimitError(
+        "Too many requests. Please try again later.",
+        retryAfter
+      );
     }
+
+    const parsed = await parseBody(favoriteOutfitSchema, req);
+    if (parsed.error) return parsed.error;
+    const { outfit } = parsed.data;
 
     const snapshot = {
       id: outfit.id,
       name: outfit.name,
       items: outfit.items,
       overallScore: outfit.overallScore,
-      coherenceScore: outfit.coherenceScore,
-      colorStoryScore: outfit.colorStoryScore,
-      proportionScore: outfit.proportionScore,
-      formalityConsistency: outfit.formalityConsistency,
+      coherenceScore: outfit.coherenceScore ?? 0,
+      colorStoryScore: outfit.colorStoryScore ?? 0,
+      proportionScore: outfit.proportionScore ?? 0,
+      formalityConsistency: outfit.formalityConsistency ?? 0,
       seasonTags: outfit.seasonTags ?? [],
       occasionTags: outfit.occasionTags ?? [],
       stylingTips: outfit.stylingTips ?? [],
       createdAt: outfit.createdAt || new Date().toISOString(),
     };
 
-    const row = await addFavoriteOutfit(
-      session.user.id,
-      JSON.stringify(snapshot)
-    );
+    const row = await addFavoriteOutfit(user.id, JSON.stringify(snapshot));
 
     return apiOk({
       favorite: {
@@ -96,20 +96,28 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session?.user) return apiError("Unauthorized", 401);
+    const user = await requireUser();
+    if (!user) return apiError("Unauthorized", 401);
+
+    const rl = await enforceRateLimit(stylistRateLimiter, user.id);
+    if (!rl.success) {
+      const retryAfter = Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000));
+      return apiRateLimitError(
+        "Too many requests. Please try again later.",
+        retryAfter
+      );
+    }
 
     const { searchParams } = new URL(req.url);
     let id = searchParams.get("id");
     if (!id) {
-      const body = await req.json().catch(() => ({}));
-      id = typeof body?.id === "string" ? body.id : null;
+      const parsed = await parseBody(favoriteOutfitDeleteSchema, req);
+      if (parsed.error) return parsed.error;
+      id = parsed.data.id;
     }
     if (!id) return apiError("id is required", 400);
 
-    const removed = await removeFavoriteOutfit(session.user.id, id);
+    const removed = await removeFavoriteOutfit(user.id, id);
     if (!removed) return apiError("Saved outfit not found", 404);
 
     return apiOk();

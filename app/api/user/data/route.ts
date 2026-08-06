@@ -1,5 +1,4 @@
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { requireUser } from "@/lib/auth/session";
 import { apiError } from "@/lib/api/response";
 import { getUserDataExport } from "@/lib/db/queries";
 
@@ -10,15 +9,12 @@ import { getUserDataExport } from "@/lib/db/queries";
  */
 export async function GET() {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user) {
+    const user = await requireUser();
+    if (!user) {
       return apiError("Unauthorized", 401);
     }
 
-    const data = await getUserDataExport(session.user.id);
+    const data = await getUserDataExport(user.id);
 
     return Response.json(data, {
       headers: {

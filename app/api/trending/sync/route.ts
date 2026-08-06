@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
-import { apiError, apiOk } from "@/lib/api/response";
+import { requireUser } from "@/lib/auth/session";
+import { apiError, apiOk, apiRateLimitError } from "@/lib/api/response";
+import { enforceRateLimit, stylistRateLimiter } from "@/lib/rate-limit";
 import { syncTrendItems } from "@/lib/trend/sync";
 
 /**
@@ -27,9 +28,17 @@ export async function POST() {
         return apiError("Forbidden", 403);
       }
     } else {
-      const session = await auth.api.getSession({ headers: headerStore });
-      if (!session?.user) {
+      const user = await requireUser();
+      if (!user) {
         return apiError("Unauthorized", 401);
+      }
+      const rl = await enforceRateLimit(stylistRateLimiter, user.id);
+      if (!rl.success) {
+        const retryAfter = Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000));
+        return apiRateLimitError(
+          "Too many sync requests. Please try again later.",
+          retryAfter
+        );
       }
     }
 

@@ -1,10 +1,10 @@
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { requireUser } from "@/lib/auth/session";
 import { db, schema } from "@/drizzle";
 import { eq } from "drizzle-orm";
 import { estimateBodyTraits } from "@/lib/ai/body-estimation";
 import { getProfileByUserId, createProfile } from "@/lib/db/queries";
-import { apiError, apiOk } from "@/lib/api/response";
+import { apiError, apiOk, apiRateLimitError } from "@/lib/api/response";
+import { analysisRateLimiter, enforceRateLimit } from "@/lib/rate-limit";
 
 /**
  * POST /api/user/profile/estimate
@@ -13,31 +13,37 @@ import { apiError, apiOk } from "@/lib/api/response";
  */
 export async function POST() {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user) {
+    const user = await requireUser();
+    if (!user) {
       return apiError("Unauthorized", 401);
     }
 
+    const rl = await enforceRateLimit(analysisRateLimiter, user.id);
+    if (!rl.success) {
+      const retryAfter = Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000));
+      return apiRateLimitError(
+        "Too many estimation requests. Please try again later.",
+        retryAfter
+      );
+    }
+
     // Get the user's self-image URL
-    const [user] = await db
+    const [row] = await db
       .select({ selfImageUrl: schema.users.selfImageUrl })
       .from(schema.users)
-      .where(eq(schema.users.id, session.user.id));
+      .where(eq(schema.users.id, user.id));
 
-    if (!user?.selfImageUrl) {
+    if (!row?.selfImageUrl) {
       return apiError("No self-image uploaded. Please upload a photo first.", 400);
     }
 
     // Run AI body estimation
-    const estimation = await estimateBodyTraits(user.selfImageUrl);
+    const estimation = await estimateBodyTraits(row.selfImageUrl);
 
     // Ensure profile exists
-    const profile = await getProfileByUserId(session.user.id);
+    const profile = await getProfileByUserId(user.id);
     if (!profile) {
-      await createProfile(session.user.id);
+      await createProfile(user.id);
     }
 
     // Save estimation results to profile
@@ -55,7 +61,7 @@ export async function POST() {
         faceShape: estimation.faceShape,
         updatedAt: now,
       })
-      .where(eq(schema.userProfiles.userId, session.user.id));
+      .where(eq(schema.userProfiles.userId, user.id));
 
     return apiOk({
       estimation: {
