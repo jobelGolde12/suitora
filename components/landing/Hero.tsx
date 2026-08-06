@@ -5,30 +5,21 @@ import Image from "next/image";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
-  Check,
   ChevronDown,
   CreditCard,
   ShieldCheck,
   Store,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { ScoreCircle } from "@/components/ui/ScoreCircle";
 import {
   fadeInUpHero as fadeInUp,
   staggerHero as stagger,
-  easeOut,
 } from "./motion";
 
 const trustItems = [
   { icon: CreditCard, label: "No credit card" },
   { icon: ShieldCheck, label: "Private by design" },
   { icon: Store, label: "Works with any store" },
-];
-
-const metrics = [
-  { label: "Body Fit", value: 92 },
-  { label: "Color Harmony", value: 96 },
-  { label: "Style Match", value: 88 },
 ];
 
 const avatars = [
