@@ -23,6 +23,13 @@ function getTrustedOrigins(): string[] {
   return raw.split(",").map((s) => s.trim()).filter(Boolean);
 }
 
+// Google OAuth is only enabled when both credentials are configured. Registering
+// the provider with empty clientId/clientSecret makes Better Auth log a
+// "missing clientId or clientSecret" warning on every request in dev.
+const googleClientId = process.env.GOOGLE_CLIENT_ID;
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+const hasGoogle = Boolean(googleClientId && googleClientSecret);
+
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
   secret: getSecret(),
@@ -56,14 +63,16 @@ export const auth = betterAuth({
   },
   trustedOrigins: getTrustedOrigins(),
   plugins: [nextCookies()],
-  socialProviders: {
-    google: {
-      clientId: process.env.GOOGLE_CLIENT_ID || "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
-    },
-  },
+  socialProviders: hasGoogle
+    ? {
+        google: {
+          clientId: googleClientId!,
+          clientSecret: googleClientSecret!,
+        },
+      }
+    : undefined,
   accountLinking: {
-    trustedProviders: ["google"],
+    trustedProviders: hasGoogle ? ["google"] : [],
     allowDifferentEmails: false,
   },
 });

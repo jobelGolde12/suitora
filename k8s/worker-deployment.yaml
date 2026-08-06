@@ -1,0 +1,42 @@
+# Worker Deployment: runs services/worker/index.ts (the Redis subscriber that
+# invalidates the dashboard cache on completed trend syncs). Built and pushed
+# by .github/workflows/docker.yml to <image>-worker.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: suitora-worker
+  labels:
+    app: suitora
+    tier: worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: suitora
+      tier: worker
+  template:
+    metadata:
+      labels:
+        app: suitora
+        tier: worker
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/jobelGolde12/suitora-worker:latest
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: REDIS_URL
+              value: "redis://redis:6379"
+            - name: TURSO_DATABASE_URL
+              value: "file:./data/suitora.db"
+          ports:
+            - containerPort: 3000
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi

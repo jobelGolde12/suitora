@@ -1,0 +1,23 @@
+# External entrypoint for the suitora-web Service using the Nginx Ingress
+# Controller. Routes external traffic to the ClusterIP Service, which itself
+# load-balances across the 3+ web replicas managed by the Deployment + HPA in
+# deployment.yaml.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: suitora-ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-body-size: 20m
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: suitora-web
+                port:
+                  number: 80

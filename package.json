@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "sync:trend": "tsx --env-file=.env.local jobs/trend-sync.ts"
+    "sync:trend": "tsx --env-file=.env.local jobs/trend-sync.ts",
+    "worker": "tsx services/worker/index.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.6.23",
@@ -24,6 +25,7 @@
     "drizzle-orm": "^0.45.2",
     "framer-motion": "^12.42.2",
     "headroom-ai": "^0.22.4",
+    "ioredis": "^5.11.1",
     "lucide-react": "^1.24.0",
     "next": "16.2.10",
     "react": "19.2.4",
