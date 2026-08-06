@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/session";
-import { db, schema } from "@/drizzle";
+import { dbWrite, dbRead, schema } from "@/drizzle";
 import { eq, and } from "drizzle-orm";
 import { nanoid } from "@/lib/utils/id";
+import { notDeleted } from "@/lib/db/filters";
 import { apiError, apiOk, apiRateLimitError } from "@/lib/api/response";
 import { parseBody, validateQuery } from "@/lib/api/request";
 import { createAnalysisSchema, analysisQuerySchema } from "@/lib/validation";
@@ -37,7 +38,7 @@ export async function POST(req: Request) {
     // Fetch user's self image if not provided
     let finalUserImage = userImageUrl;
     if (!finalUserImage) {
-      const [foundUser] = await db
+      const [foundUser] = await dbWrite
         .select({ selfImageUrl: schema.users.selfImageUrl })
         .from(schema.users)
         .where(eq(schema.users.id, user.id));
@@ -60,7 +61,7 @@ export async function POST(req: Request) {
 
         // Save to products table if doesn't exist
         const prodId = `prod_${nanoid()}`;
-        await db.insert(schema.products).values({
+        await dbWrite.insert(schema.products).values({
           id: prodId,
           sourceUrl: productUrl,
           title: extracted.title,
@@ -74,7 +75,7 @@ export async function POST(req: Request) {
         }).onConflictDoNothing();
 
         // Retrieve existing or new product ID
-        const [existing] = await db
+        const [existing] = await dbRead
           .select({ id: schema.products.id })
           .from(schema.products)
           .where(eq(schema.products.sourceUrl, productUrl));
@@ -92,7 +93,7 @@ export async function POST(req: Request) {
     const analysisId = `analysis_${nanoid()}`;
 
     // Create a pending analysis record
-    await db.insert(schema.analyses).values({
+    await dbWrite.insert(schema.analyses).values({
       id: analysisId,
       userId: user.id,
       productId: productId,
@@ -142,10 +143,10 @@ export async function GET(req: Request) {
     }
 
     // Ownership-scoped read prevents IDOR across users.
-    const [analysis] = await db
+    const [analysis] = await dbRead
       .select()
       .from(schema.analyses)
-      .where(and(eq(schema.analyses.id, id), eq(schema.analyses.userId, user.id)));
+      .where(and(eq(schema.analyses.id, id), eq(schema.analyses.userId, user.id), notDeleted(schema.analyses)));
 
     if (!analysis) {
       return apiError("Analysis not found", 404);
@@ -155,10 +156,10 @@ export async function GET(req: Request) {
     await syncTryOnLifecycle(analysis);
 
     // Re-fetch to reflect any try-on state change.
-    const [current] = await db
+    const [current] = await dbRead
       .select()
       .from(schema.analyses)
-      .where(and(eq(schema.analyses.id, id), eq(schema.analyses.userId, user.id)));
+      .where(and(eq(schema.analyses.id, id), eq(schema.analyses.userId, user.id), notDeleted(schema.analyses)));
 
     if (!current) {
       return apiError("Analysis not found", 404);
@@ -220,7 +221,7 @@ export async function GET(req: Request) {
         });
 
         // Update DB record with real analysis results
-        await db
+        await dbWrite
           .update(schema.analyses)
           .set({
             status: "completed",
@@ -244,10 +245,10 @@ export async function GET(req: Request) {
           .where(eq(schema.analyses.id, id));
 
         // Refetch complete analysis
-        const [updatedAnalysis] = await db
+        const [updatedAnalysis] = await dbRead
           .select()
           .from(schema.analyses)
-          .where(eq(schema.analyses.id, id));
+          .where(and(eq(schema.analyses.id, id), notDeleted(schema.analyses)));
 
         return NextResponse.json({
           analysis: toAnalysisResult(updatedAnalysis),
@@ -259,7 +260,7 @@ export async function GET(req: Request) {
         console.error("Vision analysis failed:", err);
 
         // Mark as failed
-        await db
+        await dbWrite
           .update(schema.analyses)
           .set({
             status: "failed",
@@ -313,10 +314,10 @@ export async function DELETE(req: Request) {
     }
 
     // Load the row (ownership-scoped) so we can clean up generated assets.
-    const [analysis] = await db
+    const [analysis] = await dbRead
       .select()
       .from(schema.analyses)
-      .where(and(eq(schema.analyses.id, id), eq(schema.analyses.userId, user.id)));
+      .where(and(eq(schema.analyses.id, id), eq(schema.analyses.userId, user.id), notDeleted(schema.analyses)));
 
     if (!analysis) {
       return apiError("Analysis not found", 404);
@@ -326,7 +327,10 @@ export async function DELETE(req: Request) {
     // Cloudinary). Never blocks the delete on storage failures.
     await deleteCloudinaryImageFromUrl(analysis.generatedImage);
 
-    await db.delete(schema.analyses).where(eq(schema.analyses.id, id));
+    await dbWrite
+      .update(schema.analyses)
+      .set({ deletedAt: new Date().toISOString() })
+      .where(eq(schema.analyses.id, id));
 
     return apiOk();
   } catch (err) {

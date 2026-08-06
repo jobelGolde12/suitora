@@ -1,4 +1,8 @@
 /**
+ * DEPRECATED — use `npm run db:migrate` (scripts/migrate.mjs) instead.
+ * The try-on columns now live in drizzle/migrations/ (2026-07-31) and are
+ * applied by the migration runner. Kept only for databases that never ran it.
+ *
  * Apply the virtual try-on columns migration to the local SQLite dev DB.
  * Idempotent — safe to re-run.
  *
@@ -33,6 +37,7 @@ try {
       console.log(`skip ${name} (exists)`);
       continue;
     }
+    // eslint-disable-next-line no-query-in-loop/noQueryInLoop -- one-off migration; bounded list, not a hot path
     await db.execute(`ALTER TABLE analyses ADD COLUMN ${name} ${def}`);
     console.log(`added ${name}`);
   }

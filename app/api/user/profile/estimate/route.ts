@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/auth/session";
-import { db, schema } from "@/drizzle";
+import { dbWrite, schema } from "@/drizzle";
 import { eq } from "drizzle-orm";
 import { estimateBodyTraits } from "@/lib/ai/body-estimation";
 import { getProfileByUserId, createProfile } from "@/lib/db/queries";
@@ -28,7 +28,7 @@ export async function POST() {
     }
 
     // Get the user's self-image URL
-    const [row] = await db
+    const [row] = await dbWrite
       .select({ selfImageUrl: schema.users.selfImageUrl })
       .from(schema.users)
       .where(eq(schema.users.id, user.id));
@@ -48,7 +48,7 @@ export async function POST() {
 
     // Save estimation results to profile
     const now = new Date().toISOString();
-    await db
+    await dbWrite
       .update(schema.userProfiles)
       .set({
         estimatedHeight: estimation.height,

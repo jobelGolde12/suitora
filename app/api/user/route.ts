@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/auth/session";
-import { db, schema } from "@/drizzle";
+import { dbWrite, schema } from "@/drizzle";
 import { eq } from "drizzle-orm";
 import { nanoid } from "@/lib/utils/id";
 import { apiError, apiOk, apiRateLimitError } from "@/lib/api/response";
@@ -37,10 +37,10 @@ export async function DELETE() {
     const userId = user.id;
 
     const [analyses, uploads, profile, users] = await Promise.all([
-      getAnalysesByUserId(userId, 5000),
+      getAnalysesByUserId(userId, 5000, 0, true),
       getUploadsByUserId(userId),
       getProfileByUserId(userId),
-      db
+      dbWrite
         .select({ image: schema.users.image, selfImageUrl: schema.users.selfImageUrl })
         .from(schema.users)
         .where(eq(schema.users.id, userId)),
@@ -71,7 +71,7 @@ export async function DELETE() {
 
     await deleteUserRecord(userId);
 
-    await db.insert(schema.auditLogs).values({
+    await dbWrite.insert(schema.auditLogs).values({
       id: nanoid(),
       userId,
       action: "account_deleted",

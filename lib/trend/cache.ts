@@ -1,4 +1,4 @@
-import { get, set, del } from "@/lib/cache";
+import { get, set } from "@/lib/cache";
 
 /**
  * Redis-backed cache for trending API responses.

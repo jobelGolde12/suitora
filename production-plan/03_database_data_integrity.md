@@ -140,7 +140,7 @@ modify, steps, and acceptance criteria.
 
 ---
 
-### Action Item 1 — Choose Engine & Define Migration Strategy
+- [x] ### Action Item 1 — Choose Engine & Define Migration Strategy
 
 **Priority:** P0
 
@@ -177,7 +177,7 @@ modify, steps, and acceptance criteria.
 
 ---
 
-### Action Item 2 — Configure Connection Pooling & Timeouts
+- [x] ### Action Item 2 — Configure Connection Pooling & Timeouts
 
 **Priority:** P0
 
@@ -214,7 +214,7 @@ pool size or timeout options.
 
 ---
 
-### Action Item 3 — Zero-Downtime, Reversible Migrations
+- [x] ### Action Item 3 — Zero-Downtime, Reversible Migrations
 
 **Priority:** P0
 
@@ -253,7 +253,7 @@ zero-downtime, reversible migration runner.
 
 ---
 
-### Action Item 4 — Read Replicas & Query Routing
+- [x] ### Action Item 4 — Read Replicas & Query Routing
 
 **Priority:** P1
 
@@ -287,7 +287,7 @@ zero-downtime, reversible migration runner.
 
 ---
 
-### Action Item 5 — Soft Deletes via `deletedAt` & Global Filters
+- [x] ### Action Item 5 — Soft Deletes via `deletedAt` & Global Filters
 
 **Priority:** P1
 
@@ -324,7 +324,7 @@ and transparent global query filters.
 
 ---
 
-### Action Item 6 — Automated Backup & Restore
+- [x] ### Action Item 6 — Automated Backup & Restore
 
 **Priority:** P0
 
@@ -364,7 +364,7 @@ environment.
 
 ---
 
-### Action Item 7 — Unit Tests for Migration Scripts
+- [x] ### Action Item 7 — Unit Tests for Migration Scripts
 
 **Priority:** P1
 
@@ -398,7 +398,7 @@ environment.
 
 ---
 
-### Action Item 8 — Query Linting & N+1 Detection
+- [x] ### Action Item 8 — Query Linting & N+1 Detection
 
 **Priority:** P2
 

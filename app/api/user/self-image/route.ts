@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/session";
-import { db, schema } from "@/drizzle";
+import { dbWrite, schema } from "@/drizzle";
 import { eq } from "drizzle-orm";
 import { nanoid } from "@/lib/utils/id";
 import { apiError, apiOk, apiRateLimitError } from "@/lib/api/response";
@@ -15,7 +15,7 @@ export async function GET() {
       return apiError("Unauthorized", 401);
     }
 
-    const [row] = await db
+    const [row] = await dbWrite
       .select({ selfImageUrl: schema.users.selfImageUrl })
       .from(schema.users)
       .where(eq(schema.users.id, user.id));
@@ -48,20 +48,20 @@ export async function POST(req: Request) {
     const { selfImageUrl } = parsed.data;
 
     // 1. Update user's selfImageUrl
-    await db
+    await dbWrite
       .update(schema.users)
       .set({ selfImageUrl, updatedAt: new Date().toISOString() })
       .where(eq(schema.users.id, user.id));
 
     // 2. Add uploads record (skip if already tracked by upload service)
-    const existingUpload = await db
+    const existingUpload = await dbWrite
       .select({ id: schema.uploads.id })
       .from(schema.uploads)
       .where(eq(schema.uploads.url, selfImageUrl))
       .limit(1);
 
     if (existingUpload.length === 0) {
-      await db.insert(schema.uploads).values({
+      await dbWrite.insert(schema.uploads).values({
         id: nanoid(),
         userId: user.id,
         kind: "user_photo",

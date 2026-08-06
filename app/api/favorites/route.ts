@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/session";
-import { db, schema } from "@/drizzle";
+import { dbWrite, schema } from "@/drizzle";
 import { eq, and } from "drizzle-orm";
 import { nanoid } from "@/lib/utils/id";
+import { notDeleted } from "@/lib/db/filters";
 import { apiError, apiOk, apiRateLimitError } from "@/lib/api/response";
 import { enforceRateLimit, stylistRateLimiter } from "@/lib/rate-limit";
 import { parseBody } from "@/lib/api/request";
@@ -75,8 +76,9 @@ export async function POST(req: Request) {
     if (parsed.error) return parsed.error;
     const { analysisId } = parsed.data;
 
-    // Check if already favorited
-    const [existing] = await db
+    // Check if already favorited — restores a previously soft-deleted favorite
+    // so the unique (user_id, analysis_id) constraint isn't violated.
+    const [existing] = await dbWrite
       .select()
       .from(schema.favorites)
       .where(
@@ -87,11 +89,19 @@ export async function POST(req: Request) {
       );
 
     if (existing) {
+      if (existing.deletedAt) {
+        const [restored] = await dbWrite
+          .update(schema.favorites)
+          .set({ deletedAt: null })
+          .where(eq(schema.favorites.id, existing.id))
+          .returning();
+        return apiOk({ favorite: restored });
+      }
       return apiOk({ favorite: existing });
     }
 
     const favId = nanoid();
-    const [newFav] = await db
+    const [newFav] = await dbWrite
       .insert(schema.favorites)
       .values({
         id: favId,
@@ -128,14 +138,15 @@ export async function PATCH(req: Request) {
     if (parsed.error) return parsed.error;
     const { analysisId, inWardrobe, wardrobeTags, wardrobeFolder } = parsed.data;
 
-    // Only allow updating wardrobe fields for an existing favorite.
-    const [existing] = await db
+    // Only allow updating wardrobe fields for an existing, non-deleted favorite.
+    const [existing] = await dbWrite
       .select()
       .from(schema.favorites)
       .where(
         and(
           eq(schema.favorites.userId, user.id),
-          eq(schema.favorites.analysisId, analysisId)
+          eq(schema.favorites.analysisId, analysisId),
+          notDeleted(schema.favorites)
         )
       );
 
@@ -219,12 +230,14 @@ export async function DELETE(req: Request) {
       return apiError("analysisId is required", 400);
     }
 
-    await db
-      .delete(schema.favorites)
+    await dbWrite
+      .update(schema.favorites)
+      .set({ deletedAt: new Date().toISOString() })
       .where(
         and(
           eq(schema.favorites.userId, user.id),
-          eq(schema.favorites.analysisId, analysisId)
+          eq(schema.favorites.analysisId, analysisId),
+          notDeleted(schema.favorites)
         )
       );
 

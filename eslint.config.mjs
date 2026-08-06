@@ -1,6 +1,8 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+import drizzle from "eslint-plugin-drizzle";
+import noQueryInLoop from "./eslint-rules/no-query-in-loop.mjs";
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -13,6 +15,16 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  // Query-quality enforcement (Pillar 03, Action Item 8).
+  {
+    files: ["**/*.{js,mjs,ts,tsx}"],
+    plugins: { drizzle, "no-query-in-loop": { rules: { noQueryInLoop } } },
+    rules: {
+      "drizzle/enforce-update-with-where": "error",
+      "drizzle/enforce-delete-with-where": "error",
+      "no-query-in-loop/noQueryInLoop": "error",
+    },
+  },
 ]);
 
 export default eslintConfig;

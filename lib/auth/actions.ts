@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@/lib/auth";
-import { db, schema } from "@/drizzle";
+import { dbWrite, schema } from "@/drizzle";
 import { loginSchema, registerSchema, forgotPasswordSchema, resetPasswordSchema, type LoginFormData, type RegisterFormData, type ForgotPasswordFormData, type ResetPasswordFormData } from "@/lib/utils/validation";
 import {
   loginRateLimiter,
@@ -362,7 +362,7 @@ async function logAuditEvent(
   details: string
 ): Promise<void> {
   try {
-    await db.insert(schema.auditLogs).values({
+    await dbWrite.insert(schema.auditLogs).values({
       id: nanoid(),
       action,
       details: JSON.stringify({ email, ip, details, timestamp: new Date().toISOString() }),

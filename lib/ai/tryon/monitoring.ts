@@ -5,9 +5,10 @@
  * and aggregates failure/latency metrics from `analyses` for the dashboard.
  */
 
-import { db, schema } from "@/drizzle";
-import { eq, sql } from "drizzle-orm";
+import { dbWrite, dbRead, schema } from "@/drizzle";
+import { eq, sql, and } from "drizzle-orm";
 import { nanoid } from "@/lib/utils/id";
+import { notDeleted } from "@/lib/db/filters";
 
 /** Structured try-on lifecycle events written to audit_logs.action. */
 export type TryOnEventAction =
@@ -120,7 +121,7 @@ export async function logTryOnEvent(event: TryOnEvent): Promise<void> {
   });
 
   try {
-    await db.insert(schema.auditLogs).values({
+    await dbWrite.insert(schema.auditLogs).values({
       id: nanoid(),
       userId: event.userId ?? null,
       action: event.action,
@@ -137,7 +138,7 @@ export async function logTryOnEvent(event: TryOnEvent): Promise<void> {
  * Uses analyses.try_on_* columns — the source of truth for final status.
  */
 export async function getTryOnStats(userId?: string): Promise<TryOnStats> {
-  const base = db
+  const base = dbRead
     .select({
       completed: sql<number>`SUM(CASE WHEN ${schema.analyses.tryOnStatus} = 'completed' THEN 1 ELSE 0 END)`,
       failed: sql<number>`SUM(CASE WHEN ${schema.analyses.tryOnStatus} = 'failed' THEN 1 ELSE 0 END)`,
@@ -149,8 +150,10 @@ export async function getTryOnStats(userId?: string): Promise<TryOnStats> {
     .from(schema.analyses);
 
   const [row] = userId
-    ? await base.where(eq(schema.analyses.userId, userId))
-    : await base;
+    ? await base.where(
+        and(notDeleted(schema.analyses), eq(schema.analyses.userId, userId))
+      )
+    : await base.where(notDeleted(schema.analyses));
 
   return computeTryOnStats({
     completed: row?.completed ?? 0,

@@ -5,8 +5,12 @@
       "schedule": "0 6 * * *"
     },
     {
+      "path": "/api/backup",
+      "schedule": "15 3 * * *"
+    },
+    {
       "path": "/api/uploads/cleanup",
-      "schedule": "0 4 * * 0"
+      "schedule": "30 3 * * *"
     }
   ]
 }

@@ -34,6 +34,13 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Migrations against a fresh DB (schema parity)
+        run: |
+          npm run db:migrate
+          npm run db:status
+        env:
+          TURSO_DATABASE_URL: "file:/tmp/ci-migrate.db"
+
       - name: Build
         run: npm run build
         env:

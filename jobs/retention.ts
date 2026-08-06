@@ -6,14 +6,21 @@
  *   npx tsx jobs/retention.ts
  */
 
-import { cleanupExpiredUploads } from "@/lib/retention";
+import { cleanupExpiredUploads, purgeSoftDeletedRows } from "@/lib/retention";
 
 async function main() {
   console.log("[retention] Starting cleanup…");
-  const result = await cleanupExpiredUploads();
+  const [uploadResult, purgeResult] = await Promise.all([
+    cleanupExpiredUploads(),
+    purgeSoftDeletedRows(),
+  ]);
   console.log(
-    `[retention] Done. scanned=${result.scanned} deleted=${result.deleted} retained=${result.retained}`
+    `[retention] Uploads done. scanned=${uploadResult.scanned} deleted=${uploadResult.deleted} retained=${uploadResult.retained}`
   );
+  const purgeSummary = purgeResult
+    .map(({ table, purged }) => `${table}=${purged}`)
+    .join(" ");
+  console.log(`[retention] Soft-delete purge done. ${purgeSummary}`);
 }
 
 main().catch((err) => {

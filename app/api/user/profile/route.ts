@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/session";
-import { db, schema } from "@/drizzle";
+import { dbWrite, schema } from "@/drizzle";
 import { eq } from "drizzle-orm";
 import { apiError, apiOk, apiRateLimitError } from "@/lib/api/response";
 import { parseBody } from "@/lib/api/request";
@@ -73,7 +73,7 @@ export async function PUT(req: Request) {
 
     // Also update the user's name if provided
     if (profileData.name) {
-      await db
+      await dbWrite
         .update(schema.users)
         .set({ name: profileData.name, updatedAt: new Date().toISOString() })
         .where(eq(schema.users.id, user.id));

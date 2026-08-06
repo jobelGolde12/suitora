@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/auth/session";
-import { db, schema } from "@/drizzle";
+import { dbWrite, schema } from "@/drizzle";
 import { nanoid } from "@/lib/utils/id";
 import { apiError, apiOk, apiRateLimitError } from "@/lib/api/response";
 import { uploadRateLimiter, enforceRateLimit } from "@/lib/rate-limit";
@@ -76,7 +76,7 @@ export async function POST(req: Request) {
     }
 
     // Track in uploads table
-    await db.insert(schema.uploads).values({
+    await dbWrite.insert(schema.uploads).values({
       id: nanoid(),
       userId: user.id,
       kind: "product_image",

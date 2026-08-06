@@ -101,6 +101,7 @@ export const analyses = sqliteTable("analyses", {
   weight: real("weight"),
   weightConfidence: real("weight_confidence"),
   compatibilityMetadata: text("compatibility_metadata"),
+  deletedAt: text("deleted_at"),
   createdAt: text("created_at")
     .notNull()
     .default(sql`CURRENT_TIMESTAMP`),
@@ -110,6 +111,7 @@ export const analyses = sqliteTable("analyses", {
 }, (t) => [
   index("analyses_user_id_idx").on(t.userId),
   index("analyses_created_at_idx").on(t.createdAt),
+  index("analyses_deleted_at_idx").on(t.deletedAt),
 ]);
 
 export const favorites = sqliteTable("favorites", {
@@ -126,6 +128,7 @@ export const favorites = sqliteTable("favorites", {
   wardrobeTags: text("wardrobe_tags").notNull().default("[]"),
   wardrobeFolder: text("wardrobe_folder"),
   addedToWardrobeAt: text("added_to_wardrobe_at"),
+  deletedAt: text("deleted_at"),
   createdAt: text("created_at")
     .notNull()
     .default(sql`CURRENT_TIMESTAMP`),
@@ -133,6 +136,7 @@ export const favorites = sqliteTable("favorites", {
   unique("favorites_user_analysis_idx").on(t.userId, t.analysisId),
   index("favorites_user_id_idx").on(t.userId),
   index("favorites_wardrobe_idx").on(t.userId, t.inWardrobe),
+  index("favorites_deleted_at_idx").on(t.deletedAt),
 ]);
 
 export const products = sqliteTable("products", {
@@ -231,6 +235,7 @@ export const userProfiles = sqliteTable("user_profiles", {
   sizePreference: text("size_preference").default("US"),
 
   // Timestamps
+  deletedAt: text("deleted_at"),
   createdAt: text("created_at")
     .notNull()
     .default(sql`CURRENT_TIMESTAMP`),
@@ -301,11 +306,15 @@ export const stylistMessages = sqliteTable(
       .references(() => users.id, { onDelete: "cascade" }),
     role: text("role").notNull(), // "user" | "assistant"
     content: text("content").notNull(),
+    deletedAt: text("deleted_at"),
     createdAt: text("created_at")
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),
   },
-  (t) => [index("stylist_messages_user_created_idx").on(t.userId, t.createdAt)]
+  (t) => [
+    index("stylist_messages_user_created_idx").on(t.userId, t.createdAt),
+    index("stylist_messages_deleted_at_idx").on(t.deletedAt),
+  ]
 );
 
 /** Named folders for organizing wardrobe items (favorites flagged in_wardrobe). */
@@ -317,11 +326,15 @@ export const wardrobeFolders = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    deletedAt: text("deleted_at"),
     createdAt: text("created_at")
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),
   },
-  (t) => [index("wardrobe_folders_user_id_idx").on(t.userId)]
+  (t) => [
+    index("wardrobe_folders_user_id_idx").on(t.userId),
+    index("wardrobe_folders_deleted_at_idx").on(t.deletedAt),
+  ]
 );
 
 /** Saved outfit snapshots from the wardrobe outfit recommender. */
@@ -333,10 +346,26 @@ export const favoriteOutfits = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     outfit: text("outfit").notNull(),
+    deletedAt: text("deleted_at"),
     createdAt: text("created_at")
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),
   },
-  (t) => [index("favorite_outfits_user_id_idx").on(t.userId)]
+  (t) => [
+    index("favorite_outfits_user_id_idx").on(t.userId),
+    index("favorite_outfits_deleted_at_idx").on(t.deletedAt),
+  ]
 );
+
+/** Status history for automated database backups (Pillar 03, Action Item 6). */
+export const backupLogs = sqliteTable("backup_logs", {
+  id: text("id").primaryKey(),
+  status: text("status").notNull(), // success | failed
+  key: text("key"), // s3 key for successful backups
+  sizeBytes: integer("size_bytes"),
+  message: text("message"),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+});
 

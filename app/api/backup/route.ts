@@ -1,18 +1,17 @@
 import { headers } from "next/headers";
 import { requireUser } from "@/lib/auth/session";
 import { apiError, apiOk } from "@/lib/api/response";
-import { cleanupExpiredUploads, purgeSoftDeletedRows } from "@/lib/retention";
+import { runBackup } from "@/jobs/backup";
 
 /**
- * POST /api/uploads/cleanup
+ * POST /api/backup
  *
  * Authentication (pick ONE per invocation):
  *  - Bearer session  — any authenticated user (manual run).
  *  - x-vercel-cron header + CRON_SECRET — Vercel Cron Jobs.
  *
- * Deletes expired user-photo uploads older than the retention window and
- * physically purges soft-deleted rows past the soft-delete retention window
- * (Pillar 03, Action Item 5 step 5).
+ * Runs a full database dump → S3 upload → retention prune, and records a
+ * `backup_logs` status row (Pillar 03, Action Item 6).
  */
 export async function POST() {
   const startTime = Date.now();
@@ -35,21 +34,16 @@ export async function POST() {
       }
     }
 
-    const [uploads, purge] = await Promise.all([
-      cleanupExpiredUploads(),
-      purgeSoftDeletedRows(),
-    ]);
+    const result = await runBackup();
     const duration = Date.now() - startTime;
 
     console.log(
-      `[retention] Completed in ${duration}ms: ${uploads.deleted} uploads deleted, ` +
-        `${uploads.retained} retained (${uploads.scanned} scanned); ` +
-        `purged ${purge.map((p) => `${p.table}=${p.purged}`).join(", ") || "none"}`
+      `[backup] POST /api/backup completed in ${duration}ms: ${result.key} (${result.bytes} bytes), pruned ${result.pruned}`
     );
 
-    return apiOk({ uploads, purge, duration });
+    return apiOk({ ...result, duration });
   } catch (err) {
-    console.error("Error in POST /api/uploads/cleanup:", err);
-    return apiError("Retention cleanup failed", 500);
+    console.error("Error in POST /api/backup:", err);
+    return apiError("Backup failed", 500);
   }
 }
