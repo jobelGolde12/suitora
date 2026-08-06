@@ -117,7 +117,7 @@ modify, steps, and acceptance criteria.
 
 ---
 
-### Action Item 1 — Standardized Error Handling & HTTP Mapping
+- [x] ### Action Item 1 — Standardized Error Handling & HTTP Mapping
 
 **Priority:** P0
 
@@ -155,7 +155,7 @@ status codes, and never leak stack traces to clients.
 
 ---
 
-### Action Item 2 — Structured JSON Logging (pino)
+- [x] ### Action Item 2 — Structured JSON Logging (pino)
 
 **Priority:** P0
 
@@ -193,7 +193,7 @@ a semi-structured `[tryon]` line.
 
 ---
 
-### Action Item 3 — Request Correlation ID
+- [x] ### Action Item 3 — Request Correlation ID
 
 **Priority:** P0
 
@@ -225,7 +225,7 @@ propagate it through logs and outbound calls.
 
 ---
 
-### Action Item 4 — OpenTelemetry Instrumentation & Tracing
+- [x] ### Action Item 4 — OpenTelemetry Instrumentation & Tracing
 
 **Priority:** P1
 
@@ -263,7 +263,7 @@ backend (Jaeger or Prometheus-exposed OTLP).
 
 ---
 
-### Action Item 5 — Prometheus `/metrics` Endpoint
+- [x] ### Action Item 5 — Prometheus `/metrics` Endpoint
 
 **Priority:** P0
 
@@ -305,7 +305,7 @@ business stats in `lib/ai/tryon/monitoring.ts` and `lib/db/queries.ts`.
 
 ---
 
-### Action Item 6 — Grafana Dashboards
+- [x] ### Action Item 6 — Grafana Dashboards
 
 **Priority:** P1
 
@@ -339,7 +339,7 @@ saturation.
 
 ---
 
-### Action Item 7 — Alerting & Error-Spike SLA
+- [x] ### Action Item 7 — Alerting & Error-Spike SLA
 
 **Priority:** P0
 

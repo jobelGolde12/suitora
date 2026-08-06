@@ -7,6 +7,7 @@
  */
 
 import type { SkinTone, StyleTag, FitPreference } from "@/types";
+import { getLogger } from "@/lib/logger";
 
 export interface StylistMessageInput {
   role: "user" | "assistant";
@@ -222,7 +223,7 @@ export async function generateStylistReply(params: {
   try {
     return await callOpenAI(params.messages, params.context);
   } catch (err) {
-    console.warn("[Stylist] Falling back to mock reply:", err);
+    getLogger().warn({ err }, "Stylist reply failed — falling back to mock");
     return mockStylistReply(params.messages, params.context);
   }
 }

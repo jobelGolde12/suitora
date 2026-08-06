@@ -1,5 +1,6 @@
 import { requireUser } from "@/lib/auth/session";
 import { apiError, apiOk, apiRateLimitError } from "@/lib/api/response";
+import { withApiRoute, withUserId, type RouteParams } from "@/lib/api/route";
 import { parseBody } from "@/lib/api/request";
 import { enforceRateLimit, stylistRateLimiter } from "@/lib/rate-limit";
 import { updateFolderSchema } from "@/lib/validation";
@@ -8,20 +9,18 @@ import {
   updateWardrobeFolder,
 } from "@/lib/db/queries";
 
-interface RouteContext {
-  params: Promise<{ id: string }>;
-}
-
 /**
  * PATCH /api/wardrobe/folders/[id] — body: { name: string }
  * DELETE /api/wardrobe/folders/[id] — unassigns items (sets wardrobe_folder null)
  */
-export async function PATCH(req: Request, context: RouteContext) {
-  try {
+export const PATCH = withApiRoute(
+  "/api/wardrobe/folders/[id]",
+  async (req: Request, context: { params: RouteParams<{ id: string }> }) => {
     const user = await requireUser();
     if (!user) {
       return apiError("Unauthorized", 401);
     }
+    withUserId(user.id);
 
     const rl = await enforceRateLimit(stylistRateLimiter, user.id);
     if (!rl.success) {
@@ -51,18 +50,17 @@ export async function PATCH(req: Request, context: RouteContext) {
         createdAt: updated.createdAt,
       },
     });
-  } catch (err) {
-    console.error("Error in PATCH /api/wardrobe/folders/[id]:", err);
-    return apiError("Internal server error", 500);
   }
-}
+);
 
-export async function DELETE(_req: Request, context: RouteContext) {
-  try {
+export const DELETE = withApiRoute(
+  "/api/wardrobe/folders/[id]",
+  async (_req: Request, context: { params: RouteParams<{ id: string }> }) => {
     const user = await requireUser();
     if (!user) {
       return apiError("Unauthorized", 401);
     }
+    withUserId(user.id);
 
     const rl = await enforceRateLimit(stylistRateLimiter, user.id);
     if (!rl.success) {
@@ -82,8 +80,5 @@ export async function DELETE(_req: Request, context: RouteContext) {
     }
 
     return apiOk();
-  } catch (err) {
-    console.error("Error in DELETE /api/wardrobe/folders/[id]:", err);
-    return apiError("Internal server error", 500);
   }
-}
+);

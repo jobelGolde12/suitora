@@ -7,23 +7,27 @@
  */
 
 import { cleanupExpiredUploads, purgeSoftDeletedRows } from "@/lib/retention";
+import { getLogger } from "@/lib/logger";
 
 async function main() {
-  console.log("[retention] Starting cleanup…");
+  const log = getLogger();
+  log.info("Retention cleanup starting");
   const [uploadResult, purgeResult] = await Promise.all([
     cleanupExpiredUploads(),
     purgeSoftDeletedRows(),
   ]);
-  console.log(
-    `[retention] Uploads done. scanned=${uploadResult.scanned} deleted=${uploadResult.deleted} retained=${uploadResult.retained}`
+  log.info(
+    {
+      uploadsScanned: uploadResult.scanned,
+      uploadsDeleted: uploadResult.deleted,
+      uploadsRetained: uploadResult.retained,
+      purge: purgeResult.map(({ table, purged }) => ({ table, purged })),
+    },
+    "Retention cleanup done"
   );
-  const purgeSummary = purgeResult
-    .map(({ table, purged }) => `${table}=${purged}`)
-    .join(" ");
-  console.log(`[retention] Soft-delete purge done. ${purgeSummary}`);
 }
 
 main().catch((err) => {
-  console.error("[retention] Fatal:", err);
+  getLogger().error({ err }, "Retention cleanup fatal");
   process.exit(1);
 });

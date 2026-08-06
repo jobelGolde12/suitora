@@ -14,6 +14,7 @@
 import { createClient } from "@libsql/client";
 import { gzipSync } from "node:zlib";
 import { dumpDatabaseSql } from "@/lib/db/dump";
+import { getLogger } from "@/lib/logger";
 import { s3Put, s3List, s3Delete } from "@/lib/storage/s3";
 import { nanoid } from "@/lib/utils/id";
 const PREFIX = "db/backups/suitora-";
@@ -127,7 +128,7 @@ export async function pruneBackups(): Promise<number> {
 
   const toDelete = keys.filter((k) => !kept.has(k));
   for (const key of toDelete) {
-    console.log(`[backup] Deleting ${key}`);
+    getLogger().info({ key }, "Pruning old backup");
     await s3Delete(key);
   }
   return toDelete.length;
@@ -141,16 +142,17 @@ if (
   import.meta.url === `file://${process.argv[1]}`
 ) {
   main().catch((err) => {
-    console.error("[backup] Failed:", err);
+    getLogger().error({ err }, "Backup failed");
     process.exit(1);
   });
 }
 
 async function main() {
-  console.log("[backup] Starting…");
+  getLogger().info("Backup starting");
   const result = await runBackup();
-  console.log(
-    `[backup] Done. ${result.key} (${(result.bytes / 1024).toFixed(1)} KiB), pruned ${result.pruned}, took ${result.durationMs}ms`
+  getLogger().info(
+    { key: result.key, sizeKiB: +(result.bytes / 1024).toFixed(1), pruned: result.pruned, durationMs: result.durationMs },
+    "Backup done"
   );
   process.exit(0);
 }

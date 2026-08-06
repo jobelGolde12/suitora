@@ -8,6 +8,7 @@ import { fetchCuratedProducts } from "./providers/curated";
 import { fetchShopifyProducts } from "./providers/shopify";
 import { fetchSerpApiProducts } from "./providers/serpapi";
 import { fetchAsosProducts } from "./providers/asos";
+import { getLogger } from "@/lib/logger";
 import type { RawProviderProduct } from "@/types/trend";
 
 export interface ProviderFetchResult {
@@ -122,9 +123,7 @@ export async function fetchAllProviders(): Promise<ProviderFetchResult[]> {
   );
 
   if (!hasLiveResults && providers.length > 0) {
-    console.warn(
-      "[trend] All live providers failed, falling back to curated data"
-    );
+    getLogger().warn("All live providers failed — falling back to curated data");
     const curated = await fetchFromProvider("curated");
     return [curated];
   }

@@ -1,0 +1,111 @@
+# Prometheus alert rules for Suitora (Pillar 04, Action Item 7).
+#
+# Rules mirror the SLOs in production-plan/04_observability_logging.md:
+#   - Error rate < 0.5% of requests (high-error alert fires above 5%)
+#   - Latency p95 < 500ms, p99 < 2s
+#   - NoData fires within ~1 evaluation interval (15s) of the app going down.
+#
+# All rules use the "suitora" label so Alertmanager can route by service.
+
+groups:
+  - name: suitora-errors
+    rules:
+      # Error-ratio (5xx + 4xx AppErrors) over total requests, 5m window.
+      # Fires within 5 minutes of onset (5m window + 5m for=). Pages on-call.
+      - alert: SuitoraHighErrorRate
+        expr: |
+          sum(rate(http_errors_total[5m])) by (route)
+            / clamp_min(sum(rate(http_requests_total[5m])) by (route), 1e-6)
+          > 0.05
+        for: 5m
+        labels:
+          service: suitora
+          severity: critical
+        annotations:
+          summary: "High error rate on {{ $labels.route }}"
+          description: "{{ $labels.route }} returned errors on {{ $value | humanizePercentage }} of requests over the last 5 minutes (threshold 5%)."
+          runbook: "https://github.com/suitora/runbooks/blob/main/incidents/high-error-rate.md"
+
+      # p99 API latency above 2s for 5 minutes.
+      - alert: SuitoraHighLatency
+        expr: |
+          histogram_quantile(0.99,
+            sum by (route) (rate(http_request_duration_seconds_bucket[5m]))
+          ) > 2
+        for: 5m
+        labels:
+          service: suitora
+          severity: warning
+        annotations:
+          summary: "p99 latency > 2s on {{ $labels.route }}"
+          description: "p99 latency on {{ $labels.route }} is {{ $value }}s (SLO target < 2s)."
+          runbook: "https://github.com/suitora/runbooks/blob/main/incidents/high-latency.md"
+
+  - name: suitora-saturation
+    rules:
+      # V8 heap nearly exhausted → likely OOM next.
+      - alert: SuitoraNodeHeapExhaustion
+        expr: |
+          nodejs_heap_size_used_bytes / nodejs_heap_size_total_bytes > 0.8
+        for: 5m
+        labels:
+          service: suitora
+          severity: warning
+        annotations:
+          summary: "Node heap utilization > 80%"
+          description: "Node.js heap on {{ $labels.instance }} is {{ $value | humanizePercentage }} used. Restart or scale the web tier."
+
+      # Unusual number of requests in flight.
+      - alert: SuitoraInFlightRequests
+        expr: http_in_flight_requests > 50
+        for: 10m
+        labels:
+          service: suitora
+          severity: warning
+        annotations:
+          summary: "{{ $value }} requests in flight"
+          description: "http_in_flight_requests has been above 50 for 10 minutes; the web tier may be saturating."
+
+      # DB round-trips degrading (p95 of db_query_duration_seconds).
+      - alert: SuitoraSlowDatabase
+        expr: |
+          histogram_quantile(0.95,
+            sum by (op) (rate(db_query_duration_seconds_bucket[5m]))
+          ) > 0.5
+        for: 10m
+        labels:
+          service: suitora
+          severity: warning
+        annotations:
+          summary: "DB query p95 > 500ms ({{ $labels.op }})"
+          description: "Database op {{ $labels.op }} is at {{ $value }}s p95. See runbook for index/query tuning."
+
+  - name: suitora-availability
+    rules:
+      # App unreachable for more than one scrape interval → critical.
+      - alert: SuitoraNoData
+        expr: absent(up{job="suitora-web"})
+        for: 1m
+        labels:
+          service: suitora
+          severity: critical
+        annotations:
+          summary: "Suitora is unreachable"
+          description: "Prometheus cannot scrape the suitora-web target. Check the container and host availability."
+          runbook: "https://github.com/suitora/runbooks/blob/main/incidents/app-down.md"
+
+  - name: suitora-providers
+    rules:
+      # Failed/submit-failed try-on attempts exceed 10% of all try-on events.
+      - alert: SuitoraProviderFailure
+        expr: |
+          sum(rate(tryon_events_total{action=~"tryon.failed|tryon.submit_failed"}[5m]))
+            / clamp_min(sum(rate(tryon_events_total[5m])), 1e-6)
+          > 0.10
+        for: 5m
+        labels:
+          service: suitora
+          severity: warning
+        annotations:
+          summary: "Try-on provider failure rate > 10%"
+          description: "{{ $value | humanizePercentage }} of try-on events failed in the last 5 minutes (threshold 10%). Check provider status."

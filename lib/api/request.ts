@@ -1,6 +1,6 @@
 import type { NextResponse } from "next/server";
 import type { z } from "zod";
-import { apiError, apiValidationError } from "./response";
+import { apiValidationError } from "./response";
 
 /**
  * Parse and validate a JSON request body against a Zod schema.
@@ -15,7 +15,7 @@ export async function parseBody<Output>(
   try {
     raw = await req.json();
   } catch {
-    return { error: apiError("Invalid JSON body", 400) };
+    return { error: apiValidationError({ issues: [], message: "Invalid JSON body" }) };
   }
   const result = schema.safeParse(raw);
   if (!result.success) {

@@ -1,0 +1,16 @@
+# Grafana dashboard provisioning (Pillar 04, Action Item 6).
+# Scans the mounted dashboards folder and imports any JSON on startup.
+
+apiVersion: 1
+
+providers:
+  - name: "suitora"
+    orgId: 1
+    folder: "Suitora"
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 60
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

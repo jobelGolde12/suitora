@@ -6,6 +6,8 @@
 
 import { Redis } from "ioredis";
 import { invalidateTrendCache } from "@/lib/trend/cache";
+import { getLogger } from "@/lib/logger";
+import { runWithRequestContext } from "@/lib/request-context";
 
 const CHANNEL = "trend-sync";
 
@@ -14,22 +16,35 @@ async function main() {
   const subscriber = redis.duplicate();
 
   await subscriber.subscribe(CHANNEL);
-  console.log(`[worker] subscribed to "${CHANNEL}"`);
+  getLogger().info({ channel: CHANNEL }, "Worker subscribed");
 
   subscriber.on("message", async (channel, message) => {
     if (channel !== CHANNEL) return;
 
+    const log = getLogger();
     try {
       const payload = JSON.parse(message);
-      console.log(
-        `[worker] sync completed: providers=${payload.providers} fetched=${payload.fetched} upserted=${payload.upserted}`
-      );
+      await runWithRequestContext(
+        {
+          requestId: crypto.randomUUID(),
+          correlationId: crypto.randomUUID(),
+          route: "worker:trend-sync",
+          method: "MESSAGE",
+        },
+        async () => {
+          const ctxLog = getLogger();
+          ctxLog.info(
+            { providers: payload.providers, fetched: payload.fetched, upserted: payload.upserted },
+            "Sync event received"
+          );
 
-      // A fresh sync just finished — drop cached dashboard responses so the
-      // next request re-queries the DB with up-to-date trend items.
-      await invalidateTrendCache();
+          // A fresh sync just finished — drop cached dashboard responses so the
+          // next request re-queries the DB with up-to-date trend items.
+          await invalidateTrendCache();
+        }
+      );
     } catch (err) {
-      console.error("[worker] failed to handle sync event:", err);
+      log.error({ err }, "Failed to handle sync event");
     }
   });
 
@@ -41,11 +56,11 @@ async function main() {
     process.exit(0);
   });
 
-  redis.on("error", (err) => console.error("[worker] redis error:", err));
-  subscriber.on("error", (err) => console.error("[worker] subscriber error:", err));
+  redis.on("error", (err) => getLogger().error({ err }, "Worker redis error"));
+  subscriber.on("error", (err) => getLogger().error({ err }, "Worker subscriber error"));
 }
 
 main().catch((err) => {
-  console.error("[worker] fatal:", err);
+  getLogger().error({ err }, "Worker fatal");
   process.exit(1);
 });

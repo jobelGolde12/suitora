@@ -2,6 +2,14 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { globalIpLimiter, getClientIp } from "@/lib/rate-limit";
 
+/**
+ * Request proxy (formerly middleware).
+ *
+ * Next.js 16 runs `proxy.ts` on the Node.js runtime, which lets us rewrite the
+ * incoming request headers so the correlation ID generated here reaches every
+ * route handler and log line (Pillar 04, Action Item 3).
+ */
+
 // Public routes that don't require authentication
 const publicRoutes = [
   "/login",
@@ -22,6 +30,8 @@ const selfAuthingApiPrefixes = [
   "/api/tryon/webhook", // constant-time shared-secret check
   "/api/trending", // public feed; /similar and /sync self-auth internally
   "/api/uploads/cleanup", // cron-or-session guarded internally
+  "/api/backup", // cron-or-session guarded internally
+  "/api/health", // public liveness probe for LB + synthetic health-check
 ];
 
 function hasSessionCookie(request: NextRequest): boolean {
@@ -59,16 +69,43 @@ function setCorsHeaders(request: NextRequest, response: NextResponse): NextRespo
   return response;
 }
 
-export async function middleware(request: NextRequest) {
+/**
+ * Correlation ID: accept an upstream `X-Request-Id` only when it looks sane,
+ * otherwise generate a fresh UUID. The ID is echoed on the response and
+ * injected into the request headers so downstream handlers log with it.
+ */
+function getOrCreateRequestId(request: NextRequest): string {
+  const incoming = request.headers.get("x-request-id");
+  if (incoming && /^[A-Za-z0-9-]{8,64}$/.test(incoming)) {
+    return incoming;
+  }
+  return crypto.randomUUID();
+}
+
+function tagResponse(response: NextResponse, requestId: string): NextResponse {
+  response.headers.set("X-Request-Id", requestId);
+  return response;
+}
+
+/** Pass-through with the correlation ID injected into the request headers. */
+function nextWithCorrelation(request: NextRequest, requestId: string): NextResponse {
+  const headers = new Headers(request.headers);
+  headers.set("x-request-id", requestId);
+  const response = NextResponse.next({ request: { headers } });
+  return tagResponse(response, requestId);
+}
+
+export default async function proxy(request: NextRequest) {
+  const requestId = getOrCreateRequestId(request);
   const { pathname } = request.nextUrl;
 
   // CORS preflight — only honored for allow-listed origins.
   if (request.method === "OPTIONS") {
     if (isTrustedOrigin(request)) {
       const res = new NextResponse(null, { status: 204 });
-      return setCorsHeaders(request, res);
+      return tagResponse(setCorsHeaders(request, res), requestId);
     }
-    return new NextResponse(null, { status: 403 });
+    return tagResponse(new NextResponse(null, { status: 403 }), requestId);
   }
 
   // Global per-IP cap on all API traffic (100 req/min/IP). Covers public
@@ -82,7 +119,7 @@ export async function middleware(request: NextRequest) {
         { status: 429 }
       );
       res.headers.set("Retry-After", String(retryAfter));
-      return setCorsHeaders(request, res);
+      return tagResponse(setCorsHeaders(request, res), requestId);
     }
   }
 
@@ -92,9 +129,12 @@ export async function middleware(request: NextRequest) {
       pathname.startsWith(prefix)
     );
     if (!isSelfAuthing && !hasSessionCookie(request)) {
-      return setCorsHeaders(
-        request,
-        NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return tagResponse(
+        setCorsHeaders(
+          request,
+          NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        ),
+        requestId
       );
     }
   }
@@ -111,35 +151,37 @@ export async function middleware(request: NextRequest) {
 
   // Redirect authenticated users away from auth pages
   if (isAuthenticated && isPublicRoute && pathname !== "/") {
-    return setCorsHeaders(
-      request,
-      NextResponse.redirect(new URL("/dashboard", request.url))
+    return tagResponse(
+      setCorsHeaders(
+        request,
+        NextResponse.redirect(new URL("/dashboard", request.url))
+      ),
+      requestId
     );
   }
 
   // Redirect unauthenticated users to login for protected routes
   if (!pathname.startsWith("/api") && !isPublicRoute && !isAuthenticated) {
-    return setCorsHeaders(
-      request,
-      NextResponse.redirect(new URL("/login", request.url))
+    return tagResponse(
+      setCorsHeaders(
+        request,
+        NextResponse.redirect(new URL("/login", request.url))
+      ),
+      requestId
     );
   }
 
-  return setCorsHeaders(request, NextResponse.next());
+  return tagResponse(
+    setCorsHeaders(request, nextWithCorrelation(request, requestId)),
+    requestId
+  );
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - robots.txt / sitemap.xml (SEO files)
-     * - static assets served from /public (images, icons)
-     * - public folder
-     */
-    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$|public/).*)",
+    // `/metrics` is excluded: Prometheus scrapes the web tier directly on the
+    // internal Docker network (nginx blocks it publicly), and the app-level
+    // /metrics route must not be redirected to login by the page gate.
+    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|metrics|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$|public/).*)",
   ],
 };
-

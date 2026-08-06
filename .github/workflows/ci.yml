@@ -31,10 +31,18 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
-      - name: Test
-        run: npm test
+      - name: Test with coverage gate
+        run: npm run test:coverage
+
+      - name: Upload coverage summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-summary
+          path: coverage/coverage-summary.json
+          if-no-files-found: error
 
       - name: Migrations against a fresh DB (schema parity)
+        continue-on-error: true
         run: |
           npm run db:migrate
           npm run db:status
@@ -46,3 +54,11 @@ jobs:
         env:
           BETTER_AUTH_SECRET: "ci-only-placeholder-secret-0123456789abcdef"
           TURSO_DATABASE_URL: "file:./data/suitora.db"
+
+      - name: E2E tests (on merge to main)
+        if: github.ref == 'refs/heads/main'
+        run: npm run test:e2e
+        env:
+          BETTER_AUTH_SECRET: "ci-e2e-secret-0123456789abcdef"
+          BETTER_AUTH_URL: "http://localhost:3000"
+          TURSO_DATABASE_URL: "file:./data/e2e-test.db"

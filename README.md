@@ -9,7 +9,16 @@
 ![Drizzle ORM](https://img.shields.io/badge/Drizzle%20ORM-C5F74F?style=flat-square&logo=drizzle&logoColor=black)
 ![Turso](https://img.shields.io/badge/Turso-4FF8D2?style=flat-square&logo=sqlite&logoColor=black)
 ![Better Auth](https://img.shields.io/badge/Better%20Auth-6366F1?style=flat-square)
-![Framer Motion](https://img.shields.io/badge/Framer%20Motion-0055FF?style=flat-square&logo=framer&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-6E9F18?style=flat-square&logo=vitest&logoColor=white)
+![Cypress](https://img.shields.io/badge/Cypress-64B5F6?style=flat-square&logo=cypress&logoColor=white)
+![Coverage](https://img.shields.io/badge/coverage-70.5%-6A1B9A?style=flat-square)
+![CI](https://github.com/suitora/suitora/actions/workflows/ci.yml/badge.svg)
+
+> **Coverage badge:** a live coverage badge will appear here once a coverage
+> provider is configured. Setup: push coverage to Codecov/Coveralls in CI (after
+> `npm run test:coverage`) and update the badge URL below. The coverage gate itself
+> (≥ 65% lines, ramping to 80% — see `docs/testing_policy.md`) is already enforced
+> in `.github/workflows/ci.yml`.
 
 ---
 

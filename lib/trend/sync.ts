@@ -15,6 +15,7 @@ import {
 import { invalidateTrendCache } from "./cache";
 import { fetchAllProviders, fetchFromProvider } from "./fetch";
 import { normalizeProduct } from "./normalize";
+import { getLogger } from "@/lib/logger";
 import type { RawProviderProduct } from "@/types/trend";
 
 export interface SyncResult {
@@ -141,7 +142,7 @@ export async function ensureTrendItemsSeeded(): Promise<void> {
     await syncTrendItems();
   } catch (err) {
     // Table may not exist yet — log and continue with empty list
-    console.error("ensureTrendItemsSeeded failed:", err);
+    getLogger().error({ err }, "ensureTrendItemsSeeded failed");
   }
 }
 
@@ -166,14 +167,14 @@ export async function maybeRefreshTrendItems(
     }
     refreshInFlight = syncTrendItems()
       .catch((err) =>
-        console.error("[trend] background refresh failed:", err)
+        getLogger().error({ err }, "Background trend refresh failed")
       )
       .then(() => {
         refreshInFlight = null;
       });
     return true;
   } catch (err) {
-    console.error("maybeRefreshTrendItems failed:", err);
+    getLogger().error({ err }, "maybeRefreshTrendItems failed");
     return false;
   }
 }

@@ -7,16 +7,24 @@
  */
 
 import { syncTrendItems } from "@/lib/trend/sync";
+import { getLogger } from "@/lib/logger";
 import { Redis } from "ioredis";
 
 async function main() {
-  console.log("[trend-sync] Starting synchronization…");
+  const log = getLogger();
+  log.info("Trend sync starting");
   const result = await syncTrendItems();
-  console.log(
-    `[trend-sync] Done. providers=${result.providers} fetched=${result.itemsFetched} upserted=${result.itemsUpserted}`
+  log.info(
+    {
+      providers: result.providers,
+      fetched: result.itemsFetched,
+      upserted: result.itemsUpserted,
+      errors: result.errors,
+    },
+    "Trend sync done"
   );
   if (result.errors.length > 0) {
-    console.warn("[trend-sync] Errors:", result.errors);
+    log.warn({ errors: result.errors }, "Trend sync errors");
   }
 
   // Publish sync result to Redis for other services to consume
@@ -31,11 +39,11 @@ async function main() {
     }));
     await redis.quit();
   } catch (redisErr) {
-    console.error("[trend-sync] Failed to publish to Redis:", redisErr);
+    log.error({ err: redisErr }, "Failed to publish trend-sync to Redis");
   }
 }
 
 main().catch((err) => {
-  console.error("[trend-sync] Fatal:", err);
+  getLogger().error({ err }, "Trend sync fatal");
   process.exit(1);
 });

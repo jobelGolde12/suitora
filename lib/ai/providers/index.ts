@@ -5,6 +5,7 @@
 
 import { setVisionProvider } from "../vision";
 import { createOpenAIProvider } from "./openai-vision";
+import { getLogger } from "@/lib/logger";
 
 let initialized = false;
 
@@ -14,9 +15,9 @@ export function initializeProviders() {
   // Configure OpenAI Vision if API key is available
   if (process.env.OPENAI_API_KEY) {
     setVisionProvider(createOpenAIProvider());
-    console.log("[AI] OpenAI Vision provider initialized");
+    getLogger().info("OpenAI Vision provider initialized");
   } else {
-    console.log("[AI] No vision provider configured — using mock analysis");
+    getLogger().info("No vision provider configured — using mock analysis");
   }
 
   initialized = true;

@@ -14,6 +14,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "coverage/**",
+    "cypress/screenshots/**",
+    "cypress/videos/**",
+    "data/e2e-test.db",
   ]),
   // Query-quality enforcement (Pillar 03, Action Item 8).
   {

@@ -1,5 +1,6 @@
 import { requireUser } from "@/lib/auth/session";
 import { apiError, apiOk, apiRateLimitError } from "@/lib/api/response";
+import { withApiRoute, withUserId } from "@/lib/api/route";
 import { stylistRateLimiter, enforceRateLimit } from "@/lib/rate-limit";
 import { parseBody } from "@/lib/api/request";
 import { stylistMessageSchema } from "@/lib/validation";
@@ -125,103 +126,95 @@ async function buildContext(userId: string): Promise<StylistContext> {
  * GET /api/stylist?limit=&offset=
  * Returns the user's persisted conversation history plus monthly usage.
  */
-export async function GET(req: Request) {
-  try {
-    const user = await requireUser();
-    if (!user) return apiError("Unauthorized", 401);
+export const GET = withApiRoute("/api/stylist", async (req: Request) => {
+  const user = await requireUser();
+  if (!user) return apiError("Unauthorized", 401);
+  withUserId(user.id);
 
-    const { searchParams } = new URL(req.url);
-    const limit = Math.min(
-      Math.max(parseInt(searchParams.get("limit") || "50", 10) || 50, 1),
-      100
-    );
-    const offset = Math.max(
-      parseInt(searchParams.get("offset") || "0", 10) || 0,
-      0
-    );
+  const { searchParams } = new URL(req.url);
+  const limit = Math.min(
+    Math.max(parseInt(searchParams.get("limit") || "50", 10) || 50, 1),
+    100
+  );
+  const offset = Math.max(
+    parseInt(searchParams.get("offset") || "0", 10) || 0,
+    0
+  );
 
-    const [messages, used] = await Promise.all([
-      getStylistMessages(user.id, limit, offset),
-      countStylistMessagesThisMonth(user.id),
-    ]);
+  const [messages, used] = await Promise.all([
+    getStylistMessages(user.id, limit, offset),
+    countStylistMessagesThisMonth(user.id),
+  ]);
 
-    return apiOk({
-      messages,
-      limit,
-      offset,
-      usage: {
-        used,
-        limit: STYLIST_MONTHLY_LIMIT,
-        remaining: Math.max(0, STYLIST_MONTHLY_LIMIT - used),
-      },
-    });
-  } catch (err) {
-    console.error("Error in GET /api/stylist:", err);
-    return apiError("Failed to load stylist history", 500);
-  }
-}
+  return apiOk({
+    messages,
+    limit,
+    offset,
+    usage: {
+      used,
+      limit: STYLIST_MONTHLY_LIMIT,
+      remaining: Math.max(0, STYLIST_MONTHLY_LIMIT - used),
+    },
+  });
+});
 
 /**
  * POST /api/stylist
  * Body: { message: string }
  * Persists the user message, generates (and persists) a stylist reply.
  */
-export async function POST(req: Request) {
-  try {
-    const user = await requireUser();
-    if (!user) return apiError("Unauthorized", 401);
-    const userId = user.id;
+export const POST = withApiRoute("/api/stylist", async (req: Request) => {
+  const user = await requireUser();
+  if (!user) return apiError("Unauthorized", 401);
+  const userId = user.id;
+  withUserId(userId);
 
-    const rate = await enforceRateLimit(stylistRateLimiter, userId);
-    if (!rate.success) {
-      const retryAfter = Math.max(1, Math.ceil((rate.reset - Date.now()) / 1000));
-      return apiRateLimitError(
-        "Too many stylist requests. Please try again later.",
-        retryAfter
-      );
-    }
-
-    const parsed = await parseBody(stylistMessageSchema, req);
-    if (parsed.error) return parsed.error;
-    const message = parsed.data.message.trim();
-
-    const [used, history, context] = await Promise.all([
-      countStylistMessagesThisMonth(userId),
-      getStylistMessages(userId, 40),
-      buildContext(userId),
-    ]);
-    context.name = user.name;
-
-    if (used >= STYLIST_MONTHLY_LIMIT) {
-      return apiError(
-        `You've reached your monthly Stylist limit of ${STYLIST_MONTHLY_LIMIT} messages.`,
-        429
-      );
-    }
-
-    await addStylistMessage(userId, "user", message);
-
-    const messages: StylistMessageInput[] = [
-      ...history.map(({ role, content }) => ({
-        role: role as StylistMessageInput["role"],
-        content,
-      })),
-      { role: "user", content: message },
-    ];
-
-    const reply = await generateStylistReply({ messages, context });
-    await addStylistMessage(userId, "assistant", reply);
-
-    return apiOk({
-      message: reply,
-      usage: {
-        used: used + 1,
-        limit: STYLIST_MONTHLY_LIMIT,
-        remaining: Math.max(0, STYLIST_MONTHLY_LIMIT - used - 1),
-      },
-    });
-  } catch (err) {
-    console.error("Error in POST /api/stylist:", err);
-    return apiError("Failed to generate stylist reply", 500);
+  const rate = await enforceRateLimit(stylistRateLimiter, userId);
+  if (!rate.success) {
+    const retryAfter = Math.max(1, Math.ceil((rate.reset - Date.now()) / 1000));
+    return apiRateLimitError(
+      "Too many stylist requests. Please try again later.",
+      retryAfter
+    );
   }
-}
+
+  const parsed = await parseBody(stylistMessageSchema, req);
+  if (parsed.error) return parsed.error;
+  const message = parsed.data.message.trim();
+
+  const [used, history, context] = await Promise.all([
+    countStylistMessagesThisMonth(userId),
+    getStylistMessages(userId, 40),
+    buildContext(userId),
+  ]);
+  context.name = user.name;
+
+  if (used >= STYLIST_MONTHLY_LIMIT) {
+    return apiError(
+      `You've reached your monthly Stylist limit of ${STYLIST_MONTHLY_LIMIT} messages.`,
+      429
+    );
+  }
+
+  await addStylistMessage(userId, "user", message);
+
+  const messages: StylistMessageInput[] = [
+    ...history.map(({ role, content }) => ({
+      role: role as StylistMessageInput["role"],
+      content,
+    })),
+    { role: "user", content: message },
+  ];
+
+  const reply = await generateStylistReply({ messages, context });
+  await addStylistMessage(userId, "assistant", reply);
+
+  return apiOk({
+    message: reply,
+    usage: {
+      used: used + 1,
+      limit: STYLIST_MONTHLY_LIMIT,
+      remaining: Math.max(0, STYLIST_MONTHLY_LIMIT - used - 1),
+    },
+  });
+});

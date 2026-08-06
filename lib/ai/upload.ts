@@ -44,6 +44,9 @@ export async function uploadImage(
 
 /**
  * Delete an uploaded image by public ID.
+ * Best-effort: network/deletion failures are intentionally swallowed — the
+ * uploads table is the source of truth and the Cloudinary cleanup is retried
+ * by the retention job.
  */
 export async function deleteImage(publicId: string): Promise<void> {
   try {
@@ -51,7 +54,7 @@ export async function deleteImage(publicId: string): Promise<void> {
       method: "DELETE",
       credentials: "include",
     });
-  } catch (err) {
-    console.error("Failed to delete image:", err);
+  } catch {
+    // best-effort — see note above
   }
 }

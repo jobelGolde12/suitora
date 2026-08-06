@@ -1,4 +1,16 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+
+const loggerInfo = vi.fn();
+
+vi.mock("@/lib/logger", () => ({
+  getLogger: () => ({
+    info: loggerInfo,
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  }),
+}));
+
 import { sendPasswordResetEmail } from "./email";
 
 const RESET_URL = "https://suitora.app/reset-password/abc123?callbackURL=%2Freset-password";
@@ -7,6 +19,7 @@ describe("sendPasswordResetEmail", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
+    loggerInfo.mockClear();
   });
 
   it("sends the reset email via Resend when configured", async () => {
@@ -43,28 +56,24 @@ describe("sendPasswordResetEmail", () => {
     ).rejects.toThrow(/Resend API error: 401/);
   });
 
-  it("logs the reset link to the console in development without a provider", async () => {
+  it("logs the reset link in development without a provider", async () => {
     vi.stubEnv("RESEND_API_KEY", "");
     vi.stubEnv("NODE_ENV", "development");
 
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-
     await sendPasswordResetEmail("user@example.com", RESET_URL);
 
-    expect(logSpy).toHaveBeenCalledTimes(1);
-    expect(logSpy.mock.calls[0].join(" ")).toContain(RESET_URL);
+    expect(loggerInfo).toHaveBeenCalledTimes(1);
+    expect(loggerInfo.mock.calls[0][1]).toContain(RESET_URL);
   });
 
   it("throws in production without a provider and never logs the reset link", async () => {
     vi.stubEnv("RESEND_API_KEY", "");
     vi.stubEnv("NODE_ENV", "production");
 
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-
     await expect(
       sendPasswordResetEmail("user@example.com", RESET_URL)
     ).rejects.toThrow(/No email provider configured/);
 
-    expect(logSpy).not.toHaveBeenCalled();
+    expect(loggerInfo).not.toHaveBeenCalled();
   });
 });

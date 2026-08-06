@@ -13,6 +13,7 @@ import {
   passwordResetEmailLimiter,
 } from "@/lib/rate-limit";
 import { nanoid } from "@/lib/utils/id";
+import { getLogger } from "@/lib/logger";
 
 export type AuthResult = {
   success: boolean;
@@ -121,7 +122,7 @@ export async function loginAction(
       },
     };
   } catch (error) {
-    console.error("Login error:", error);
+    getLogger().error({ err: error }, "Login failed");
 
     // Log the failed attempt
     const email = data.email || "unknown";
@@ -218,7 +219,7 @@ export async function registerAction(data: RegisterFormData, ip: string = "anony
       },
     };
   } catch (error) {
-    console.error("Registration error:", error);
+    getLogger().error({ err: error }, "Registration failed");
 
     // Handle specific error cases
     if (error instanceof Error) {
@@ -249,7 +250,7 @@ export async function logoutAction(): Promise<{ success: boolean; error?: string
     await auth.api.signOut({ headers });
     return { success: true };
   } catch (error) {
-    console.error("Logout error:", error);
+    getLogger().error({ err: error }, "Logout failed");
     return {
       success: false,
       error: "Failed to sign out. Please try again.",
@@ -304,7 +305,7 @@ export async function requestPasswordResetAction(
 
     return { success: true };
   } catch (error) {
-    console.error("Password reset request error:", error);
+    getLogger().error({ err: error }, "Password reset request failed");
 
     // Never leak whether the account exists or the request failed.
     return { success: true };
@@ -331,7 +332,7 @@ export async function resetPasswordAction(
 
     return { success: true };
   } catch (error) {
-    console.error("Password reset error:", error);
+    getLogger().error({ err: error }, "Password reset failed");
 
     if (error instanceof Error) {
       if (error.message.includes("token") || error.message.includes("expired")) {
@@ -369,6 +370,6 @@ async function logAuditEvent(
       createdAt: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("Failed to log audit event:", error);
+    getLogger().error({ err: error }, "Failed to log audit event");
   }
 }

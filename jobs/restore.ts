@@ -16,6 +16,7 @@ import { createClient } from "@libsql/client";
 import { gunzipSync } from "node:zlib";
 import { s3Get, s3List, getS3Config } from "@/lib/storage/s3";
 import { listTables } from "@/lib/db/dump";
+import { getLogger } from "@/lib/logger";
 
 const PREFIX = "db/backups/suitora-";
 
@@ -69,12 +70,11 @@ export async function pickBackupKey(options: {
 
 export async function runRestore(options: RestoreOptions = {}): Promise<RestoreResult> {
   const key = await pickBackupKey(options);
-  const { bucket } = getS3Config();
-  console.log(`[restore] Downloading s3://${bucket}/${key}…`);
+  getLogger().info({ key }, "Downloading backup");
 
   const gz = await s3Get(key);
   const sql = gunzipSync(gz).toString("utf8");
-  console.log(`[restore] Restore payload: ${(sql.length / 1024).toFixed(1)} KiB SQL`);
+  getLogger().info({ sqlBytes: sql.length }, "Restore payload downloaded");
 
   const target = openTarget();
 
@@ -87,7 +87,7 @@ export async function runRestore(options: RestoreOptions = {}): Promise<RestoreR
             "Use --force to drop existing tables and restore anyway."
         );
       }
-      console.log(`[restore] Dropping ${existing.length} existing table(s)…`);
+      getLogger().info({ tables: existing.length }, "Dropping existing tables");
       for (const table of existing) {
         await target.execute(`DROP TABLE IF EXISTS ${JSON.stringify(table)}`);
       }
@@ -99,7 +99,7 @@ export async function runRestore(options: RestoreOptions = {}): Promise<RestoreR
     await target.executeMultiple(sql);
 
     const tablesAfter = await listTables(target);
-    console.log(`[restore] Restore complete from ${key}`);
+    getLogger().info({ key, tablesRestored: tablesAfter.length }, "Restore complete");
     return {
       key,
       sqlBytes: sql.length,
@@ -118,7 +118,7 @@ if (
 ) {
   const args = parseArgs(process.argv.slice(2));
   main(args).catch((err) => {
-    console.error("[restore] Failed:", err);
+    getLogger().error({ err }, "Restore failed");
     process.exit(1);
   });
 }
@@ -138,8 +138,9 @@ async function main(args: Record<string, string | boolean>) {
     date: typeof args.date === "string" ? args.date : undefined,
     force: args.force === true,
   });
-  console.log(
-    `[restore] Done. ${result.key}, ${result.tablesRestored} tables restored from ${(result.sqlBytes / 1024).toFixed(1)} KiB SQL`
+  getLogger().info(
+    { key: result.key, tablesRestored: result.tablesRestored, sqlBytes: result.sqlBytes },
+    "Restore done"
   );
   process.exit(0);
 }

@@ -9,6 +9,7 @@
  */
 
 import type { RawProviderProduct } from "@/types/trend";
+import { getLogger } from "@/lib/logger";
 
 // --- Store Registry ---
 
@@ -309,8 +310,9 @@ async function fetchStoreProducts(
       clearTimeout(timeout);
 
       if (!res.ok) {
-        console.warn(
-          `[shopify] ${store.name}: HTTP ${res.status} — stopping pagination`
+        getLogger().warn(
+          { store: store.name, status: res.status },
+          "Shopify HTTP error — stopping pagination"
         );
         break;
       }
@@ -365,11 +367,9 @@ async function fetchStoreProducts(
       if (items.length < PRODUCTS_PER_PAGE) break;
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
-        console.warn(`[shopify] ${store.name}: request timed out`);
+        getLogger().warn({ store: store.name }, "Shopify request timed out");
       } else {
-        console.warn(
-          `[shopify] ${store.name}: ${err instanceof Error ? err.message : "fetch failed"}`
-        );
+        getLogger().warn({ store: store.name, err }, "Shopify fetch error");
       }
       break;
     }
@@ -453,17 +453,19 @@ export async function fetchShopifyProducts(): Promise<RawProviderProduct[]> {
     const store = SHOPIFY_STORES[i];
 
     if (result.status === "fulfilled") {
-      console.log(
-        `[shopify] ${store.name}: fetched ${result.value.length} products`
+      getLogger().info(
+        { store: store.name, count: result.value.length },
+        "Shopify store fetched"
       );
       allProducts.push(...result.value);
     } else {
-      console.warn(
-        `[shopify] ${store.name}: ${result.reason instanceof Error ? result.reason.message : "failed"}`
+      getLogger().warn(
+        { store: store.name, err: result.reason },
+        "Shopify store failed"
       );
     }
   }
 
-  console.log(`[shopify] total: ${allProducts.length} products from ${SHOPIFY_STORES.length} stores`);
+  getLogger().info({ count: allProducts.length, stores: SHOPIFY_STORES.length }, "Shopify total products");
   return allProducts;
 }

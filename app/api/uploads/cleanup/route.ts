@@ -1,6 +1,8 @@
 import { headers } from "next/headers";
 import { requireUser } from "@/lib/auth/session";
 import { apiError, apiOk } from "@/lib/api/response";
+import { withApiRoute, withUserId } from "@/lib/api/route";
+import { getLogger } from "@/lib/logger";
 import { cleanupExpiredUploads, purgeSoftDeletedRows } from "@/lib/retention";
 
 /**
@@ -14,42 +16,43 @@ import { cleanupExpiredUploads, purgeSoftDeletedRows } from "@/lib/retention";
  * physically purges soft-deleted rows past the soft-delete retention window
  * (Pillar 03, Action Item 5 step 5).
  */
-export async function POST() {
+export const POST = withApiRoute("/api/uploads/cleanup", async () => {
   const startTime = Date.now();
 
-  try {
-    const headerStore = await headers();
-    const cronSecret = process.env.CRON_SECRET;
-    const isVercelCron =
-      cronSecret && headerStore.get("x-vercel-cron") === "1";
+  const headerStore = await headers();
+  const cronSecret = process.env.CRON_SECRET;
+  const isVercelCron =
+    cronSecret && headerStore.get("x-vercel-cron") === "1";
 
-    if (isVercelCron) {
-      const authHeader = headerStore.get("authorization");
-      if (authHeader !== `Bearer ${cronSecret}`) {
-        return apiError("Forbidden", 403);
-      }
-    } else {
-      const user = await requireUser();
-      if (!user) {
-        return apiError("Unauthorized", 401);
-      }
+  if (isVercelCron) {
+    const authHeader = headerStore.get("authorization");
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      return apiError("Forbidden", 403);
     }
-
-    const [uploads, purge] = await Promise.all([
-      cleanupExpiredUploads(),
-      purgeSoftDeletedRows(),
-    ]);
-    const duration = Date.now() - startTime;
-
-    console.log(
-      `[retention] Completed in ${duration}ms: ${uploads.deleted} uploads deleted, ` +
-        `${uploads.retained} retained (${uploads.scanned} scanned); ` +
-        `purged ${purge.map((p) => `${p.table}=${p.purged}`).join(", ") || "none"}`
-    );
-
-    return apiOk({ uploads, purge, duration });
-  } catch (err) {
-    console.error("Error in POST /api/uploads/cleanup:", err);
-    return apiError("Retention cleanup failed", 500);
+  } else {
+    const user = await requireUser();
+    if (!user) {
+      return apiError("Unauthorized", 401);
+    }
+    withUserId(user.id);
   }
-}
+
+  const [uploads, purge] = await Promise.all([
+    cleanupExpiredUploads(),
+    purgeSoftDeletedRows(),
+  ]);
+  const duration = Date.now() - startTime;
+
+  getLogger().info(
+    {
+      uploadsDeleted: uploads.deleted,
+      uploadsRetained: uploads.retained,
+      uploadsScanned: uploads.scanned,
+      purged: purge.map((p) => `${p.table}=${p.purged}`).join(", ") || "none",
+      durationMs: duration,
+    },
+    "Retention cleanup completed"
+  );
+
+  return apiOk({ uploads, purge, duration });
+});

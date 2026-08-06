@@ -5,6 +5,7 @@ import { getTryOnProvider } from "./providers";
 import { uploadToCloudinary } from "@/lib/storage/cloudinary";
 import { tryOnRateLimiter } from "@/lib/rate-limit";
 import { logTryOnEvent } from "./monitoring";
+import { getLogger } from "@/lib/logger";
 
 const TRYON_OUTPUT_FOLDER = "suitora/tryon/outputs";
 const TRYON_CACHE_TTL_DAYS = 30;
@@ -181,7 +182,7 @@ export async function syncTryOnLifecycle(
       // "pending"/"processing" → still running; wait for the next tick
     } catch (err) {
       // Transient error (network) — leave as processing; next tick retries
-      console.error(`[tryon] resolve failed for ${analysis.id}:`, err);
+      getLogger().error({ err, analysisId: analysis.id }, "Try-on resolve failed");
     }
   }
 }
@@ -298,7 +299,7 @@ async function persistGeneratedImage(
     });
     return uploaded.url;
   } catch (err) {
-    console.error("[tryon] Failed to persist output to Cloudinary:", err);
+    getLogger().error({ err }, "Failed to persist try-on output to Cloudinary");
     return resultUrl;
   }
 }

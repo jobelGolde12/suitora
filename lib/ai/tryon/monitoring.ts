@@ -9,6 +9,8 @@ import { dbWrite, dbRead, schema } from "@/drizzle";
 import { eq, sql, and } from "drizzle-orm";
 import { nanoid } from "@/lib/utils/id";
 import { notDeleted } from "@/lib/db/filters";
+import { getLogger } from "@/lib/logger";
+import { observeTryOn } from "@/lib/metrics";
 
 /** Structured try-on lifecycle events written to audit_logs.action. */
 export type TryOnEventAction =
@@ -92,8 +94,8 @@ export function computeTryOnStats(row: TryOnCountRow): TryOnStats {
 }
 
 /**
- * Persist a try-on lifecycle event to audit_logs and emit a structured
- * console line for ops (jobId, provider, latency, status).
+ * Persist a try-on lifecycle event to audit_logs, emit a structured log line,
+ * and record Prometheus counters/histograms.
  *
  * Never throws — monitoring must not break the try-on pipeline.
  */
@@ -109,16 +111,14 @@ export async function logTryOnEvent(event: TryOnEvent): Promise<void> {
     timestamp: new Date().toISOString(),
   };
 
-  // Structured ops log — greppable as `[tryon]`
-  console.info("[tryon]", {
-    action: event.action,
-    analysisId: event.analysisId,
-    jobId: payload.jobId,
-    provider: payload.provider,
-    latencyMs: payload.latencyMs,
-    status: payload.status,
-    error: payload.error,
-  });
+  observeTryOn(event.action, event.latencyMs ?? 0, event.provider ?? undefined);
+
+  const log = getLogger().child({ action: event.action });
+  if (event.action.endsWith("failed") || event.action === "tryon.submit_failed") {
+    log.warn(payload, "Try-on lifecycle event");
+  } else {
+    log.info(payload, "Try-on lifecycle event");
+  }
 
   try {
     await dbWrite.insert(schema.auditLogs).values({
@@ -129,7 +129,7 @@ export async function logTryOnEvent(event: TryOnEvent): Promise<void> {
       createdAt: new Date().toISOString(),
     });
   } catch (err) {
-    console.error("[tryon] failed to write audit log:", err);
+    getLogger().error({ err }, "Failed to write try-on audit log");
   }
 }
 

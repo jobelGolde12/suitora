@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { apiError } from "@/lib/api/response";
+import { withApiRoute } from "@/lib/api/route";
 import { listTrendItems } from "@/lib/db/queries";
 import { getCached, setCached } from "@/lib/trend/cache";
 import { rowToTrendItem } from "@/lib/trend/normalize";
@@ -15,9 +15,8 @@ import type { TrendItem } from "@/types/trend";
  * Serves normalized TrendItem objects from the local DB only.
  * Never calls third-party fashion APIs from this route.
  */
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = request.nextUrl;
+export const GET = withApiRoute("/api/trending", async (request: NextRequest) => {
+  const { searchParams } = request.nextUrl;
     const limit = Math.min(
       Math.max(parseInt(searchParams.get("limit") || "12", 10) || 12, 1),
       48
@@ -70,8 +69,4 @@ export async function GET(request: NextRequest) {
     await setCached(cacheKey, items);
 
     return NextResponse.json({ items, cached: false });
-  } catch (err) {
-    console.error("Error in GET /api/trending:", err);
-    return apiError("Failed to load trending items", 500);
-  }
-}
+});

@@ -9,6 +9,7 @@
 
 import { getKeywords } from "../keywords";
 import type { RawProviderProduct } from "@/types/trend";
+import { getLogger } from "@/lib/logger";
 
 const SERPAPI_BASE = "https://serpapi.com/search.json";
 const ENGINE = "google_shopping";
@@ -168,14 +169,14 @@ async function queryGoogleShopping(
     clearTimeout(timeout);
 
     if (!res.ok) {
-      console.warn(`[serpapi] HTTP ${res.status} for keyword: ${keyword}`);
+      getLogger().warn({ status: res.status, keyword }, "SerpAPI HTTP error");
       return [];
     }
 
     const data = (await res.json()) as SerpApiShoppingResponse;
 
     if (data.error) {
-      console.warn(`[serpapi] API error: ${data.error}`);
+      getLogger().warn({ keyword, error: data.error }, "SerpAPI API error");
       return [];
     }
 
@@ -204,11 +205,9 @@ async function queryGoogleShopping(
   } catch (err) {
     clearTimeout(timeout);
     if (err instanceof Error && err.name === "AbortError") {
-      console.warn(`[serpapi] Timeout for keyword: ${keyword}`);
+      getLogger().warn({ keyword }, "SerpAPI timeout");
     } else {
-      console.warn(
-        `[serpapi] Fetch error: ${err instanceof Error ? err.message : "unknown"}`
-      );
+      getLogger().warn({ err }, "SerpAPI fetch error");
     }
     return [];
   }
@@ -264,7 +263,7 @@ export async function fetchSerpApiProducts(
   const keywords = getKeywords(maxQueries);
   const allProducts: RawProviderProduct[] = [];
 
-  console.log(`[serpapi] Querying ${keywords.length} keywords: ${keywords.join(", ")}`);
+  getLogger().info({ keywords: keywords.join(", ") }, "SerpAPI querying");
 
   // Execute queries sequentially to respect rate limits
   for (const keyword of keywords) {
@@ -286,6 +285,6 @@ export async function fetchSerpApiProducts(
     return true;
   });
 
-  console.log(`[serpapi] total: ${unique.length} unique products from ${keywords.length} queries`);
+  getLogger().info({ count: unique.length, queries: keywords.length }, "SerpAPI unique products");
   return unique;
 }

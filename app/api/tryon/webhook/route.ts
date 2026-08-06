@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { apiError, apiOk } from "@/lib/api/response";
+import { withApiRoute } from "@/lib/api/route";
 import { completeTryOnByJobId } from "@/lib/ai/tryon/lifecycle";
 
 interface RunPodWebhookPayload {
@@ -18,7 +19,7 @@ interface RunPodWebhookPayload {
  * (signed at submit time), a header, or the JSON body, then the analysis is
  * completed/failed exactly like the poll-tick path — avoiding wasted polls.
  */
-export async function POST(req: Request) {
+export const POST = withApiRoute("/api/tryon/webhook", async (req: Request) => {
   const secret = process.env.RUNPOD_WEBHOOK_SECRET;
   if (!secret) {
     return apiError("Webhook not configured", 503);
@@ -76,7 +77,7 @@ export async function POST(req: Request) {
 
   // IN_QUEUE / IN_PROGRESS — nothing to do yet.
   return apiOk();
-}
+});
 
 function safeEqual(a: string, b: string): boolean {
   const aBuf = Buffer.from(a);
