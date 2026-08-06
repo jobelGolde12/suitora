@@ -132,6 +132,8 @@ export interface DashboardStats {
   averageScore: number;
   favoriteCount: number;
   recentActivity: number;
+  /** Number of favorites flagged as part of the user's wardrobe. */
+  wardrobeCount: number;
   /** Per-user try-on reliability (from analyses.try_on_*). */
   tryOn: TryOnStats;
 }

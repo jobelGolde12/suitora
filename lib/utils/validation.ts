@@ -47,6 +47,20 @@ export const forgotPasswordSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
 });
 
+export const resetPasswordSchema = z
+  .object({
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .max(128, "Password must be less than 128 characters"),
+    confirmPassword: z.string(),
+    token: z.string().min(1, "The reset link is invalid or has expired"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  });
+
 export const uploadSchema = z.object({
   userImage: imageFileSchema,
   clothingImage: imageFileSchema,
@@ -54,6 +68,7 @@ export const uploadSchema = z.object({
 
 export type RegisterFormData = z.infer<typeof registerSchema>;
 export type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 export type UploadFormData = z.infer<typeof uploadSchema>;
 
 const genderEnum = z.enum(["male", "female", "non-binary", "prefer-not-to-say"]);

@@ -32,6 +32,10 @@ export const failedAttemptsLimiter = createLimiter("ratelimit:failed", [10, "30 
 export const registerRateLimiter = createLimiter("ratelimit:register", [3, "1 h"]);
 export const registerEmailLimiter = createLimiter("ratelimit:register-email", [3, "1 h"]);
 
+// Password reset limiters
+export const passwordResetIpLimiter = createLimiter("ratelimit:password-reset-ip", [5, "1 h"]);
+export const passwordResetEmailLimiter = createLimiter("ratelimit:password-reset-email", [3, "1 h"]);
+
 // Try-on generation limiters
 export const tryOnRateLimiter = createLimiter("ratelimit:tryon", [10, "24 h"]);
 

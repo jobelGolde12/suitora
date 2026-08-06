@@ -250,6 +250,14 @@ export async function isFavorite(analysisId: string, userId: string) {
   return !!favorite;
 }
 
+export async function getFavoriteAnalysisIds(userId: string): Promise<Set<string>> {
+  const rows = await db
+    .select({ analysisId: schema.favorites.analysisId })
+    .from(schema.favorites)
+    .where(eq(schema.favorites.userId, userId));
+  return new Set(rows.map((r) => r.analysisId));
+}
+
 // ─── Wardrobe Folder Queries ──────────────────────────────────────
 
 export async function getWardrobeFoldersByUserId(userId: string) {
@@ -525,6 +533,7 @@ export async function getDashboardStats(userId: string) {
       averageScore: sql<number>`AVG(${schema.analyses.overallScore})`,
       favoriteCount: sql<number>`(SELECT COUNT(*) FROM ${schema.favorites} WHERE ${schema.favorites.userId} = ${userId})`,
       recentActivity: sql<number>`COUNT(CASE WHEN ${schema.analyses.createdAt} >= datetime('now', '-7 days') THEN 1 END)`,
+      wardrobeCount: sql<number>`(SELECT COUNT(*) FROM ${schema.favorites} WHERE ${schema.favorites.userId} = ${userId} AND ${schema.favorites.inWardrobe} = true)`,
     })
     .from(schema.analyses)
     .where(eq(schema.analyses.userId, userId));
@@ -536,6 +545,7 @@ export async function getDashboardStats(userId: string) {
     averageScore: Math.round(stats?.averageScore ?? 0),
     favoriteCount: stats?.favoriteCount ?? 0,
     recentActivity: stats?.recentActivity ?? 0,
+    wardrobeCount: stats?.wardrobeCount ?? 0,
     tryOn,
   };
 }

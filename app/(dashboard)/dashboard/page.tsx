@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import useSWR from "swr";
 import Link from "next/link";
 import {
   BarChart3,
@@ -32,78 +32,55 @@ import {
 import { OutfitSuggestions } from "@/components/wardrobe/OutfitSuggestions";
 import { TrendingCollection } from "@/components/trending";
 import { getCurrentSeason } from "@/lib/season";
-import type { AnalysisResult, DashboardStats, SkinTone } from "@/types";
+import type { AnalysisResult, DashboardStats } from "@/types";
 import type { TrendItem } from "@/types/trend";
 
+const fetcher = (url: string) =>
+  fetch(url, { credentials: "include" }).then((res) => {
+    if (!res.ok) {
+      throw new Error("Failed to fetch");
+    }
+    return res.json();
+  });
+
 export default function DashboardPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [recentAnalyses, setRecentAnalyses] = useState<
-    (AnalysisResult & { isFavorite?: boolean })[]
-  >([]);
-  const [scoreTrend, setScoreTrend] = useState<number[]>([]);
-  const [trendDates, setTrendDates] = useState<string[]>([]);
-  const [bestScore, setBestScore] = useState<number | null>(null);
-  const [userName, setUserName] = useState<string | null>(null);
-  const [skinTone, setSkinTone] = useState<SkinTone | null>(null);
-  const [wardrobeCount, setWardrobeCount] = useState(0);
-  const [trendingItems, setTrendingItems] = useState<TrendItem[]>([]);
-  const [trendingLoading, setTrendingLoading] = useState(true);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    async function loadStats() {
-      try {
-        const [statsRes, wardrobeRes, profileRes] = await Promise.all([
-          fetch("/api/dashboard/stats", { credentials: "include" }),
-          fetch("/api/wardrobe", { credentials: "include" }),
-          fetch("/api/user/profile", { credentials: "include" }),
-        ]);
-
-        if (statsRes.ok) {
-          const data = await statsRes.json();
-          setStats(data.stats);
-          setRecentAnalyses(data.recentAnalyses || []);
-          setScoreTrend(data.scoreTrend || []);
-          setTrendDates(data.trendDates || []);
-          setBestScore(data.bestScore ?? null);
-          setUserName(data.userName || null);
-        }
-
-        if (wardrobeRes.ok) {
-          const data = await wardrobeRes.json();
-          setWardrobeCount((data?.items ?? []).length);
-        }
-
-        if (profileRes.ok) {
-          const data = await profileRes.json();
-          setSkinTone((data?.profile?.skinTone as SkinTone) ?? null);
-        }
-      } catch (err) {
-        console.error("Error loading dashboard stats:", err);
-      } finally {
-        setIsLoading(false);
-      }
+  const {
+    data: statsData,
+    isLoading: statsLoading,
+  } = useSWR<{ stats: DashboardStats; recentAnalyses: AnalysisResult[]; scoreTrend: number[]; trendDates: string[]; bestScore: number | null; userName: string | null }>(
+    "/api/dashboard/stats",
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 30_000, // 30 seconds
     }
+  );
 
-    async function loadTrending() {
-      try {
-        const res = await fetch("/api/trending?limit=8", {
-          credentials: "include",
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setTrendingItems(data.items || []);
-        }
-      } catch (err) {
-        console.error("Error loading trending items:", err);
-      } finally {
-        setTrendingLoading(false);
-      }
+  const {
+    data: trendingData,
+    isLoading: trendingLoading,
+  } = useSWR<{ items: TrendItem[] }>(
+    "/api/trending?limit=8",
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 30_000,
     }
+  );
 
-    void loadStats();
-    void loadTrending();
-  }, []);
+  const isLoading = statsLoading || trendingLoading;
+
+  const stats = statsData?.stats;
+  const recentAnalyses = statsData?.recentAnalyses ?? [];
+  const scoreTrend = statsData?.scoreTrend ?? [];
+  const trendDates = statsData?.trendDates ?? [];
+  const bestScore = statsData?.bestScore ?? null;
+  const userName = statsData?.userName ?? null;
+  const wardrobeCount = statsData?.stats?.wardrobeCount ?? 0;
+  const trendingItems = trendingData?.items ?? [];
+  const trendingLoadingState = trendingLoading;
 
   if (isLoading) {
     return <DashboardSkeleton />;
@@ -114,6 +91,7 @@ export default function DashboardPage() {
     averageScore: 0,
     favoriteCount: 0,
     recentActivity: 0,
+    wardrobeCount: 0,
     tryOn: {
       total: 0,
       completed: 0,
@@ -165,7 +143,7 @@ export default function DashboardPage() {
         />
         <div className="space-y-4">
           <ContextualTips stats={activeStats} wardrobeCount={wardrobeCount} />
-          <SeasonalTipCard skinTone={skinTone} />
+          <SeasonalTipCard skinTone={null} />
         </div>
       </div>
 
@@ -313,7 +291,7 @@ export default function DashboardPage() {
       <TrendingCollection
         title="Trending items"
         items={trendingItems}
-        isLoading={trendingLoading}
+        isLoading={trendingLoadingState}
         layout="carousel"
         href="/trending"
       />

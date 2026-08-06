@@ -45,10 +45,25 @@ function NavLinks({
         const isActive =
           pathname === link.href || pathname.startsWith(link.href + "/");
 
+        const isDashboardLink = link.href === "/dashboard";
+
+        const handleMouseEnter = () => {
+          if (isDashboardLink && typeof window !== "undefined") {
+            // Prefetch dashboard stats and wardrobe count via the stats endpoint
+            // (wardrobe count is now included in dashboard stats)
+            fetch("/api/dashboard/stats", {
+              credentials: "include",
+            }).catch((err) => {
+              console.warn("Failed to prefetch dashboard stats:", err);
+            });
+          }
+        };
+
         return (
           <Link
             key={link.href}
             href={link.href}
+            onMouseEnter={handleMouseEnter}
             className={cn(
               "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
               "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",

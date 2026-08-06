@@ -2,13 +2,15 @@
 
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/drizzle";
-import { loginSchema, registerSchema, type LoginFormData, type RegisterFormData } from "@/lib/utils/validation";
+import { loginSchema, registerSchema, forgotPasswordSchema, resetPasswordSchema, type LoginFormData, type RegisterFormData, type ForgotPasswordFormData, type ResetPasswordFormData } from "@/lib/utils/validation";
 import {
   loginRateLimiter,
   bruteForceLimiter,
   failedAttemptsLimiter,
   registerRateLimiter,
   registerEmailLimiter,
+  passwordResetIpLimiter,
+  passwordResetEmailLimiter,
 } from "@/lib/rate-limit";
 import { nanoid } from "@/lib/utils/id";
 
@@ -251,6 +253,104 @@ export async function logoutAction(): Promise<{ success: boolean; error?: string
     return {
       success: false,
       error: "Failed to sign out. Please try again.",
+    };
+  }
+}
+
+/**
+ * Request a password-reset email. Always returns the same generic success
+ * message so the endpoint cannot be used to enumerate registered emails.
+ */
+export async function requestPasswordResetAction(
+  data: ForgotPasswordFormData,
+  ip: string = "anonymous"
+): Promise<AuthResult> {
+  try {
+    const validated = forgotPasswordSchema.safeParse(data);
+    if (!validated.success) {
+      return {
+        success: false,
+        error: "Please enter a valid email address.",
+      };
+    }
+
+    const { email } = validated.data;
+
+    const ipLimit = await passwordResetIpLimiter.limit(ip);
+    if (!ipLimit.success) {
+      return {
+        success: false,
+        error: "Too many reset requests. Please try again in an hour.",
+        rateLimit: {
+          limit: ipLimit.limit,
+          remaining: ipLimit.remaining,
+          reset: ipLimit.reset,
+        },
+      };
+    }
+
+    const emailLimit = await passwordResetEmailLimiter.limit(email);
+    if (!emailLimit.success) {
+      // Identical copy to the success message — do not reveal throttling.
+      await logAuditEvent("password_reset_throttled", email, ip, "Rate limited");
+      return { success: true };
+    }
+
+    await auth.api.requestPasswordReset({
+      body: { email, redirectTo: "/reset-password" },
+    });
+
+    await logAuditEvent("password_reset_requested", email, ip, "Reset link requested");
+
+    return { success: true };
+  } catch (error) {
+    console.error("Password reset request error:", error);
+
+    // Never leak whether the account exists or the request failed.
+    return { success: true };
+  }
+}
+
+export async function resetPasswordAction(
+  data: ResetPasswordFormData
+): Promise<AuthResult> {
+  try {
+    const validated = resetPasswordSchema.safeParse(data);
+    if (!validated.success) {
+      return {
+        success: false,
+        error: "Please fill in all fields correctly.",
+      };
+    }
+
+    const { password, token } = validated.data;
+
+    await auth.api.resetPassword({
+      body: { newPassword: password, token },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("Password reset error:", error);
+
+    if (error instanceof Error) {
+      if (error.message.includes("token") || error.message.includes("expired")) {
+        return {
+          success: false,
+          error: "This reset link is invalid or has expired. Please request a new one.",
+        };
+      }
+      if (error.message.includes("weak") || error.message.includes("password")) {
+        return {
+          success: false,
+          error: "Password is too weak. Please use a stronger password.",
+        };
+      }
+    }
+
+    return {
+      success: false,
+      error: "Unable to reset your password. Please try again.",
     };
   }
 }

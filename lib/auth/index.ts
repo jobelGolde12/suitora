@@ -3,6 +3,7 @@ import { nextCookies } from "better-auth/next-js";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { db } from "@/drizzle";
 import * as schema from "@/drizzle/schema";
+import { sendPasswordResetEmail } from "@/lib/email";
 
 function getSecret(): string {
   const secret = process.env.BETTER_AUTH_SECRET;
@@ -33,6 +34,12 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
+    // Called whenever a password reset is requested. The reset URL already
+    // includes a one-time token and points at /reset-password.
+    sendResetPassword: ({ user, url }) =>
+      sendPasswordResetEmail(user.email, url),
+    // Invalidate every session when a password is reset via email link.
+    revokeSessionsOnPasswordReset: true,
   },
   session: {
     expiresIn: 60 * 60 * 24 * 7, // 7 days

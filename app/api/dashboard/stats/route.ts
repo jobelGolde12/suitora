@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { apiError } from "@/lib/api/response";
-import { getDashboardStats, getAnalysesByUserId, getFavoritesByUserId, toAnalysisResult } from "@/lib/db/queries";
+import {
+  getDashboardStats,
+  getAnalysesByUserId,
+  getFavoriteAnalysisIds,
+  toAnalysisResult,
+} from "@/lib/db/queries";
 
 export async function GET() {
   try {
@@ -16,23 +21,23 @@ export async function GET() {
 
     const userId = session.user.id;
 
-    // 1. Get stats
-    const stats = await getDashboardStats(userId);
-
-    // 2. Get recent analyses
-    const recent = await getAnalysesByUserId(userId, 5);
-
-    // 3. Get favorites to set isFavorite on recent items
-    const favorites = await getFavoritesByUserId(userId);
-    const favoriteAnalysisIds = new Set(favorites.map((f) => f.favorite.analysisId));
+    // Fetch independent queries in parallel — reduces worst-case latency to
+    // the slowest single query instead of the sum of all query times.
+    const [stats, recent, favoriteAnalysisIds, trendAnalyses] =
+      await Promise.all([
+        getDashboardStats(userId),
+        getAnalysesByUserId(userId, 5),
+        getFavoriteAnalysisIds(userId), // lightweight: only returns favorited analysis IDs
+        getAnalysesByUserId(userId, 10),
+      ]);
 
     const recentAnalysesWithFavorite = recent.map((item) => ({
       ...toAnalysisResult(item),
       isFavorite: favoriteAnalysisIds.has(item.id),
     }));
 
-    // 4. Score trend: use overallScore of recent 10 analyses in ascending chronological order
-    const trendAnalyses = await getAnalysesByUserId(userId, 10);
+    // Score trend: use overallScore of the recent 10 analyses in ascending
+    // chronological order.
     const scoreTrend = trendAnalyses
       .map((a) => a.overallScore)
       .reverse(); // oldest first
