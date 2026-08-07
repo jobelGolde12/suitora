@@ -1,0 +1,53 @@
+# Promotion Rules Configuration
+#
+# This file codifies the promotion rules for advancing changes through
+# environments. It is used by CI/CD jobs to determine when and how
+# deployments may proceed.
+
+rules:
+  # Automatic promotion from Development to Staging
+  devToStaging:
+    branch: main
+    automatic: true
+    requiredChecks:
+      - lint
+      - test
+      - security-scan
+      - coverage
+    requiredApprovals: 0
+    enabled: true
+    environmentInjection:
+      secrets: true
+      featureFlags: true
+
+  # Manual promotion from Staging to Production
+  stagingToProduction:
+    branch: main
+    manualApproval: true
+    requiredChecks:
+      - staging-smoke-tests
+      - security-scan
+      - integration-test
+      - performance-test
+    requiredApprovals: 1
+    requiredReviews: 2
+    enforcement:
+      branchProtection: true
+      requiredLabelsOnApproval: [production-approve]
+    environmentInjection:
+      secrets: true
+      featureFlags: true
+    maxRollbackTimeSeconds: 120
+
+  # Optional canary promotion
+  canaryToProduction:
+    branch: main
+    requiresCanarySuccess: true
+    canaryTrafficWeights:
+      initial: 5    # 5% traffic
+      target: 100   # 100% gradual shift
+    successCriteria:
+      - errorRate < 0.5%
+      - latency < 200ms
+      - no critical alerts
+    maxRollbackTimeSeconds: 300

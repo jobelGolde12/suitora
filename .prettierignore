@@ -1,0 +1,13 @@
+# Ignore artifacts:
+.build
+.cache
+.coverage
+.next
+.out
+build
+dist
+node_modules
+.vercel
+output
+*.tsbuildinfo
+.next

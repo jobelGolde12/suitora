@@ -19,7 +19,7 @@ security fixes. Older tags are not patched.
 **Do not open a public GitHub issue** for security vulnerabilities. Instead,
 please report privately:
 
-- Email the maintainers: **security@suitora.app** (replace with your real
+- Email the maintainers: **`security@suitora.app`** (replace with your real
   address before release).
 - Optionally encrypt the report with the project's GPG key (see below) if a key
   is published.

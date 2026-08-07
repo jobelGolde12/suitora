@@ -1,0 +1,11 @@
+{
+  "MD013": false,
+  "MD024": { "siblings_only": true },
+  "MD033": false,
+  "MD034": true,
+  "MD040": false,
+  "MD041": false,
+  "MD048": { "style": "backtick" },
+  "MD060": false,
+  "default": true
+}

@@ -1,0 +1,19 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Suitora API",
+    "version": "1.0.0",
+    "description": "AI Fashion Compatibility Platform API"
+  },
+  "servers": [{
+    "url": "/api/docs",
+    "description": "Swagger UI endpoint"
+  }],
+  "paths": {
+    "/api/docs": {
+      "get": {
+        "summary": "Serve OpenAPI spec for Swagger UI"
+      }
+    }
+  }
+}

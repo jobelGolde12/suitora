@@ -1,0 +1,1501 @@
+openapi: 3.0.3
+info:
+  title: Suitora API
+  description: |
+    API documentation for the Suitora AI Fashion Compatibility Platform.
+
+    Suitora is an AI-powered fashion assistant that provides virtual try-on,
+    compatibility scoring, and personalized style recommendations.
+
+    ## Authentication
+    Most endpoints require a valid session. Authenticate with Better Auth
+    (`/api/auth/*`) and send the session cookie. Protected routes return `401`
+    when the caller is not authenticated.
+
+    ## Error format
+    All errors share a consistent envelope:
+    ```json
+    { "error": "message", "code": "ERROR_CODE", "requestId": "uuid" }
+    ```
+    Validation failures additionally include an `issues` array with per-field
+    messages. Every response carries an `X-Request-Id` header for correlation
+    (see `docs/runbooks.md`).
+
+    ## Rate limiting
+    Endpoints are rate limited (Upstash Redis sliding window). Excess requests
+    return `429` with a `Retry-After` header.
+
+    ## Pagination
+    List endpoints accept `limit` and `offset` query parameters. `limit` is
+    clamped to a safe maximum per endpoint.
+  version: 1.0.0
+servers:
+  - url: /api
+    description: Relative URL (Next.js route handlers)
+tags:
+  - name: Health
+    description: Service health and liveness
+  - name: Auth
+    description: Authentication (Better Auth)
+  - name: Analysis
+    description: AI fashion analysis lifecycle
+  - name: Favorites
+    description: Saved analyses and wardrobe organization
+  - name: Uploads
+    description: Image upload and cleanup
+  - name: User
+    description: Account, profile, and data portability
+  - name: Wardrobe
+    description: Wardrobe folders and outfit recommendations
+  - name: Stylist
+    description: AI stylist conversation
+  - name: Trending
+    description: Trending fashion items
+  - name: Backup
+    description: Database backup and retention
+  - name: Docs
+    description: API documentation UI
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: Public liveness probe. Returns 200 when the service is healthy.
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: string
+                    example: ok
+
+  /docs:
+    get:
+      tags: [Docs]
+      summary: Swagger UI
+      description: Interactive OpenAPI documentation UI (HTML).
+      responses:
+        '200':
+          description: HTML documentation page
+
+  /auth/{slug}:
+    parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Auth]
+      summary: Better Auth endpoints (GET)
+      description: |
+        Better Auth routes (e.g. `/api/auth/sign-in/email`,
+        `/api/auth/session`). See the Better Auth docs for the full route tree.
+      responses:
+        '200':
+          description: Auth response
+    post:
+      tags: [Auth]
+      summary: Better Auth endpoints (POST)
+      description: |
+        Better Auth routes (e.g. `/api/auth/sign-in/email`,
+        `/api/auth/sign-up/email`, `/api/auth/sign-out`).
+      responses:
+        '200':
+          description: Auth response
+
+  /analysis:
+    post:
+      tags: [Analysis]
+      summary: Create an analysis
+      description: |
+        Starts a new AI fashion analysis. Requires a user self-image to be set
+        (or provided). Rate limited to 20/day.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                productUrl:
+                  type: string
+                  description: Product URL to extract an image from (SSRF-guarded)
+                productImageUpload:
+                  type: string
+                  description: Upload URL returned by POST /api/uploads
+                userImageUrl:
+                  type: string
+                  description: Optional override for the user's stored self-image
+                category:
+                  type: string
+      responses:
+        '200':
+          description: Analysis created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  analysisId:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+    get:
+      tags: [Analysis]
+      summary: Get analysis or list history
+      description: |
+        With an `id` query param returns a single ownership-scoped analysis.
+        Without it returns the user's paginated analysis history.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Analysis or history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  analysis:
+                    $ref: '#/components/schemas/Analysis'
+                  progress:
+                    type: integer
+                  stage:
+                    type: string
+                  message:
+                    type: string
+                  analyses:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Analysis'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Analysis]
+      summary: Soft-delete an analysis
+      description: Soft-deletes an analysis and best-effort purges its generated assets.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /favorites:
+    get:
+      tags: [Favorites]
+      summary: List favorites
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Favorites list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  favorites:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Favorite'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Favorites]
+      summary: Add a favorite
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                analysisId:
+                  type: string
+      responses:
+        '200':
+          description: Favorite added or restored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  favorite:
+                    $ref: '#/components/schemas/Favorite'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+    patch:
+      tags: [Favorites]
+      summary: Update favorite wardrobe fields
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                analysisId:
+                  type: string
+                inWardrobe:
+                  type: boolean
+                wardrobeTags:
+                  type: array
+                  items:
+                    type: string
+                wardrobeFolder:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Updated favorite
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  favorite:
+                    $ref: '#/components/schemas/Favorite'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+    delete:
+      tags: [Favorites]
+      summary: Remove a favorite
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: analysisId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Removed
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /uploads:
+    post:
+      tags: [Uploads]
+      summary: Upload an image
+      description: |
+        Uploads an image (multipart form field `file`) to Cloudinary and returns
+        its URL + publicId. Rate limited to 10/hour.
+      security:
+        - sessionCookie: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                  publicId:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+    delete:
+      tags: [Uploads]
+      summary: Delete an uploaded image
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: publicId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /uploads/cleanup:
+    post:
+      tags: [Uploads]
+      summary: Run retention cleanup
+      description: |
+        Deletes expired uploads and purges soft-deleted rows. Triggered by
+        Vercel cron (`x-vercel-cron` + `CRON_SECRET`) or an authenticated user.
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Cleanup result
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /user:
+    delete:
+      tags: [User]
+      summary: Delete account
+      description: Permanently deletes the account and all associated data (GDPR).
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Account deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+                  purgedAssets:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /user/data:
+    get:
+      tags: [User]
+      summary: Export user data
+      description: Downloads the user's data as a JSON file (data portability).
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: JSON data export
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /user/profile:
+    get:
+      tags: [User]
+      summary: Get profile
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profile:
+                    $ref: '#/components/schemas/Profile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      tags: [User]
+      summary: Update profile
+      description: Accepts partial updates to the user's profile and preferences.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Partial profile fields
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profile:
+                    $ref: '#/components/schemas/Profile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /user/profile/estimate:
+    post:
+      tags: [User]
+      summary: Run AI body estimation
+      description: Estimates body traits from the user's self-image and saves them to the profile.
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Estimation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  estimation:
+                    type: object
+                    properties:
+                      height:
+                        type: number
+                        nullable: true
+                      weight:
+                        type: number
+                        nullable: true
+                      bodyShape:
+                        type: string
+                        nullable: true
+                      skinTone:
+                        type: string
+                        nullable: true
+                      faceShape:
+                        type: string
+                        nullable: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /user/self-image:
+    get:
+      tags: [User]
+      summary: Get self-image URL
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Self-image URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  selfImageUrl:
+                    type: string
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [User]
+      summary: Set self-image URL
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                selfImageUrl:
+                  type: string
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  selfImageUrl:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /dashboard/stats:
+    get:
+      tags: [Analysis]
+      summary: Dashboard statistics
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stats:
+                    type: object
+                  recentAnalyses:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Analysis'
+                  scoreTrend:
+                    type: array
+                    items:
+                      type: number
+                  trendDates:
+                    type: array
+                    items:
+                      type: string
+                  bestScore:
+                    type: number
+                    nullable: true
+                  userName:
+                    type: string
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /stylist:
+    get:
+      tags: [Stylist]
+      summary: Get stylist conversation history
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Messages and usage
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StylistMessage'
+                  usage:
+                    $ref: '#/components/schemas/StylistUsage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Stylist]
+      summary: Send a stylist message
+      description: Persists the user message and returns an AI-generated reply. Monthly limit enforced.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+      responses:
+        '200':
+          description: Reply
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  usage:
+                    $ref: '#/components/schemas/StylistUsage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /trending:
+    get:
+      tags: [Trending]
+      summary: List trending items
+      description: Public endpoint. Returns ranked, normalized trend items from the local DB.
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 12
+            maximum: 48
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: season
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: gender
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: occasion
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: brand
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: featured
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Trending items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TrendItem'
+                  cached:
+                    type: boolean
+
+  /trending/{id}:
+    get:
+      tags: [Trending]
+      summary: Get a trending item and similar items
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Item and similar items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  item:
+                    $ref: '#/components/schemas/TrendItem'
+                  similar:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TrendItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /trending/similar:
+    get:
+      tags: [Trending]
+      summary: Get similar items for an analysis
+      description: Returns trending items matching an analysis's category/style, scored against the user's profile.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: analysisId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 6
+      responses:
+        '200':
+          description: Scored similar items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /trending/sync:
+    post:
+      tags: [Trending]
+      summary: Trigger trend sync
+      description: Runs the trend synchronization pipeline. Auth via session or Vercel cron.
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Sync result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  itemsUpserted:
+                    type: integer
+                  errors:
+                    type: array
+                  duration:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /tryon/webhook:
+    post:
+      tags: [Analysis]
+      summary: Try-on provider webhook
+      description: RunPod callback for try-on job completion. Secret verified constant-time.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                status:
+                  type: string
+                error:
+                  type: string
+                secret:
+                  type: string
+                output:
+                  type: object
+      responses:
+        '200':
+          description: Acknowledged
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          description: Webhook not configured
+
+  /wardrobe:
+    get:
+      tags: [Wardrobe]
+      summary: Get wardrobe
+      description: Returns folders and in-wardrobe favorites joined with folder info.
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Wardrobe
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  folders:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WardrobeFolder'
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WardrobeItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /wardrobe/folders:
+    get:
+      tags: [Wardrobe]
+      summary: List folders
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Folders
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  folders:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WardrobeFolder'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Wardrobe]
+      summary: Create a folder
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+      responses:
+        '200':
+          description: Created folder
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  folder:
+                    $ref: '#/components/schemas/WardrobeFolder'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /wardrobe/folders/{id}:
+    patch:
+      tags: [Wardrobe]
+      summary: Rename a folder
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+      responses:
+        '200':
+          description: Renamed folder
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  folder:
+                    $ref: '#/components/schemas/WardrobeFolder'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+    delete:
+      tags: [Wardrobe]
+      summary: Delete a folder
+      description: Unassigns items from the folder (sets wardrobe_folder null).
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /wardrobe/outfits:
+    get:
+      tags: [Wardrobe]
+      summary: Get outfit suggestions
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 6
+        - name: regenerate
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Outfit suggestions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  outfits:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Outfit'
+                  wardrobeCount:
+                    type: integer
+                  saved:
+                    type: array
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Wardrobe]
+      summary: Regenerate outfit suggestions
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                regenerate:
+                  type: boolean
+                limit:
+                  type: integer
+      responses:
+        '200':
+          description: Outfit suggestions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  outfits:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Outfit'
+                  wardrobeCount:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /wardrobe/outfits/favorite:
+    get:
+      tags: [Wardrobe]
+      summary: List saved outfits
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Saved outfits
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  saved:
+                    type: array
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Wardrobe]
+      summary: Save an outfit
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                outfit:
+                  type: object
+      responses:
+        '200':
+          description: Saved outfit
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  favorite:
+                    type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+    delete:
+      tags: [Wardrobe]
+      summary: Delete a saved outfit
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /backup:
+    post:
+      tags: [Backup]
+      summary: Run a database backup
+      description: |
+        Dumps the database to S3 with retention pruning. Auth via session
+        (manual) or Vercel cron (`x-vercel-cron` + `CRON_SECRET`).
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Backup result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key:
+                    type: string
+                  bytes:
+                    type: integer
+                  pruned:
+                    type: integer
+                  duration:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: better-auth.session_token
+      description: Better Auth session cookie set at login.
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+        requestId:
+          type: string
+      required: [error, code]
+    ValidationError:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            issues:
+              type: array
+              items:
+                type: object
+                properties:
+                  path:
+                    type: string
+                  message:
+                    type: string
+    RateLimitError:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            code:
+              type: string
+              enum: [RATE_LIMIT]
+    Analysis:
+      type: object
+      properties:
+        id:
+          type: string
+        overallScore:
+          type: number
+        bodyScore:
+          type: number
+          nullable: true
+        styleScore:
+          type: number
+          nullable: true
+        colorScore:
+          type: number
+          nullable: true
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        tryOnStatus:
+          type: string
+          enum: [pending, processing, completed, failed, skipped]
+        userImage:
+          type: string
+        productImage:
+          type: string
+        generatedImage:
+          type: string
+          nullable: true
+        bodyShape:
+          type: string
+          nullable: true
+        skinTone:
+          type: string
+          nullable: true
+        faceShape:
+          type: string
+          nullable: true
+        styleType:
+          type: string
+          nullable: true
+        recommendations:
+          type: array
+          items:
+            type: string
+        colorAnalysis:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+    Favorite:
+      type: object
+      properties:
+        id:
+          type: string
+        analysisId:
+          type: string
+        inWardrobe:
+          type: boolean
+        wardrobeTags:
+          type: array
+          items:
+            type: string
+        wardrobeFolder:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    TrendItem:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        brand:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        category:
+          type: string
+        subcategory:
+          type: string
+          nullable: true
+        gender:
+          type: string
+          nullable: true
+        imageUrl:
+          type: string
+        productUrl:
+          type: string
+          nullable: true
+        price:
+          type: number
+          nullable: true
+        currency:
+          type: string
+          nullable: true
+        season:
+          type: string
+          nullable: true
+        occasion:
+          type: string
+          nullable: true
+        styleTags:
+          type: array
+          items:
+            type: string
+        colors:
+          type: array
+          items:
+            type: string
+        popularityScore:
+          type: number
+        isFeatured:
+          type: boolean
+    StylistMessage:
+      type: object
+      properties:
+        id:
+          type: string
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    StylistUsage:
+      type: object
+      properties:
+        used:
+          type: integer
+        limit:
+          type: integer
+        remaining:
+          type: integer
+    Profile:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        height:
+          type: number
+          nullable: true
+        weight:
+          type: number
+          nullable: true
+        bodyShape:
+          type: string
+          nullable: true
+        skinTone:
+          type: string
+          nullable: true
+        faceShape:
+          type: string
+          nullable: true
+        styleTags:
+          type: array
+          items:
+            type: string
+        preferredBrands:
+          type: array
+          items:
+            type: string
+        preferredColors:
+          type: array
+          items:
+            type: string
+        avoidColors:
+          type: array
+          items:
+            type: string
+        fitPreference:
+          type: string
+        selfImageUrl:
+          type: string
+          nullable: true
+    WardrobeFolder:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        itemCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+    WardrobeItem:
+      type: object
+      properties:
+        id:
+          type: string
+        analysisId:
+          type: string
+        inWardrobe:
+          type: boolean
+        wardrobeTags:
+          type: array
+          items:
+            type: string
+        wardrobeFolder:
+          type: string
+          nullable: true
+        wardrobeFolderName:
+          type: string
+          nullable: true
+        analysis:
+          $ref: '#/components/schemas/Analysis'
+    Outfit:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        items:
+          type: array
+        overallScore:
+          type: number
+        coherenceScore:
+          type: number
+        colorStoryScore:
+          type: number
+        proportionScore:
+          type: number
+        formalityConsistency:
+          type: number
+        seasonTags:
+          type: array
+          items:
+            type: string
+        occasionTags:
+          type: array
+          items:
+            type: string
+        stylingTips:
+          type: array
+          items:
+            type: string
+  responses:
+    Unauthorized:
+      description: Missing or invalid session
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Insufficient permissions (e.g. bad cron secret)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    BadRequest:
+      description: Invalid request or validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+    RateLimited:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RateLimitError'

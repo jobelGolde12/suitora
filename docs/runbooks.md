@@ -34,7 +34,9 @@ for end-to-end correlation.
 ## Alert runbooks
 
 ### SuitoraHighErrorRate (critical)
+
 Error ratio on a route > 5% for 5 minutes.
+
 - Check Grafana "Error rate by code / route" — identify `error_code` (e.g.
   `UPSTREAM_UNAVAILABLE`, `RATE_LIMIT`).
 - Pull recent error logs for the affected route; look for `errorCode` and
@@ -45,20 +47,26 @@ Error ratio on a route > 5% for 5 minutes.
   deploy.
 
 ### SuitoraNoData (critical)
+
 Prometheus cannot scrape `web:3000/metrics`.
+
 - Check `docker compose ps web`; restart if exited (`docker compose up -d web`).
 - Check host memory/disk. OOM-killed containers restart via `restart: always`.
 - If the LB is healthy but /metrics is dead, restart the web tier.
 
 ### SuitoraHighLatency (warning)
+
 p99 > 2s on a route for 5 minutes.
+
 - Check Grafana latency panel for the offending route.
 - Look for slow `db_query_duration_seconds` (index/query tuning) or upstream
   provider latency (upstream_request_duration_seconds).
 - Scale web replicas if CPU/heap is saturating.
 
 ### SuitoraProviderFailure (warning)
+
 > 10% of try-on events failed in 5m.
+
 - Check provider status (RunPod/OpenAI).
 - Check `tryon.failed` / `tryon.submit_failed` audit-log rows and the
   provider error in logs.
@@ -66,6 +74,7 @@ p99 > 2s on a route for 5 minutes.
   experience, then restore the provider.
 
 ### SuitoraNodeHeapExhaustion / SuitoraInFlightRequests / SuitoraSlowDatabase (warning)
+
 - Heap: restart web tier; increase `NODE_OPTIONS=--max-old-space-size` if repeat.
 - In-flight: check for a runaway loop in trend-sync or a traffic spike.
 - Slow DB: review slow queries; see `03_database_data_integrity.md`.
