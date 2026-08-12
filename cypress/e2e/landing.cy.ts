@@ -16,8 +16,8 @@ describe("Landing page", () => {
 
 	it("renders the feature grid and how-it-works sections", () => {
 		cy.visit("/");
-		cy.contains("text", /virtual try-on/i).should("be.visible");
-		cy.contains("text", /compatibility scores/i).should("be.visible");
+		cy.contains(/virtual try-on/i).should("be.visible");
+		cy.contains(/compatibility scores/i).should("be.visible");
 		cy.get('[data-cy="how-it-works"]').should("exist");
 	});
 

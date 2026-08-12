@@ -5,5 +5,5 @@
   "printWidth": 100,
   "tabWidth": 2,
   "arrowParens": "avoid",
-  "endOfFile": "lf"
+  "endOfLine": "lf"
 }

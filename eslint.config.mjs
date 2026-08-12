@@ -5,6 +5,9 @@ import drizzle from "eslint-plugin-drizzle";
 import noQueryInLoop from "./eslint-rules/no-query-in-loop.mjs";
 
 const eslintConfig = defineConfig([
+  // Flat config is authoritative (`.eslintrc.*` files are not loaded).
+  // `npm run lint` runs `eslint .`, so new dirs/files are linted automatically
+  // without glob maintenance; add anything that must NOT be linted here.
   ...nextVitals,
   ...nextTs,
   // Override default ignores of eslint-config-next.

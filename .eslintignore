@@ -1,7 +1,0 @@
-# .eslintignore
-node_modules
-build
-dist
-. next
-out
-coverage

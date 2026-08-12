@@ -125,6 +125,9 @@ commit real secrets — the repo ignores `.env`/`.env.local`.
 | `npm run restore`       | Restore the database from a dump        |
 | `npm run worker`        | Start the background worker locally     |
 
+> ESLint uses the flat config (`eslint.config.mjs`); the legacy
+> `.eslintrc.js` was removed (see `project-plan/adrs/ADR-002-repair-lint-scripts.md`).
+
 ## Project Structure
 
 The repository uses a feature-first layout at the repository root (no `src/`

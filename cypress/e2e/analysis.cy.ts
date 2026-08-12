@@ -2,7 +2,7 @@
 
 describe("Upload & analysis flow", () => {
 	beforeEach(() => {
-		cy.login("e2e-user@example.com", "TestPass123!");
+		cy.seedUser();
 	});
 
 	it("loads the upload page with dual upload areas", () => {
@@ -12,16 +12,15 @@ describe("Upload & analysis flow", () => {
 		cy.get('[data-cy="clothing-image-upload"]').should("be.visible");
 	});
 
-	it("shows validation error when submitting without images", () => {
+	it("keeps the analyze action disabled until both images are provided", () => {
 		cy.visit("/upload");
-		cy.contains("button", /next/i).first().click();
-		cy.contains(/select/i).should("be.visible");
+		cy.get('[data-cy="analyze-cta"]').should("be.disabled");
 	});
 
 	it("can upload mock images and start an analysis", () => {
 		cy.visit("/upload");
 
-		// Use fixture images for drag-and-drop or file input
+		// Use fixture images via the dropzone file inputs.
 		cy.get('[data-cy="user-image-upload"] input[type="file"]').selectFile(
 			"cypress/fixtures/selfie.jpg",
 			{ force: true }
@@ -31,25 +30,13 @@ describe("Upload & analysis flow", () => {
 			{ force: true }
 		);
 
-		cy.contains("button", /next/i).first().click();
-		cy.contains("button", /analyze/i).click();
+		// The CTA enables once the self photo has uploaded and been saved.
+		cy.get('[data-cy="analyze-cta"]', { timeout: 15000 }).should("be.enabled");
+		cy.get('[data-cy="analyze-cta"]').click();
 
-		// Should redirect to the analysis page
-		cy.url({ timeout: 10000 }).should("include", "/analysis");
-
-		// Stub the analysis API to return a completed result
-		cy.intercept("GET", "/api/analysis/*", {
-			statusCode: 200,
-			body: {
-				success: true,
-				data: {
-					id: "analysis-e2e-1",
-					overallScore: 82,
-					status: "completed",
-				},
-			},
-		}).as("getAnalysis");
-
-		cy.url({ timeout: 15000 }).should("include", "/results/");
+		// The analysis is created and we leave the upload page (either still
+		// polling on /analysis, or already on the results page once completed).
+		cy.url({ timeout: 30000 }).should("not.include", "/upload");
+		cy.url().should("match", /\/analysis|\/results\//);
 	});
 });

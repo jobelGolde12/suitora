@@ -2,7 +2,7 @@
 
 describe("Wardrobe & favorites flow", () => {
 	beforeEach(() => {
-		cy.login("e2e-user@example.com", "TestPass123!");
+		cy.seedUser();
 	});
 
 	it("navigates the favorites page", () => {
@@ -23,29 +23,25 @@ describe("Wardrobe & favorites flow", () => {
 
 describe("Stylist chatbot flow", () => {
 	beforeEach(() => {
-		cy.login("e2e-user@example.com", "TestPass123!");
+		cy.seedUser();
 	});
 
 	it("loads the stylist page and can send a message", () => {
+		// Stub the stylist API response before the request fires
+		cy.intercept("POST", "/api/stylist*", {
+			statusCode: 200,
+			body: {
+				success: true,
+				message: "A flowy midi dress in floral print would be perfect.",
+			},
+		}).as("stylistReply");
+
 		cy.visit("/stylist");
 		cy.url().should("include", "/stylist");
 
 		cy.get('[data-cy="stylist-input"]').should("be.visible");
 		cy.get('[data-cy="stylist-input"]').type("What should I wear for a summer wedding?");
 		cy.get('[data-cy="stylist-send"]').click();
-
-		// Stub the stylist API response
-		cy.intercept("POST", "/api/stylist*", {
-			statusCode: 200,
-			body: {
-				success: true,
-				data: {
-					id: "msg_e2e",
-					role: "assistant",
-					content: "A flowy midi dress in floral print would be perfect.",
-				},
-			},
-		}).as("stylistReply");
 
 		// The assistant reply should eventually appear
 		cy.get('[data-cy="stylist-message"]', { timeout: 10000 })

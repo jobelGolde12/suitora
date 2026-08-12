@@ -16,9 +16,13 @@
   --t-surface: #F7F6F2;
   --t-border-dashed: #DAD3C8;
   --t-ink: #2B2926;
-  --t-ink-muted: #8A857C;
-  --t-ink-faint: #B3ADA3;
-  --t-accent: #B4835C;
+  /* Text-safe values (WCAG 2.1 AA ≥4.5:1 on the surfaces above): the
+     previous #8A857C (ink-muted), #B3ADA3 (ink-faint) and #B4835C (accent)
+     failed contrast as text — see project-plan/10-next-phases-suggestions.md
+     S-02. */
+  --t-ink-muted: #6B645E;
+  --t-ink-faint: #736C66;
+  --t-accent: #87582F;
   --t-badge: #E7DFD5;
   --t-error: #B4593C;
 

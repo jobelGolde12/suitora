@@ -17,7 +17,7 @@ describe("Authentication flows", () => {
 
 		// After registration, user should land on dashboard (or be redirected)
 		cy.url().should("include", "/dashboard", { timeout: 15000 });
-		cy.contains(/welcome back/i).should("be.visible");
+		cy.contains(/welcome back/i, { timeout: 20000 }).should("be.visible");
 	});
 
 	it("rejects registration with mismatched passwords", () => {
@@ -43,7 +43,9 @@ describe("Authentication flows", () => {
 
 	it("shows a validation error for an invalid email on login", () => {
 		cy.visit("/login");
-		cy.get('input[name="email"]').type("not-an-email");
+		// `not-an-email@x` passes the browser's native email input check so the
+		// form submits and React Hook Form's zod validation renders the error.
+		cy.get('input[name="email"]').type("not-an-email@x");
 		cy.get('input[name="password"]').type(TEST_PASSWORD);
 		cy.contains("button", /sign in/i).click();
 		cy.contains(/valid email/i).should("be.visible");

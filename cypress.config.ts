@@ -1,11 +1,15 @@
 import { defineConfig } from "cypress";
 
 export default defineConfig({
-	e2e: {
-		baseUrl: "http://localhost:3000",
-		specPattern: "cypress/e2e/**/*.cy.{ts,tsx}",
-		supportFile: "cypress/support/e2e.ts",
-		setupNodeEvents(on, config) {
+		e2e: {
+			baseUrl: "http://localhost:3000",
+			specPattern: "cypress/e2e/**/*.cy.{ts,tsx}",
+			supportFile: "cypress/support/e2e.ts",
+			// The app under test holds a lot of DOM in memory; keep the runner
+			// lean to avoid Electron renderer crashes on long suites.
+			numTestsKeptInMemory: 0,
+			pageLoadTimeout: 120000,
+			setupNodeEvents(on, config) {
 			return config;
 		},
 		env: {

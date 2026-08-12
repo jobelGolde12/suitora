@@ -25,6 +25,13 @@ export default function RegisterPage() {
     formState: { errors },
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+      agreeToTerms: false,
+    },
   });
 
   const onSubmit = async (data: RegisterFormData) => {
@@ -35,12 +42,12 @@ export default function RegisterPage() {
       const result = await registerAction(data);
 
       if (result.success) {
-        setMessage({ type: "success", text: "Account created! Redirecting to your dashboard..." });
+        setMessage({ type: "success", text: "Account created successfully! Redirecting..." });
         setTimeout(() => {
           router.push("/dashboard");
-        }, 1500);
+        }, 500);
       } else {
-        setMessage({ type: "error", text: result.error || "Unable to create account." });
+        setMessage({ type: "error", text: result.error || "Registration failed. Please try again." });
       }
     } catch {
       setMessage({ type: "error", text: "Network error. Please check your connection and try again." });
@@ -58,7 +65,7 @@ export default function RegisterPage() {
       <div className="text-center mb-10">
         <h1 className="font-heading text-3xl font-light tracking-tight">Create your account</h1>
         <p className="mt-3 text-sm text-muted font-light">
-          Start your fashion discovery journey
+          Start your fashion journey with AI-powered style recommendations
         </p>
       </div>
 
@@ -90,9 +97,10 @@ export default function RegisterPage() {
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <Input
-          label="Name"
+          label="Full Name"
           type="text"
-          placeholder="Your full name"
+          autoComplete="name"
+          placeholder="John Doe"
           error={errors.name?.message}
           {...register("name")}
         />
@@ -100,6 +108,7 @@ export default function RegisterPage() {
         <Input
           label="Email"
           type="email"
+          autoComplete="email"
           placeholder="hello@example.com"
           error={errors.email?.message}
           {...register("email")}
@@ -109,7 +118,8 @@ export default function RegisterPage() {
           <Input
             label="Password"
             type={showPassword ? "text" : "password"}
-            placeholder="Create a password"
+            autoComplete="new-password"
+            placeholder="Create a strong password"
             error={errors.password?.message}
             {...register("password")}
           />
@@ -117,6 +127,7 @@ export default function RegisterPage() {
             type="button"
             onClick={() => setShowPassword(!showPassword)}
             className="absolute right-3 top-[38px] text-muted hover:text-foreground transition-colors"
+            aria-label={showPassword ? "Hide password" : "Show password"}
           >
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
@@ -126,6 +137,7 @@ export default function RegisterPage() {
           <Input
             label="Confirm Password"
             type={showConfirmPassword ? "text" : "password"}
+            autoComplete="new-password"
             placeholder="Confirm your password"
             error={errors.confirmPassword?.message}
             {...register("confirmPassword")}
@@ -134,16 +146,17 @@ export default function RegisterPage() {
             type="button"
             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
             className="absolute right-3 top-[38px] text-muted hover:text-foreground transition-colors"
+            aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
           >
             {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
 
-        <label className="flex items-start gap-2.5 cursor-pointer">
+        <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
             {...register("agreeToTerms")}
-            className="mt-0.5 h-4 w-4 rounded border-border text-accent focus:ring-accent"
+            className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
           />
           <span className="text-sm text-muted font-light leading-relaxed">
             I agree to the{" "}
@@ -157,7 +170,7 @@ export default function RegisterPage() {
           </span>
         </label>
         {errors.agreeToTerms && (
-          <p className="text-xs text-error">{errors.agreeToTerms.message}</p>
+          <p className="text-sm text-error mt-1">You must agree to the terms and conditions</p>
         )}
 
         <Button type="submit" loading={isLoading} variant="editorial" className="w-full rounded-full h-12">
@@ -170,6 +183,15 @@ export default function RegisterPage() {
         Already have an account?{" "}
         <Link href="/login" className="text-accent hover:text-accent-light font-medium transition-colors">
           Sign in
+        </Link>
+      </p>
+
+      <p className="mt-4 text-center text-xs text-muted font-light">
+        <Link
+          href="/privacy-policy"
+          className="hover:text-accent transition-colors"
+        >
+          Privacy Policy
         </Link>
       </p>
     </motion.div>

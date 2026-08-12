@@ -44,6 +44,32 @@ function extractCategory(meta: Record<string, unknown> | null): string | null {
   return itemProfile?.category ?? null;
 }
 
+function extractItemProfile(
+  meta: Record<string, unknown> | null
+): { category?: string; subtype?: string } | null {
+  const itemProfile = meta?.itemProfile as
+    | { category?: string; subtype?: string }
+    | undefined;
+  return itemProfile ?? null;
+}
+
+function average(values: number[]): number {
+  return values.length > 0
+    ? values.reduce((sum, v) => sum + v, 0) / values.length
+    : 0;
+}
+
+function scoreTrendDirection(
+  recentAverage: number,
+  earlierAverage: number,
+  sampleSize: number
+): "improving" | "declining" | "stable" {
+  if (sampleSize < 4 || Math.abs(recentAverage - earlierAverage) < 2) {
+    return "stable";
+  }
+  return recentAverage > earlierAverage ? "improving" : "declining";
+}
+
 async function buildContext(userId: string): Promise<StylistContext> {
   const [profile, analyses, favorites, stats, wardrobeRows, folders] =
     await Promise.all([
@@ -101,6 +127,46 @@ async function buildContext(userId: string): Promise<StylistContext> {
     )
   ).slice(0, 8);
 
+  const categoryBreakdown = Array.from(categoryScores.entries())
+    .map(([category, values]) => ({
+      category,
+      averageScore: Math.round(average(values) * 10) / 10,
+      count: values.length,
+    }))
+    .sort(
+      (a, b) => b.averageScore - a.averageScore || b.count - a.count
+    );
+
+  const midpoint = Math.ceil(analyses.length / 2);
+  const recentScores = analyses.slice(0, midpoint).map((a) => a.overallScore);
+  const earlierScores = analyses.slice(midpoint).map((a) => a.overallScore);
+  const recentAverage = average(recentScores);
+  const earlierAverage = average(earlierScores);
+
+  const styleTypeCounts = new Map<string, number>();
+  for (const a of analyses) {
+    if (!a.styleType) continue;
+    styleTypeCounts.set(a.styleType, (styleTypeCounts.get(a.styleType) ?? 0) + 1);
+  }
+  const topStyleTypes = Array.from(styleTypeCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([type]) => type)
+    .slice(0, 3);
+
+  const recentItems = analyses.slice(0, 8).flatMap((a) => {
+    const item = extractItemProfile(parseJsonObject(a.compatibilityMetadata));
+    if (!item?.category) return [];
+    return [{ category: item.category, subtype: item.subtype, score: a.overallScore }];
+  });
+
+  const wardrobeTags = Array.from(
+    new Set(
+      wardrobeRows.flatMap(({ favorite }) =>
+        parseJsonArray(favorite.wardrobeTags)
+      )
+    )
+  ).slice(0, 10);
+
   const season = getCurrentSeason();
 
   return {
@@ -108,6 +174,7 @@ async function buildContext(userId: string): Promise<StylistContext> {
     skinTone,
     styleTags: parseJsonArray(profile?.styleTags) as StyleTag[],
     fitPreference,
+    sizePreference: profile?.sizePreference ?? null,
     totalAnalyses: stats.totalAnalyses,
     averageScore: stats.averageScore,
     bestScore: scores.length > 0 ? Math.max(...scores) : null,
@@ -119,6 +186,17 @@ async function buildContext(userId: string): Promise<StylistContext> {
     currentSeason: season.label,
     bestCategory,
     worstCategory,
+    categoryBreakdown,
+    scoreTrend: {
+      direction: scoreTrendDirection(recentAverage, earlierAverage, analyses.length),
+      recentAverage,
+      earlierAverage,
+    },
+    recentItems,
+    wardrobeTags,
+    preferredColors: parseJsonArray(profile?.preferredColors),
+    avoidColors: parseJsonArray(profile?.avoidColors),
+    topStyleTypes,
   };
 }
 

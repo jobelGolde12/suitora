@@ -196,7 +196,10 @@ export const GET = withApiRoute("/api/analysis", async (req: Request) => {
 
       const colorAnalysis = visionResult.colorAnalysis;
 
-      const compatibilityMetadata = {
+      // Prefer the engine's rich fit metadata (body + item profiles, fit
+      // deltas, insights, size advice) when available; otherwise persist the
+      // flat trait snapshot so the results UI still has something to render.
+      const compatibilityMetadata = visionResult.compatibilityMetadata ?? {
         bodyShape: visionResult.traits.bodyShape,
         skinTone: visionResult.traits.skinTone,
         faceShape: visionResult.traits.faceShape,

@@ -22,6 +22,9 @@ import { Badge } from "@/components/ui/Badge";
 import { ScoreCircle } from "@/components/ui/ScoreCircle";
 import { SimilarItems } from "@/components/trending/SimilarItems";
 import { ColorPaletteCard } from "@/components/results/ColorPaletteCard";
+import { FitSummary } from "@/components/results/FitSummary";
+import { DetailedFitAnalytics } from "@/components/results/DetailedFitAnalytics";
+import { CategoryHeroImage } from "@/components/results/CategoryHeroImage";
 import { OutfitItemStrip } from "@/components/outfits";
 import { useToast } from "@/components/ui/Toast";
 import {
@@ -33,6 +36,7 @@ import {
 } from "@/components/dashboard";
 import { cn } from "@/lib/utils/cn";
 import { getResultsSeasonalLine } from "@/lib/season";
+import { buildMeasurementDeltas } from "@/lib/utils/fit-deltas";
 import type {
   AnalysisResult,
   BodyShape,
@@ -43,6 +47,9 @@ import type {
   UserProfile,
   FitPreference,
 } from "@/types";
+import type {
+  CompatibilityMetadata,
+} from "@/types/body-fit";
 import type { TrendOutfit, TrendOutfitItem } from "@/types/trend";
 
 const FIT_OPTIONS: { value: FitPreference; label: string }[] = [
@@ -283,6 +290,22 @@ export default function ResultsPage() {
       ?.itemProfile?.category ?? null;
   const seasonalLine = getResultsSeasonalLine(itemCategory);
 
+  const compatibilityMetadata =
+    (result.compatibilityMetadata as CompatibilityMetadata | null) ?? null;
+  const hasRichMetadata = !!(
+    compatibilityMetadata?.bodyProfile &&
+    compatibilityMetadata?.itemProfile &&
+    compatibilityMetadata.scores &&
+    compatibilityMetadata.insights &&
+    compatibilityMetadata.sizeRecommendation &&
+    Array.isArray(compatibilityMetadata.itemProfile.colors) &&
+    Array.isArray(compatibilityMetadata.itemProfile.styleTags) &&
+    Array.isArray(compatibilityMetadata.bodyProfile.stylePreference)
+  );
+  const measurementDeltas = hasRichMetadata
+    ? buildMeasurementDeltas(compatibilityMetadata)
+    : [];
+
   return (
     <PageContainer>
       <motion.div
@@ -377,11 +400,12 @@ export default function ResultsPage() {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={result.productImage}
+                <CategoryHeroImage
+                  category={itemCategory}
+                  imageUrl={result.productImage}
                   alt="Original clothing item"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full rounded-none border-0 shadow-none"
+                  priority
                 />
               )}
             </div>
@@ -418,12 +442,44 @@ export default function ResultsPage() {
             </Card>
           </motion.div>
 
-          {displayWearWith.length > 0 && (
+          {hasRichMetadata && compatibilityMetadata && (
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={fadeInUp}
+              custom={2.25}
+            >
+              <FitSummary
+                insights={compatibilityMetadata.insights}
+                category={compatibilityMetadata.itemProfile.category}
+                scores={{
+                  overall: result.overallScore,
+                  body: result.bodyScore || 0,
+                }}
+              />
+            </motion.div>
+          )}
+
+          {hasRichMetadata && compatibilityMetadata && (
             <motion.div
               initial="hidden"
               animate="visible"
               variants={fadeInUp}
               custom={2.5}
+            >
+              <DetailedFitAnalytics
+                metadata={compatibilityMetadata}
+                deltas={measurementDeltas}
+              />
+            </motion.div>
+          )}
+
+          {displayWearWith.length > 0 && (
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={fadeInUp}
+              custom={2.75}
             >
               <Card>
                 <CardHeader>

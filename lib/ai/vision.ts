@@ -5,6 +5,7 @@
  */
 
 import type { BodyShape, SkinTone, FaceShape, StyleTag } from "@/types";
+import type { CompatibilityMetadata } from "@/types/body-fit";
 
 export interface VisionAnalysisInput {
   userImageUrl: string;
@@ -34,6 +35,8 @@ export interface VisionAnalysisResult {
     recommendedColors: string[];
     avoidColors: string[];
   };
+  /** Optional rich fit metadata produced by the analysis engine. */
+  compatibilityMetadata?: CompatibilityMetadata;
 }
 
 export interface VisionProvider {
@@ -79,7 +82,12 @@ export async function analyzeWithVision(
       faceShape: mockResult.faceShape,
       styleType: mockResult.styleType,
     },
+    height: mockResult.height,
+    heightConfidence: mockResult.heightConfidence,
+    weight: mockResult.weight,
+    weightConfidence: mockResult.weightConfidence,
     recommendations: mockResult.recommendations,
     colorAnalysis: mockResult.colorAnalysis,
+    compatibilityMetadata: mockResult.compatibilityMetadata,
   };
 }

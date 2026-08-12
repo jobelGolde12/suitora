@@ -42,7 +42,7 @@ export function FAQ() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
-    <section id="faq" className="relative py-32 sm:py-40 px-6 scroll-mt-20">
+    <section id="faq" data-cy="faq" className="relative py-32 sm:py-40 px-6 scroll-mt-20">
       <div className="mx-auto max-w-3xl">
         <motion.div
           initial="hidden"
@@ -83,6 +83,7 @@ export function FAQ() {
               >
                 <button
                   id={buttonId}
+                  data-cy="faq-question"
                   aria-expanded={isOpen}
                   aria-controls={panelId}
                   onClick={() => setOpenIndex(isOpen ? null : i)}
@@ -109,7 +110,7 @@ export function FAQ() {
                   )}
                 >
                   <div className="overflow-hidden">
-                    <p className="px-6 pb-5 text-sm text-muted leading-relaxed font-light">
+                    <p data-cy="faq-answer" className="px-6 pb-5 text-sm text-muted leading-relaxed font-light">
                       {faq.answer}
                     </p>
                   </div>

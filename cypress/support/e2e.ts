@@ -1,6 +1,9 @@
 /// <reference types="cypress" />
 
 import "./commands";
+// Registers cy.injectAxe()/cy.configureAxe()/cy.checkA11y() commands and the
+// axe-core global typing (S-02: automated a11y regression).
+import "cypress-axe";
 
 beforeEach(() => {
 	// Prevent window.alert from blocking tests

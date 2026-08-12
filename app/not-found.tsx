@@ -22,9 +22,14 @@ export default function NotFound() {
         <p className="text-sm text-muted mb-6">
           The page you&apos;re looking for doesn&apos;t exist or has been moved.
         </p>
-        <Link href="/">
-          <Button>Go Home</Button>
-        </Link>
+        <div className="flex items-center justify-center gap-3">
+          <Link href="/">
+            <Button variant="secondary">Go Home</Button>
+          </Link>
+          <Link href="/dashboard">
+            <Button>Go to Dashboard</Button>
+          </Link>
+        </div>
       </div>
     </div>
   );

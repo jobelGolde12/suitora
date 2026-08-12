@@ -7,6 +7,11 @@ declare global {
 		interface Chainable {
 			/** Register a new user through the UI */
 			register(email: string, password: string, name?: string): Chainable<void>;
+			/**
+			 * Register a fresh, unique throwaway account and land on the dashboard.
+			 * Deterministic across runs because the email is unique per invocation.
+			 */
+			seedUser(): Chainable<void>;
 			/** Log in through the UI using form submit */
 			login(email: string, password: string): Chainable<void>;
 			/** Log out the current user */
@@ -18,6 +23,7 @@ declare global {
 }
 
 const TEST_NAME = "E2E Tester";
+const TEST_PASSWORD = "TestPass123!";
 
 Cypress.Commands.add("register", (email, password, name = TEST_NAME) => {
 	cy.visit("/register");
@@ -27,6 +33,12 @@ Cypress.Commands.add("register", (email, password, name = TEST_NAME) => {
 	cy.get('input[name="confirmPassword"]').type(password);
 	cy.get('input[name="agreeToTerms"]').check();
 	cy.contains("button", /create account/i).click();
+});
+
+Cypress.Commands.add("seedUser", () => {
+	const email = `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
+	cy.register(email, TEST_PASSWORD);
+	cy.url({ timeout: 20000 }).should("include", "/dashboard");
 });
 
 Cypress.Commands.add("login", (email, password) => {

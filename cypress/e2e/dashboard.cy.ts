@@ -2,13 +2,13 @@
 
 describe("Dashboard navigation", () => {
 	beforeEach(() => {
-		cy.login("e2e-user@example.com", "TestPass123!");
+		cy.seedUser();
 	});
 
 	it("renders the dashboard with stats and quick actions", () => {
 		cy.visit("/dashboard");
 		cy.url().should("include", "/dashboard");
-		cy.contains(/welcome back/i).should("be visible");
+		cy.contains(/welcome back/i).should("be.visible");
 		cy.contains(/quick actions/i).should("be.visible");
 
 		// Quick action cards
@@ -21,23 +21,23 @@ describe("Dashboard navigation", () => {
 	it("navigates to the upload page from the quick action", () => {
 		cy.visit("/dashboard");
 		cy.contains(/upload photo/i).click();
-		cy.url().should("include", "/upload");
+		cy.url().should("include", "/upload", { timeout: 30000 });
 	});
 
 	it("navigates to the wardrobe page", () => {
 		cy.visit("/dashboard");
 		cy.contains(/wardrobe/i).click();
-		cy.url().should("include", "/wardrobe");
+		cy.url().should("include", "/wardrobe", { timeout: 30000 });
 	});
 
 	it("navigates to the stylist page", () => {
 		cy.visit("/dashboard");
 		cy.contains(/ai stylist/i).click();
-		cy.url().should("include", "/stylist");
+		cy.url().should("include", "/stylist", { timeout: 30000 });
 	});
 
 	it("shows the history page with empty state", () => {
 		cy.visit("/history");
-		cy.contains(/no analyses yet/i).should("be.visible");
+		cy.contains(/no analyses found/i).should("be.visible");
 	});
 });

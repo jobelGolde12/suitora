@@ -10,6 +10,7 @@ import { fadeInUp, stagger, revealViewport } from "./motion";
 export function CTA() {
   return (
     <section
+      data-cy="cta-section"
       aria-labelledby="cta-heading"
       className="relative isolate overflow-hidden bg-surface/40 px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-24"
     >

@@ -11,8 +11,8 @@
 ![Better Auth](https://img.shields.io/badge/Better%20Auth-6366F1?style=flat-square)
 ![Vitest](https://img.shields.io/badge/Vitest-6E9F18?style=flat-square&logo=vitest&logoColor=white)
 ![Cypress](https://img.shields.io/badge/Cypress-64B5F6?style=flat-square&logo=cypress&logoColor=white)
-![Coverage](https://img.shields.io/badge/coverage-70.5%-6A1B9A?style=flat-square)
-![CI](https://github.com/suitora/suitora/actions/workflows/ci.yml/badge.svg)
+![Coverage](https://img.shields.io/badge/coverage-70.62%25-6A1B9A?style=flat-square)
+![CI](https://github.com/jobelGolde12/suitora/actions/workflows/ci.yml/badge.svg)
 
 > **Coverage badge:** a live coverage badge will appear here once a coverage
 > provider is configured. Setup: push coverage to Codecov/Coveralls in CI (after
@@ -131,7 +131,7 @@ Become the leading AI shopping companion that eliminates the uncertainty in onli
 |-----------|---------|
 | [Cloudinary](https://cloudinary.com/) | Image upload, optimization, and CDN |
 | [OpenAI Vision](https://platform.openai.com/) | AI image analysis (future) |
-| [Gemini Vision](https://deepmind.google/technologies/gemini/) | AI image analysis (future) |
+| [Gemini Vision](https://ai.google.dev/gemini-api/) | AI image analysis (future) |
 
 ### Deployment
 
@@ -244,10 +244,25 @@ flowchart TD
 | `npm run dev` | Start development server |
 | `npm run build` | Production build |
 | `npm run start` | Start production server |
-| `npm run lint` | Run ESLint |
-| `npx drizzle-kit push` | Push schema to database |
+| `npm run lint` | Run ESLint (no warnings allowed) |
+| `npm run lint:fix` | Auto-fix ESLint issues |
+| `npm run lint:md` | Markdown lint (docs PRs) |
+| `npm run check:links` | Validate links in markdown docs |
+| `npm run format` | Format code with Prettier |
+| `npm run test` | Run unit tests (Vitest, one shot) |
+| `npm run test:watch` | Run unit tests in watch mode |
+| `npm run test:coverage` | Run tests with coverage report + gate |
+| `npm run test:e2e` | Run Cypress end-to-end tests |
+| `npm run test:e2e:open` | Open the Cypress interactive runner |
+| `npm run db:migrate` | Apply pending migrations |
+| `npm run db:generate` | Generate a migration from schema changes |
+| `npm run db:rollback` | Roll back the last migration |
+| `npm run db:status` | Show migration status |
+| `npm run backup` | Run the database backup job |
+| `npm run restore` | Restore the database from a dump |
+| `npm run worker` | Start the background worker locally |
+| `npx drizzle-kit push` | Push schema to database (local dev) |
 | `npx drizzle-kit generate` | Generate migration files |
-| `npx drizzle-kit migrate` | Run pending migrations |
 
 ---
 
