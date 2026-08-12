@@ -1,10 +1,11 @@
 import { eq, sql, and, desc } from "drizzle-orm";
-import { db, schema } from "@/drizzle";
+import { dbWrite, schema } from "@/drizzle";
 import { submitTryOn, resolveTryOn } from "./index";
 import { getTryOnProvider } from "./providers";
 import { uploadToCloudinary } from "@/lib/storage/cloudinary";
 import { tryOnRateLimiter } from "@/lib/rate-limit";
 import { logTryOnEvent } from "./monitoring";
+import { getLogger } from "@/lib/logger";
 
 const TRYON_OUTPUT_FOLDER = "suitora/tryon/outputs";
 const TRYON_CACHE_TTL_DAYS = 30;
@@ -54,7 +55,7 @@ export async function syncTryOnLifecycle(
       analysis.productId
     );
     if (cached) {
-      await db
+      await dbWrite
         .update(schema.analyses)
         .set({
           tryOnStatus: "completed",
@@ -75,7 +76,7 @@ export async function syncTryOnLifecycle(
       return;
     }
 
-    const claim = await db.run(sql`
+    const claim = await dbWrite.run(sql`
       UPDATE ${schema.analyses}
       SET try_on_status = 'processing', try_on_error = NULL, updated_at = ${now}
       WHERE id = ${analysis.id} AND try_on_status = 'pending'
@@ -90,7 +91,7 @@ export async function syncTryOnLifecycle(
     if (getTryOnProvider().name === "runpod") {
       const rl = await tryOnRateLimiter.limit(analysis.userId);
       if (!rl.success) {
-        await db
+        await dbWrite
           .update(schema.analyses)
           .set({
             tryOnStatus: "skipped",
@@ -117,7 +118,7 @@ export async function syncTryOnLifecycle(
         { category: analysis.tryOnCategory || undefined, webhookUrl: buildWebhookUrl() }
       );
 
-      await db
+      await dbWrite
         .update(schema.analyses)
         .set({
           tryOnJobId: jobId,
@@ -139,7 +140,7 @@ export async function syncTryOnLifecycle(
       // Roll back to pending so a transient submit failure can retry on
       // the next poll instead of burning a permanently failed status.
       const message = (err as Error).message;
-      await db
+      await dbWrite
         .update(schema.analyses)
         .set({
           tryOnStatus: "pending",
@@ -181,7 +182,7 @@ export async function syncTryOnLifecycle(
       // "pending"/"processing" → still running; wait for the next tick
     } catch (err) {
       // Transient error (network) — leave as processing; next tick retries
-      console.error(`[tryon] resolve failed for ${analysis.id}:`, err);
+      getLogger().error({ err, analysisId: analysis.id }, "Try-on resolve failed");
     }
   }
 }
@@ -196,7 +197,7 @@ export async function completeTryOnByJobId(
   jobId: string,
   resolution: TryOnResolution
 ): Promise<boolean> {
-  const [analysis] = await db
+  const [analysis] = await dbWrite
     .select()
     .from(schema.analyses)
     .where(eq(schema.analyses.tryOnJobId, jobId))
@@ -227,7 +228,7 @@ async function applyTryOnResolution(
       ? Math.max(0, Date.now() - new Date(analysis.tryOnStartedAt).getTime())
       : null;
 
-    await db
+    await dbWrite
       .update(schema.analyses)
       .set({
         tryOnStatus: "completed",
@@ -255,7 +256,7 @@ async function applyTryOnResolution(
     ? Math.max(0, Date.now() - new Date(analysis.tryOnStartedAt).getTime())
     : null;
 
-  await db
+  await dbWrite
     .update(schema.analyses)
     .set({
       tryOnStatus: "failed",
@@ -298,7 +299,7 @@ async function persistGeneratedImage(
     });
     return uploaded.url;
   } catch (err) {
-    console.error("[tryon] Failed to persist output to Cloudinary:", err);
+    getLogger().error({ err }, "Failed to persist try-on output to Cloudinary");
     return resultUrl;
   }
 }
@@ -318,7 +319,7 @@ async function findCachedGeneratedImage(
     Date.now() - TRYON_CACHE_TTL_DAYS * 24 * 60 * 60 * 1000
   ).toISOString();
 
-  const [cached] = await db
+  const [cached] = await dbWrite
     .select({ generatedImage: schema.analyses.generatedImage })
     .from(schema.analyses)
     .where(

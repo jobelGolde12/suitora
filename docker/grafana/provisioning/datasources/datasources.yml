@@ -1,0 +1,13 @@
+# Grafana datasource provisioning (Pillar 04, Action Item 6).
+# Loaded automatically by the Grafana container at startup.
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false

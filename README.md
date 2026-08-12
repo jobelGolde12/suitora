@@ -9,7 +9,16 @@
 ![Drizzle ORM](https://img.shields.io/badge/Drizzle%20ORM-C5F74F?style=flat-square&logo=drizzle&logoColor=black)
 ![Turso](https://img.shields.io/badge/Turso-4FF8D2?style=flat-square&logo=sqlite&logoColor=black)
 ![Better Auth](https://img.shields.io/badge/Better%20Auth-6366F1?style=flat-square)
-![Framer Motion](https://img.shields.io/badge/Framer%20Motion-0055FF?style=flat-square&logo=framer&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-6E9F18?style=flat-square&logo=vitest&logoColor=white)
+![Cypress](https://img.shields.io/badge/Cypress-64B5F6?style=flat-square&logo=cypress&logoColor=white)
+![Coverage](https://img.shields.io/badge/coverage-70.62%25-6A1B9A?style=flat-square)
+![CI](https://github.com/jobelGolde12/suitora/actions/workflows/ci.yml/badge.svg)
+
+> **Coverage badge:** a live coverage badge will appear here once a coverage
+> provider is configured. Setup: push coverage to Codecov/Coveralls in CI (after
+> `npm run test:coverage`) and update the badge URL below. The coverage gate itself
+> (≥ 65% lines, ramping to 80% — see `docs/testing_policy.md`) is already enforced
+> in `.github/workflows/ci.yml`.
 
 ---
 
@@ -122,7 +131,7 @@ Become the leading AI shopping companion that eliminates the uncertainty in onli
 |-----------|---------|
 | [Cloudinary](https://cloudinary.com/) | Image upload, optimization, and CDN |
 | [OpenAI Vision](https://platform.openai.com/) | AI image analysis (future) |
-| [Gemini Vision](https://deepmind.google/technologies/gemini/) | AI image analysis (future) |
+| [Gemini Vision](https://ai.google.dev/gemini-api/) | AI image analysis (future) |
 
 ### Deployment
 
@@ -235,10 +244,25 @@ flowchart TD
 | `npm run dev` | Start development server |
 | `npm run build` | Production build |
 | `npm run start` | Start production server |
-| `npm run lint` | Run ESLint |
-| `npx drizzle-kit push` | Push schema to database |
+| `npm run lint` | Run ESLint (no warnings allowed) |
+| `npm run lint:fix` | Auto-fix ESLint issues |
+| `npm run lint:md` | Markdown lint (docs PRs) |
+| `npm run check:links` | Validate links in markdown docs |
+| `npm run format` | Format code with Prettier |
+| `npm run test` | Run unit tests (Vitest, one shot) |
+| `npm run test:watch` | Run unit tests in watch mode |
+| `npm run test:coverage` | Run tests with coverage report + gate |
+| `npm run test:e2e` | Run Cypress end-to-end tests |
+| `npm run test:e2e:open` | Open the Cypress interactive runner |
+| `npm run db:migrate` | Apply pending migrations |
+| `npm run db:generate` | Generate a migration from schema changes |
+| `npm run db:rollback` | Roll back the last migration |
+| `npm run db:status` | Show migration status |
+| `npm run backup` | Run the database backup job |
+| `npm run restore` | Restore the database from a dump |
+| `npm run worker` | Start the background worker locally |
+| `npx drizzle-kit push` | Push schema to database (local dev) |
 | `npx drizzle-kit generate` | Generate migration files |
-| `npx drizzle-kit migrate` | Run pending migrations |
 
 ---
 

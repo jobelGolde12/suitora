@@ -1,4 +1,5 @@
 import { v2 as cloudinary } from "cloudinary";
+import { getLogger } from "@/lib/logger";
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -97,7 +98,7 @@ export async function deleteCloudinaryImageFromUrl(
     await deleteFromCloudinary(publicId);
     return true;
   } catch (err) {
-    console.error("[cloudinary] delete failed:", err);
+    getLogger().error({ err, publicId }, "Cloudinary delete failed");
     return false;
   }
 }

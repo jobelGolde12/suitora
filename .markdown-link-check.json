@@ -1,0 +1,12 @@
+{
+  "ignorePatterns": [
+    { "pattern": "^#+" },
+    { "pattern": "^http://localhost" },
+    { "pattern": "^mailto:" },
+    { "pattern": "unpkg.com" }
+  ],
+  "timeout": "20s",
+  "retryOn429": true,
+  "retryCount": 2,
+  "aliveStatusCodes": [200, 206, 301, 302, 303, 307, 403]
+}

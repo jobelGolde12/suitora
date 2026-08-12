@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   User,
@@ -15,14 +15,24 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
 import { useSession } from "@/components/providers/SessionProvider";
 import { PageContainer, PageHeader, fadeInUp } from "@/components/dashboard";
 import { ProfileForm } from "@/components/settings/ProfileForm";
+import { PasswordChangeForm } from "@/components/settings/PasswordChangeForm";
 import { cn } from "@/lib/utils/cn";
+
+const THEME_STORAGE_KEY = "suitora-theme";
+
+function getInitialTheme(): boolean {
+  if (typeof window === "undefined") return false;
+  const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+  if (stored === "dark") return true;
+  if (stored === "light") return false;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
 
 type SettingsTab = "profile" | "measurements" | "password" | "appearance" | "subscription";
 
@@ -39,6 +49,26 @@ export default function SettingsPage() {
   const { logout } = useSession();
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
   const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Initialize theme from the stored preference (or system preference) and
+  // keep the document class in sync so the toggle has an immediate effect.
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      const dark = getInitialTheme();
+      setIsDarkMode(dark);
+      document.documentElement.classList.toggle("dark", dark);
+    });
+  }, []);
+
+  const handleThemeChange = (dark: boolean) => {
+    setIsDarkMode(dark);
+    document.documentElement.classList.toggle("dark", dark);
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, dark ? "dark" : "light");
+    } catch {
+      // Storage may be unavailable (private mode) — the in-page state still works.
+    }
+  };
   const [isSaving, setIsSaving] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -96,28 +126,7 @@ export default function SettingsPage() {
         return <ProfileForm />;
 
       case "password":
-        return (
-          <motion.div
-            key="password"
-            initial="hidden"
-            animate="visible"
-            variants={fadeInUp}
-            className="space-y-4"
-          >
-            <Input label="Current Password" type="password" placeholder="Enter current password" />
-            <Input label="New Password" type="password" placeholder="Enter new password" />
-            <Input label="Confirm New Password" type="password" placeholder="Confirm new password" />
-            <Button
-              onClick={handleSave}
-              loading={isSaving}
-              variant="editorial"
-              className="rounded-full px-6"
-            >
-              <Check className="h-4 w-4" strokeWidth={1.5} />
-              Update Password
-            </Button>
-          </motion.div>
-        );
+        return <PasswordChangeForm />;
 
       case "appearance":
         return (
@@ -132,7 +141,8 @@ export default function SettingsPage() {
             <div className="grid grid-cols-2 gap-4">
               <button
                 type="button"
-                onClick={() => setIsDarkMode(false)}
+                onClick={() => handleThemeChange(false)}
+                aria-pressed={!isDarkMode}
                 className={cn(
                   "rounded-2xl border p-6 text-center transition-all duration-200",
                   "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -149,7 +159,8 @@ export default function SettingsPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setIsDarkMode(true)}
+                onClick={() => handleThemeChange(true)}
+                aria-pressed={isDarkMode}
                 className={cn(
                   "rounded-2xl border p-6 text-center transition-all duration-200",
                   "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",

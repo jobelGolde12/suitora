@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Self-contained build output for the Docker image (official Next.js pattern).
+  output: "standalone",
   images: {
     remotePatterns: [
       {
@@ -39,6 +41,17 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
+      // Well-known immutable assets served from the CDN edge. The max-age tells
+      // any CDN (Vercel Edge, nginx, Cloudflare) to cache build artifacts long-term.
+      {
+        source: "/_next/static/(.*)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
       {
         source: "/(.*)",
         headers: [

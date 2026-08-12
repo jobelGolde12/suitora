@@ -1,16 +1,4 @@
-import { drizzle } from "drizzle-orm/libsql";
-import { createClient } from "@libsql/client";
-import * as schema from "./schema";
-
-const tursoDbUrl = process.env.TURSO_DATABASE_URL;
-const tursoAuthToken = process.env.TURSO_AUTH_TOKEN;
-
-// Configure Turso client
-const client = createClient({
-  url: tursoDbUrl || "file:./data/suitora.db",
-  authToken: tursoAuthToken,
-});
-
-export const db = drizzle(client, { schema });
-
-export { schema };
+// The DB client + pooled handles now live in `@/lib/db` (Pillar 03, Action
+// Items 2 & 4). This module re-exports them under the historical `@/drizzle`
+// path so existing imports keep working and all access flows through one pool.
+export { db, dbRead, dbWrite, schema } from "@/lib/db";

@@ -6,17 +6,28 @@
  *   npx tsx jobs/retention.ts
  */
 
-import { cleanupExpiredUploads } from "@/lib/retention";
+import { cleanupExpiredUploads, purgeSoftDeletedRows } from "@/lib/retention";
+import { getLogger } from "@/lib/logger";
 
 async function main() {
-  console.log("[retention] Starting cleanup…");
-  const result = await cleanupExpiredUploads();
-  console.log(
-    `[retention] Done. scanned=${result.scanned} deleted=${result.deleted} retained=${result.retained}`
+  const log = getLogger();
+  log.info("Retention cleanup starting");
+  const [uploadResult, purgeResult] = await Promise.all([
+    cleanupExpiredUploads(),
+    purgeSoftDeletedRows(),
+  ]);
+  log.info(
+    {
+      uploadsScanned: uploadResult.scanned,
+      uploadsDeleted: uploadResult.deleted,
+      uploadsRetained: uploadResult.retained,
+      purge: purgeResult.map(({ table, purged }) => ({ table, purged })),
+    },
+    "Retention cleanup done"
   );
 }
 
 main().catch((err) => {
-  console.error("[retention] Fatal:", err);
+  getLogger().error({ err }, "Retention cleanup fatal");
   process.exit(1);
 });

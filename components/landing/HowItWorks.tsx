@@ -36,7 +36,7 @@ export function HowItWorks() {
   const reduceMotion = useReducedMotion();
 
   return (
-    <section id="how-it-works" className="relative py-32 sm:py-40 px-6 bg-surface/40 scroll-mt-20">
+    <section id="how-it-works" data-cy="how-it-works" className="relative py-32 sm:py-40 px-6 bg-surface/40 scroll-mt-20">
       <div className="mx-auto max-w-6xl">
         <motion.div
           initial="hidden"

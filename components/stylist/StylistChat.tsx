@@ -194,7 +194,7 @@ export function StylistChat() {
                     : "bg-surface border border-border/60 text-foreground rounded-bl-md"
                 )}
               >
-                <p className="font-light whitespace-pre-wrap">{msg.content}</p>
+                <p data-cy="stylist-message" className="font-light whitespace-pre-wrap">{msg.content}</p>
               </div>
 
               {msg.role === "assistant" &&
@@ -252,6 +252,7 @@ export function StylistChat() {
       <form onSubmit={onSubmit} className="border-t border-border p-4">
         <div className="flex items-end gap-2">
           <textarea
+            data-cy="stylist-input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -268,6 +269,7 @@ export function StylistChat() {
           />
           <button
             type="submit"
+            data-cy="stylist-send"
             disabled={!input.trim() || isSending}
             aria-label="Send message"
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-white shadow-soft transition-all duration-200 hover:bg-accent/90 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 disabled:pointer-events-none"

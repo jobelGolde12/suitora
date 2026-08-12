@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: suitora-canary-ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-weight: "5"
+    # Optional: you can set more fine‑grained canary rules here
+    # e.g., nginx.ingress.kubernetes.io/canary-target: "10%" 
+    # but weight is the most common way to split traffic
+spec:
+  rules:
+    - host: canary.suitora.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: suitora-web-green   # Change to the canary target (e.g., green or blue)
+                port:
+                  number: 80

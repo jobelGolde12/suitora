@@ -10,6 +10,8 @@
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 const DEFAULT_FROM = "Suitora <no-reply@suitora.app>";
 
+import { getLogger } from "@/lib/logger";
+
 function isResendConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY);
 }
@@ -82,8 +84,9 @@ export async function sendPasswordResetEmail(
   }
 
   if (isDevelopment()) {
-    console.log(
-      `[email] No email provider configured. Password reset link for ${to}:\n${resetUrl}`
+    getLogger().info(
+      { to },
+      `No email provider configured. Password reset link: ${resetUrl}`
     );
     return;
   }

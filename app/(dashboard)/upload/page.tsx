@@ -92,6 +92,9 @@ export default function UploadPage() {
   }, []);
 
   const validateFile = useCallback((file: File): string | undefined => {
+    if (file.size === 0) {
+      return "The file appears to be empty.";
+    }
     if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
       return "Please upload a JPG, PNG, or WEBP image.";
     }
@@ -192,6 +195,8 @@ export default function UploadPage() {
       return;
     }
 
+    const clothingFile = clothingPhoto.file;
+    if (productInputMode === "upload" && !clothingFile) return;
     setIsAnalyzing(true);
 
     try {
@@ -200,9 +205,12 @@ export default function UploadPage() {
       };
 
       if (productInputMode === "upload") {
-        if (!clothingPhoto.file) return;
+        if (!clothingFile) {
+          setIsAnalyzing(false);
+          return;
+        }
         // Upload the clothing image file first
-        const uploadRes = await uploadImage(clothingPhoto.file);
+        const uploadRes = await uploadImage(clothingFile);
         payload.productImageUpload = uploadRes.url;
       } else {
         if (!productUrl) {
@@ -421,17 +429,9 @@ export default function UploadPage() {
                 </div>
               ) : (
                 <div
+                  data-cy="user-image-upload"
                   className={"tryon-zone" + (selfDragOver ? " dragover" : "")}
-                  role="button"
-                  tabIndex={0}
-                  aria-labelledby="self-zone-label"
                   onClick={() => selfInputRef.current?.click()}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      selfInputRef.current?.click();
-                    }
-                  }}
                   onDrop={handleSelfDrop}
                   onDragOver={(e) => e.preventDefault()}
                   onDragEnter={handleSelfDragEnter}
@@ -457,6 +457,7 @@ export default function UploadPage() {
                     ref={selfInputRef}
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
+                    aria-label="Upload your photo"
                     className="sr-only"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
@@ -604,17 +605,9 @@ export default function UploadPage() {
                 </div>
               ) : showClothingZone ? (
                 <div
+                  data-cy="clothing-image-upload"
                   className={"tryon-zone" + (dragOver === "clothing" ? " dragover" : "")}
-                  role="button"
-                  tabIndex={0}
-                  aria-labelledby="item-zone-label"
                   onClick={() => clothingInputRef.current?.click()}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      clothingInputRef.current?.click();
-                    }
-                  }}
                   onDrop={handleDrop}
                   onDragOver={handleDragOver}
                   onDragEnter={() => setDragOver("clothing")}
@@ -640,6 +633,7 @@ export default function UploadPage() {
                     ref={clothingInputRef}
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
+                    aria-label="Upload item to match"
                     className="sr-only"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
@@ -703,6 +697,7 @@ export default function UploadPage() {
         <div className="tryon-cta">
           <button
             type="button"
+            data-cy="analyze-cta"
             className="tryon-cta-btn"
             disabled={!canProceed || isAnalyzing}
             onClick={handleAnalyze}

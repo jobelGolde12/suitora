@@ -13,6 +13,7 @@
  */
 
 import type { RawProviderProduct } from "@/types/trend";
+import { getLogger } from "@/lib/logger";
 
 const SKIMLINKS_API = "https://api.skimlinks.com/v3/linkify.json";
 const REQUEST_TIMEOUT_MS = 8_000;
@@ -131,15 +132,16 @@ export async function fetchAffiliateProducts(
   products: RawProviderProduct[],
   apiKey: string
 ): Promise<RawProviderProduct[]> {
-  console.log(`[affiliate] Enriching ${products.length} products with affiliate links`);
+  getLogger().info({ count: products.length }, "Affiliate enrichment starting");
 
   const enriched = await enrichBatchWithAffiliate(products, apiKey);
   const withAffiliate = enriched.filter((p) =>
     p.styleTags?.includes("affiliate")
   );
 
-  console.log(
-    `[affiliate] ${withAffiliate.length}/${enriched.length} products enriched with affiliate links`
+  getLogger().info(
+    { enriched: withAffiliate.length, total: enriched.length },
+    "Affiliate enrichment complete"
   );
 
   return enriched;

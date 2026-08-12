@@ -1,0 +1,55 @@
+# Helm values for staging environment
+# (Can be used with Helm chart or as a configuration reference)
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/${{ github.repository_owner }}/suitora
+  pullPolicy: IfNotPresent
+  # Tag is overridden by CI/CD pipeline (e.g., commit SHA or semantic version)
+  tag: "latest"
+
+service:
+  type: ClusterIP
+  port: 80
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 256Mi
+  requests:
+    cpu: 200m
+    memory: 128Mi
+
+env:
+  NODE_ENV: "production"
+  # Example: DATABASE_URL would be injected from secrets
+  DATABASE_URL: ""
+  REDIS_URL: "redis://redis:6379"
+  # API base path for internal calls
+  NEXT_PUBLIC_API_BASE: "/api"
+
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+
+# Staging-specific feature flags (example)
+featureFlags:
+  newFeatureEnabled: false
+  experimentalUi: false
+
+# Staging-specific ingress annotations (if using ingress)
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  hosts:
+    - host: staging.suitora.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []  # TLS configuration would be added via secrets

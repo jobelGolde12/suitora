@@ -4,21 +4,25 @@
 @theme inline {
   --color-background: #F8F5F1;
   --color-foreground: #2E2B29;
+  /* Text-safe token values (WCAG 2.1 AA ≥4.5:1 on background/card/surface).
+     Previously #8A8580 (muted), #B5B0AB (muted-foreground), #C5A07A
+     (accent) and #ef4444 (error) failed contrast as text — see
+     project-plan/10-next-phases-suggestions.md S-02. */
   --color-primary: #2E2B29;
   --color-primary-light: #4A4541;
   --color-primary-dark: #1A1816;
-  --color-accent: #C5A07A;
+  --color-accent: #846342;
   --color-accent-light: #D4B896;
-  --color-muted: #8A8580;
-  --color-muted-foreground: #B5B0AB;
+  --color-muted: #6B645E;
+  --color-muted-foreground: #6E675F;
   --color-border: #E8E3DD;
   --color-card: #FFFFFF;
   --color-card-hover: #F2EDE8;
   --color-surface: #F0EBE5;
-  --color-success: #10b981;
+  --color-success: #047857;
   --color-warning: #f59e0b;
-  --color-error: #ef4444;
-  --color-ring: #C5A07A;
+  --color-error: #B91C1C;
+  --color-ring: #846342;
 
   --font-sans: var(--font-inter), 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-heading: var(--font-cormorant), 'Cormorant Garamond', 'Georgia', ui-serif, serif;
@@ -45,11 +49,13 @@
   --color-accent: #C5A07A;
   --color-accent-light: #D4B896;
   --color-muted: #8A8580;
-  --color-muted-foreground: #6A6560;
+  --color-muted-foreground: #8F8A83;
   --color-border: #2E2B29;
   --color-card: #231F1D;
   --color-card-hover: #2A2624;
   --color-surface: #231F1D;
+  --color-success: #34D399;
+  --color-error: #F87171;
 }
 
 @layer base {

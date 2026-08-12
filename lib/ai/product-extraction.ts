@@ -22,7 +22,7 @@ export async function extractProductFromUrlCached(
   productUrl: string
 ): Promise<ExtractedProduct> {
   const cacheKey = `product:url:${encodeURIComponent(productUrl)}`;
-  const cached = getCached<ExtractedProduct>(cacheKey);
+  const cached = await getCached<ExtractedProduct>(cacheKey);
   if (cached) return cached;
 
   const extracted = await extractProductFromUrl(productUrl);

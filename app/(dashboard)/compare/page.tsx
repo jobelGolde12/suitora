@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { GitCompareArrows, Check, Shirt, Clock } from "lucide-react";
+import { GitCompareArrows, Check, Shirt, Clock, AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import {
@@ -25,17 +25,28 @@ export default function ComparePage() {
   const [analyses, setAnalyses] = useState<(AnalysisResult & { isFavorite: boolean })[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+
+  const loadAnalyses = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(false);
+    try {
+      const res = await fetch("/api/analysis?limit=24", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load analyses");
+      const data = await res.json();
+      setAnalyses((data?.analyses ?? []) as (AnalysisResult & { isFavorite: boolean })[]);
+    } catch (err) {
+      console.error("Failed to load analyses:", err);
+      setLoadError(true);
+      addToast("Failed to load your analyses", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [addToast]);
 
   useEffect(() => {
-    fetch("/api/analysis?limit=24", { credentials: "include" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setAnalyses((data?.analyses ?? []) as (AnalysisResult & { isFavorite: boolean })[]))
-      .catch((err) => {
-        console.error("Failed to load analyses:", err);
-        addToast("Failed to load your analyses", "error");
-      })
-      .finally(() => setIsLoading(false));
-  }, [addToast]);
+    void Promise.resolve().then(() => loadAnalyses());
+  }, [loadAnalyses]);
 
   const toggleSelection = (id: string) => {
     setSelectedIds((prev) => {
@@ -88,7 +99,23 @@ export default function ComparePage() {
         }
       />
 
-      {analyses.length === 0 && (
+      {loadError ? (
+        <EmptyState
+          icon={AlertCircle}
+          title="Couldn't load your analyses"
+          description="Something went wrong while fetching your analyses. Check your connection and try again."
+          action={
+            <Button
+              variant="editorial"
+              className="rounded-full px-6"
+              onClick={() => void loadAnalyses()}
+            >
+              <RefreshCw className="h-4 w-4" strokeWidth={1.5} />
+              Retry
+            </Button>
+          }
+        />
+      ) : analyses.length === 0 ? (
         <EmptyState
           icon={Clock}
           title="Nothing to compare yet"
@@ -101,9 +128,7 @@ export default function ComparePage() {
             </Link>
           }
         />
-      )}
-
-      {analyses.length > 0 && (
+      ) : (
         <>
           <motion.div
             initial="hidden"
@@ -115,7 +140,9 @@ export default function ComparePage() {
             <p className="text-xs text-muted font-light mb-4">
               {selectedIds.length === 0
                 ? "Tap the cards to add them to the comparison."
-                : `${selectedIds.length} of ${MAX_SELECTION} selected.`}
+                : selectedIds.length === 1
+                  ? "1 of 4 selected — choose one more item to start comparing."
+                  : `${selectedIds.length} of ${MAX_SELECTION} selected.`}
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {sortedAnalyses.map((analysis, i) => {

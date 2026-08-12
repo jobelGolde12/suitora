@@ -1,39 +1,27 @@
+import { get, set } from "@/lib/cache";
+
 /**
- * Lightweight in-memory cache for trending API responses.
+ * Redis-backed cache for trending API responses.
  * Dashboard requests should never hit third-party APIs in real time.
  */
 
-interface CacheEntry<T> {
-  data: T;
-  expiresAt: number;
+const DEFAULT_TTL_SECONDS = 5 * 60; // 5 minutes
+
+export async function getCached<T>(key: string): Promise<T | null> {
+  return get<T>(key);
 }
 
-const store = new Map<string, CacheEntry<unknown>>();
-
-const DEFAULT_TTL_MS = 5 * 60 * 1000; // 5 minutes
-
-export function getCached<T>(key: string): T | null {
-  const entry = store.get(key);
-  if (!entry) return null;
-  if (Date.now() > entry.expiresAt) {
-    store.delete(key);
-    return null;
-  }
-  return entry.data as T;
+export async function setCached<T>(key: string, data: T, ttlSeconds: number = DEFAULT_TTL_SECONDS): Promise<void> {
+  await set(key, data, ttlSeconds);
 }
 
-export function setCached<T>(key: string, data: T, ttlMs = DEFAULT_TTL_MS): void {
-  store.set(key, {
-    data,
-    expiresAt: Date.now() + ttlMs,
-  });
-}
-
-export function invalidateTrendCache(prefix = "trending:"): void {
-  for (const key of store.keys()) {
-    if (key.startsWith(prefix)) {
-      store.delete(key);
-    }
+export async function invalidateTrendCache(prefix = "trending:"): Promise<void> {
+  // Redis does not support prefix-based deletion natively without scanning
+  // keys. If the KEYS command is acceptable in your environment, otherwise use SCAN.
+  const client = (await import("@/lib/cache")).getRedisClient();
+  const keys = await client.keys(`${prefix}*`);
+  if (keys.length > 0) {
+    await client.del(keys);
   }
 }
 

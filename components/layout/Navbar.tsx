@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
 import { Button } from "@/components/ui/Button";
 import { Menu, X } from "lucide-react";
+import { useSession } from "@/components/providers/SessionProvider";
 
 const navLinks = [
   { label: "Features", href: "/#features" },
@@ -19,6 +20,7 @@ export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
   const isLanding = pathname === "/";
+  const { session, isLoading } = useSession();
 
   // Close the mobile menu whenever the route changes. Tracking the previous
   // pathname during render avoids a setState-in-effect cascade.
@@ -78,16 +80,26 @@ export function Navbar() {
 
         {/* Desktop Actions */}
         <div className="hidden md:flex items-center gap-4">
-          <Link href="/login">
-            <Button variant="ghost" size="sm" className="rounded-full">
-              Sign In
-            </Button>
-          </Link>
-          <Link href="/register">
-            <Button variant="editorial" size="sm" className="rounded-full px-5">
-              Get Started
-            </Button>
-          </Link>
+          {!isLoading && session ? (
+            <Link href="/dashboard">
+              <Button variant="editorial" size="sm" className="rounded-full px-5">
+                Dashboard
+              </Button>
+            </Link>
+          ) : (
+            <>
+              <Link href="/login">
+                <Button variant="ghost" size="sm" className="rounded-full">
+                  Sign In
+                </Button>
+              </Link>
+              <Link href="/register">
+                <Button variant="editorial" size="sm" className="rounded-full px-5">
+                  Get Started
+                </Button>
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Mobile Menu Button — positioned at top right */}
@@ -114,16 +126,26 @@ export function Navbar() {
               </Link>
             ))}
             <div className="flex flex-col gap-3 pt-6 border-t border-border/40">
-              <Link href="/login" className="w-full">
-                <Button variant="secondary" className="w-full rounded-full">
-                  Sign In
-                </Button>
-              </Link>
-              <Link href="/register" className="w-full">
-                <Button variant="editorial" className="w-full rounded-full">
-                  Get Started
-                </Button>
-              </Link>
+              {!isLoading && session ? (
+                <Link href="/dashboard" className="w-full">
+                  <Button variant="editorial" className="w-full rounded-full">
+                    Dashboard
+                  </Button>
+                </Link>
+              ) : (
+                <>
+                  <Link href="/login" className="w-full">
+                    <Button variant="secondary" className="w-full rounded-full">
+                      Sign In
+                    </Button>
+                  </Link>
+                  <Link href="/register" className="w-full">
+                    <Button variant="editorial" className="w-full rounded-full">
+                      Get Started
+                    </Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>

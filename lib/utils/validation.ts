@@ -5,6 +5,7 @@ export const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 export const imageFileSchema = z
   .instanceof(File)
+  .refine((file) => file.size > 0, "The file appears to be empty")
   .refine((file) => file.size <= MAX_FILE_SIZE, "File size must be less than 5MB")
   .refine(
     (file) => ACCEPTED_IMAGE_TYPES.includes(file.type),
@@ -34,7 +35,7 @@ export const registerSchema = z
       .min(8, "Password must be at least 8 characters")
       .max(128, "Password must be less than 128 characters"),
     confirmPassword: z.string(),
-    agreeToTerms: z.literal(true, {
+    agreeToTerms: z.boolean().refine((value) => value === true, {
       message: "You must agree to the Terms and Privacy Policy",
     }),
   })

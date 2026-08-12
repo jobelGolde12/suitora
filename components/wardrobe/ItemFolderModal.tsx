@@ -6,6 +6,7 @@ import { FolderPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toast";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { cn } from "@/lib/utils/cn";
 
 export interface WardrobeFolderOption {
@@ -79,6 +80,7 @@ function ItemFolderModalInner({
   titleId,
 }: Omit<ItemFolderModalProps, "isOpen"> & { titleId: string }) {
   const { addToast } = useToast();
+  const dialogRef = useRef<HTMLDivElement>(null);
   const firstFieldRef = useRef<HTMLButtonElement>(null);
   const [folderId, setFolderId] = useState<string | null>(initialFolderId);
   const [tags, setTags] = useState<string[]>(initialTags);
@@ -86,6 +88,8 @@ function ItemFolderModalInner({
   const [newFolderName, setNewFolderName] = useState("");
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  useFocusTrap(dialogRef, true);
 
   useEffect(() => {
     const t = window.setTimeout(() => firstFieldRef.current?.focus(), 50);
@@ -183,6 +187,7 @@ function ItemFolderModalInner({
 
   return (
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md p-4"
       aria-modal="true"
       role="dialog"

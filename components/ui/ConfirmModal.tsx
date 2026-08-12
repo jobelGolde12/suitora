@@ -1,7 +1,9 @@
 "use client";
 
+import { useId, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/Button";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -26,14 +28,19 @@ export function ConfirmModal({
   variant = "default",
   isLoading = false,
 }: ConfirmModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  useFocusTrap(dialogRef, isOpen);
+
   return (
     <AnimatePresence>
       {isOpen && (
         <div
+          ref={dialogRef}
           className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md p-4"
           aria-modal="true"
           role="dialog"
-          aria-labelledby="confirm-modal-title"
+          aria-labelledby={titleId}
           onClick={onClose}
         >
           <motion.div
@@ -46,7 +53,7 @@ export function ConfirmModal({
           >
             <div className="p-6 sm:p-8">
               <h3
-                id="confirm-modal-title"
+                id={titleId}
                 className="font-heading text-lg font-medium text-foreground leading-tight"
               >
                 {title}

@@ -9,6 +9,8 @@ import type {
   VisionAnalysisResult,
 } from "../vision";
 import type { BodyShape, SkinTone, FaceShape, StyleType } from "@/types";
+import { getLogger } from "@/lib/logger";
+import { observeUpstream } from "@/lib/metrics";
 
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 const FETCH_TIMEOUT_MS = 30_000;
@@ -206,7 +208,7 @@ function parseResponse(content: string): VisionAnalysisResult {
       colorAnalysis,
     };
   } catch (err) {
-    console.error("Failed to parse OpenAI response:", err);
+    getLogger().error({ err }, "Failed to parse OpenAI response");
     // Return sensible defaults
     return {
       scores: { overall: 70, body: 65, style: 70, color: 68 },
@@ -240,6 +242,7 @@ export function createOpenAIProvider(): VisionProvider {
         throw new Error("OPENAI_API_KEY is not configured");
       }
 
+      const started = Date.now();
       const response = await fetchWithRetry(OPENAI_API_URL, {
         method: "POST",
         headers: {
@@ -268,6 +271,7 @@ export function createOpenAIProvider(): VisionProvider {
           temperature: 0.3,
         }),
       });
+      observeUpstream("openai", Date.now() - started);
 
       if (!response.ok) {
         const error = await response.text();

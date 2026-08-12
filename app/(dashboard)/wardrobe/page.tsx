@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { FolderOpen, Heart, Pencil, Shirt, Trash2, BarChart3 } from "lucide-react";
+import { FolderOpen, Heart, Pencil, Settings2, Shirt, Trash2, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { CategoryBadge } from "@/components/ui/CategoryBadge";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
 import {
   PageContainer,
@@ -16,6 +17,7 @@ import {
   FavoritesSkeleton,
 } from "@/components/dashboard";
 import { OutfitSuggestions } from "@/components/wardrobe/OutfitSuggestions";
+import { FolderManagerModal } from "@/components/wardrobe/FolderManagerModal";
 import {
   ItemFolderModal,
   type WardrobeFolderOption,
@@ -54,6 +56,9 @@ export default function WardrobePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeFolder, setActiveFolder] = useState<"all" | "none" | string>("all");
   const [editing, setEditing] = useState<WardrobeItem | null>(null);
+  const [itemToRemove, setItemToRemove] = useState<WardrobeItem | null>(null);
+  const [isRemoving, setIsRemoving] = useState(false);
+  const [isFolderManagerOpen, setIsFolderManagerOpen] = useState(false);
   const [hasFavorites, setHasFavorites] = useState(true);
 
   useEffect(() => {
@@ -93,6 +98,8 @@ export default function WardrobePage() {
   }, [items, activeFolder]);
 
   const handleRemoveFromWardrobe = async (item: WardrobeItem) => {
+    if (isRemoving) return;
+    setIsRemoving(true);
     setItems((prev) => prev.filter((i) => i.analysisId !== item.analysisId));
     try {
       const res = await fetch("/api/favorites", {
@@ -111,7 +118,29 @@ export default function WardrobePage() {
       console.error(err);
       setItems((prev) => [...prev, item]);
       addToast("Failed to update wardrobe", "error");
+    } finally {
+      setIsRemoving(false);
+      setItemToRemove(null);
     }
+  };
+
+  const handleFolderRenamed = (id: string, name: string) => {
+    setItems((prev) =>
+      prev.map((i) =>
+        i.wardrobeFolder === id ? { ...i, wardrobeFolderName: name } : i
+      )
+    );
+  };
+
+  const handleFolderDeleted = (id: string) => {
+    setActiveFolder((current) => (current === id ? "all" : current));
+    setItems((prev) =>
+      prev.map((i) =>
+        i.wardrobeFolder === id
+          ? { ...i, wardrobeFolder: null, wardrobeFolderName: null }
+          : i
+      )
+    );
   };
 
   if (isLoading) {
@@ -176,6 +205,16 @@ export default function WardrobePage() {
               {folder.name} ({folder.itemCount ?? 0})
             </button>
           ))}
+          {folders.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setIsFolderManagerOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-border px-4 py-1.5 text-xs font-medium text-muted hover:text-foreground hover:border-foreground transition-colors"
+            >
+              <Settings2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+              Manage folders
+            </button>
+          )}
         </div>
       )}
 
@@ -264,7 +303,7 @@ export default function WardrobePage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => void handleRemoveFromWardrobe(item)}
+                    onClick={() => setItemToRemove(item)}
                     className="absolute top-3 right-3 h-9 w-9 rounded-full bg-card/90 border border-border text-foreground flex items-center justify-center hover:bg-error/10 hover:text-error transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     aria-label="Remove from wardrobe"
                   >
@@ -357,6 +396,28 @@ export default function WardrobePage() {
             })
           );
         }}
+      />
+
+      <FolderManagerModal
+        isOpen={isFolderManagerOpen}
+        onClose={() => setIsFolderManagerOpen(false)}
+        folders={folders}
+        onFoldersChange={setFolders}
+        onFolderRenamed={handleFolderRenamed}
+        onFolderDeleted={handleFolderDeleted}
+      />
+
+      <ConfirmModal
+        isOpen={!!itemToRemove}
+        onClose={() => setItemToRemove(null)}
+        onConfirm={() => {
+          if (itemToRemove) void handleRemoveFromWardrobe(itemToRemove);
+        }}
+        title="Remove from wardrobe?"
+        description={`"${itemToRemove?.analysis.category ?? "This item"}" will be removed from your wardrobe.`}
+        confirmLabel="Remove"
+        variant="danger"
+        isLoading={isRemoving}
       />
     </PageContainer>
   );

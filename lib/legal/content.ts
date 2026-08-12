@@ -21,6 +21,10 @@ const DOCUMENTS: Record<string, { file: string; title: string }> = {
     file: "PRIVACY_POLICY.md",
     title: "Privacy Policy",
   },
+  "terms-of-service": {
+    file: "TERMS_OF_SERVICE.md",
+    title: "Terms of Service",
+  },
 };
 
 export async function readLegalMarkdown(slug: string): Promise<LegalDocument> {

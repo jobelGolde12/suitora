@@ -127,31 +127,33 @@ export function ContextualTips({ stats, wardrobeCount }: ContextualTipsProps) {
         Suggestions
       </p>
       <ul className="space-y-3">
-        {tips.slice(0, 5).map((tip, i) => {
-          const content = (
-            <li
-              key={i}
-              className="flex items-start gap-3 text-sm text-foreground font-light"
-            >
-              <tip.icon
-                className="h-4 w-4 text-accent shrink-0 mt-0.5"
-                strokeWidth={1.5}
-              />
-              <span>{tip.text}</span>
-            </li>
-          );
-          return tip.href ? (
-            <Link
-              key={i}
-              href={tip.href}
-              className="block rounded-xl -mx-2 px-2 py-0.5 transition-colors hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {content}
-            </Link>
-          ) : (
-            content
-          );
-        })}
+        {tips.slice(0, 5).map((tip, i) => (
+          <li
+            key={i}
+            className="flex items-start gap-3 text-sm text-foreground font-light"
+          >
+            {tip.href ? (
+              <Link
+                href={tip.href}
+                className="-mx-2 flex items-start gap-3 rounded-xl px-2 py-0.5 transition-colors hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <tip.icon
+                  className="h-4 w-4 text-accent shrink-0 mt-0.5"
+                  strokeWidth={1.5}
+                />
+                <span>{tip.text}</span>
+              </Link>
+            ) : (
+              <>
+                <tip.icon
+                  className="h-4 w-4 text-accent shrink-0 mt-0.5"
+                  strokeWidth={1.5}
+                />
+                <span>{tip.text}</span>
+              </>
+            )}
+          </li>
+        ))}
       </ul>
     </Card>
   );

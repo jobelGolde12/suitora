@@ -1,12 +1,18 @@
 /**
  * AI Stylist — context-aware fashion chat.
  *
- * Uses OpenAI chat completions when OPENAI_API_KEY is configured and falls
- * back to a helpful rule-based reply otherwise (mirroring the vision
+ * Uses NVIDIA chat completions (OpenAI-compatible endpoint) when
+ * NVIDIA_API_KEY is configured, falling back to OpenAI when OPENAI_API_KEY is
+ * set, and to a helpful rule-based reply otherwise (mirroring the vision
  * pipeline's mock fallback so the feature always works).
+ *
+ * Provider selection (STYLIST_PROVIDER=auto|nvidia|openai|mock):
+ *   - explicit value wins
+ *   - otherwise NVIDIA is preferred when a key exists, then OpenAI, then mock
  */
 
 import type { SkinTone, StyleTag, FitPreference } from "@/types";
+import { getLogger } from "@/lib/logger";
 
 export interface StylistMessageInput {
   role: "user" | "assistant";
@@ -20,6 +26,7 @@ export interface StylistContext {
   skinTone?: SkinTone | null;
   styleTags?: StyleTag[];
   fitPreference?: FitPreference | null;
+  sizePreference?: string | null;
   totalAnalyses: number;
   averageScore: number;
   bestScore?: number | null;
@@ -31,11 +38,55 @@ export interface StylistContext {
   currentSeason?: string;
   bestCategory?: string | null;
   worstCategory?: string | null;
+  // ── Analytics ─────────────────────────────────────────────────
+  /** Per-category average compatibility, strongest first. */
+  categoryBreakdown?: Array<{
+    category: string;
+    averageScore: number;
+    count: number;
+  }>;
+  /** Whether recent analyses score higher/lower than earlier ones. */
+  scoreTrend?: {
+    direction: "improving" | "declining" | "stable";
+    recentAverage: number;
+    earlierAverage: number;
+  } | null;
+  /** Most recently analyzed garments, newest first. */
+  recentItems?: Array<{
+    category: string;
+    subtype?: string;
+    score: number;
+  }>;
+  /** Aggregated tags across everything in the wardrobe. */
+  wardrobeTags?: string[];
+  preferredColors?: string[];
+  avoidColors?: string[];
+  /** Most frequently detected style types across analyses. */
+  topStyleTypes?: string[];
 }
 
-const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
+export type StylistProvider = "auto" | "openai" | "nvidia" | "mock";
+
+const OPENAI_API_URL = "https://api.openai.com/v1";
+const OPENAI_MODEL = "gpt-4o";
+const NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1";
+const NVIDIA_MODEL = "meta/llama-3.3-70b-instruct";
 const FETCH_TIMEOUT_MS = 30_000;
 const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+
+/**
+ * Resolve which chat provider should answer stylist messages.
+ * `auto` (default) prefers NVIDIA, then OpenAI, then the rule-based mock.
+ */
+export function resolveStylistProvider(): StylistProvider {
+  const forced = process.env.STYLIST_PROVIDER?.trim().toLowerCase();
+  if (forced === "openai" || forced === "nvidia" || forced === "mock") {
+    return forced;
+  }
+  if (process.env.NVIDIA_API_KEY) return "nvidia";
+  if (process.env.OPENAI_API_KEY) return "openai";
+  return "mock";
+}
 
 async function fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
   let lastError: unknown;
@@ -47,7 +98,7 @@ async function fetchWithRetry(url: string, init: RequestInit): Promise<Response>
     try {
       const response = await fetch(url, { ...init, signal: controller.signal });
       if (response.ok || !RETRYABLE_STATUS.has(response.status)) return response;
-      lastError = new Error(`OpenAI API status ${response.status}`);
+      lastError = new Error(`Chat API status ${response.status}`);
     } catch (err) {
       lastError = err;
     } finally {
@@ -61,7 +112,41 @@ async function fetchWithRetry(url: string, init: RequestInit): Promise<Response>
     }
   }
 
-  throw lastError instanceof Error ? lastError : new Error("OpenAI request failed");
+  throw lastError instanceof Error ? lastError : new Error("Chat API request failed");
+}
+
+interface ChatProviderConfig {
+  name: "openai" | "nvidia";
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+}
+
+function getProviderConfig(provider: StylistProvider): ChatProviderConfig | null {
+  switch (provider) {
+    case "nvidia": {
+      const apiKey = process.env.NVIDIA_API_KEY;
+      if (!apiKey) throw new Error("NVIDIA_API_KEY is not configured");
+      return {
+        name: "nvidia",
+        apiKey,
+        baseUrl: (process.env.NVIDIA_BASE_URL || NVIDIA_API_URL).replace(/\/+$/, ""),
+        model: process.env.NVIDIA_MODEL || NVIDIA_MODEL,
+      };
+    }
+    case "openai": {
+      const apiKey = process.env.OPENAI_API_KEY;
+      if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
+      return {
+        name: "openai",
+        apiKey,
+        baseUrl: OPENAI_API_URL,
+        model: process.env.OPENAI_MODEL || OPENAI_MODEL,
+      };
+    }
+    default:
+      return null;
+  }
 }
 
 export function buildSystemPrompt(context: StylistContext): string {
@@ -77,6 +162,7 @@ export function buildSystemPrompt(context: StylistContext): string {
   if (context.styleTags?.length)
     profile.push(`Style preferences: ${context.styleTags.join(", ")}`);
   if (context.fitPreference) profile.push(`Fit preference: ${context.fitPreference}`);
+  if (context.sizePreference) profile.push(`Size system: ${context.sizePreference}`);
   if (profile.length > 0) {
     lines.push(`User profile:\n- ${profile.join("\n- ")}`);
   }
@@ -105,24 +191,65 @@ export function buildSystemPrompt(context: StylistContext): string {
     lines.push(`Usage context:\n- ${history.join("\n- ")}`);
   }
 
+  const analytics: string[] = [];
+  if (context.scoreTrend && context.totalAnalyses >= 4) {
+    analytics.push(
+      `Score trend: ${context.scoreTrend.direction} — recent average ${Math.round(
+        context.scoreTrend.recentAverage
+      )} vs earlier ${Math.round(context.scoreTrend.earlierAverage)}`
+    );
+  }
+  if (context.categoryBreakdown?.length) {
+    const top = context.categoryBreakdown
+      .slice(0, 3)
+      .map(
+        (c) =>
+          `${c.category} (avg ${Math.round(c.averageScore)}, ${c.count} ${
+            c.count === 1 ? "item" : "items"
+          })`
+      )
+      .join(", ");
+    analytics.push(`Category strength: ${top}`);
+  }
+  if (context.recentItems?.length) {
+    analytics.push(
+      `Recently analyzed: ${context.recentItems
+        .slice(0, 5)
+        .map((i) => `${i.category}${i.subtype ? ` (${i.subtype})` : ""} (${Math.round(i.score)})`)
+        .join(", ")}`
+    );
+  }
+  if (context.wardrobeTags?.length) {
+    analytics.push(`Wardrobe staples: ${context.wardrobeTags.slice(0, 6).join(", ")}`);
+  }
+  if (context.topStyleTypes?.length) {
+    analytics.push(`Dominant style: ${context.topStyleTypes.slice(0, 3).join(", ")}`);
+  }
+  const colorLeanings: string[] = [];
+  if (context.preferredColors?.length)
+    colorLeanings.push(`prefers ${context.preferredColors.join(", ")}`);
+  if (context.avoidColors?.length) colorLeanings.push(`avoids ${context.avoidColors.join(", ")}`);
+  if (colorLeanings.length) analytics.push(`Color leanings: ${colorLeanings.join("; ")}`);
+  if (analytics.length > 0) {
+    lines.push(`Analytics:\n- ${analytics.join("\n- ")}`);
+  }
+
   return lines.join("\n\n");
 }
 
-async function callOpenAI(
+async function callChatCompletion(
+  provider: ChatProviderConfig,
   messages: StylistMessageInput[],
   context: StylistContext
 ): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
-
-  const response = await fetchWithRetry(OPENAI_API_URL, {
+  const response = await fetchWithRetry(`${provider.baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${provider.apiKey}`,
     },
     body: JSON.stringify({
-      model: "gpt-4o",
+      model: provider.model,
       messages: [
         { role: "system", content: buildSystemPrompt(context) },
         ...messages.map((m) => ({ role: m.role, content: m.content })),
@@ -134,14 +261,14 @@ async function callOpenAI(
 
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(`OpenAI API error: ${response.status} - ${error}`);
+    throw new Error(`${provider.name} API error: ${response.status} - ${error}`);
   }
 
   const data = (await response.json()) as {
     choices?: Array<{ message?: { content?: string } }>;
   };
   const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error("Empty response from OpenAI");
+  if (!content) throw new Error(`Empty response from ${provider.name}`);
   return content.trim();
 }
 
@@ -159,7 +286,11 @@ function mockStylistReply(
         context.folderNames && context.folderNames.length
           ? ` across folders like ${context.folderNames.slice(0, 3).join(", ")}`
           : "";
-      return `You have ${context.wardrobeCount} pieces in your wardrobe${folders}. Start with your strongest category${
+      const staples =
+        context.wardrobeTags && context.wardrobeTags.length
+          ? ` Your staples lean ${context.wardrobeTags.slice(0, 3).join(", ")}.`
+          : "";
+      return `You have ${context.wardrobeCount} pieces in your wardrobe${folders}.${staples} Start with your strongest category${
         context.bestCategory ? ` (${context.bestCategory})` : ""
       }, pair it with a contrasting silhouette, and keep one accent color. Want a full outfit for a specific occasion?`;
     }
@@ -208,21 +339,30 @@ function mockStylistReply(
   const recent = context.recentScores.length
     ? ` your last ${context.recentScores.length} scores averaged ${Math.round(context.averageScore)}`
     : "";
-  return `${greeting}here's a thought based on${recent || " your profile"}: keep the hero piece simple and let one statement detail (color, texture, or silhouette) carry the look. Tell me what you're styling for and I'll get more specific.`;
+  const trend =
+    context.scoreTrend && context.scoreTrend.direction !== "stable"
+      ? ` and your fit is trending ${context.scoreTrend.direction}`
+      : "";
+  return `${greeting}here's a thought based on${recent || " your profile"}: keep the hero piece simple and let one statement detail (color, texture, or silhouette) carry the look${trend}. Tell me what you're styling for and I'll get more specific.`;
 }
 
 /**
- * Generate a stylist reply for the conversation. Falls back to rule-based
- * advice when no OpenAI key is configured or the API call fails.
+ * Generate a stylist reply for the conversation. Routes to the configured chat
+ * provider (NVIDIA → OpenAI → mock) and falls back to rule-based advice when
+ * the provider is unavailable or fails.
  */
 export async function generateStylistReply(params: {
   messages: StylistMessageInput[];
   context: StylistContext;
 }): Promise<string> {
+  const provider = resolveStylistProvider();
+
   try {
-    return await callOpenAI(params.messages, params.context);
+    const config = getProviderConfig(provider);
+    if (!config) return mockStylistReply(params.messages, params.context);
+    return await callChatCompletion(config, params.messages, params.context);
   } catch (err) {
-    console.warn("[Stylist] Falling back to mock reply:", err);
+    getLogger().warn({ err, provider }, "Stylist reply failed — falling back to mock");
     return mockStylistReply(params.messages, params.context);
   }
 }

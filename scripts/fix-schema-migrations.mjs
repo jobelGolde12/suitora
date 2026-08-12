@@ -1,4 +1,9 @@
 /**
+ * DEPRECATED — use `npm run db:migrate` (scripts/migrate.mjs) instead.
+ * The migrations below now live in drizzle/migrations/ and are applied by the
+ * migration runner. This one-off script is kept only for databases that never
+ * ran the runner; do not extend it.
+ *
  * Idempotent schema sync for migrations missing from the running database:
  *   - user_profiles table                     (2026-07-21-add-user-profiles.sql)
  *   - favorites wardrobe columns              (2026-08-04-add-wardrobe-fields.sql)
@@ -98,6 +103,7 @@ if (!tables.has("favorites")) {
       console.log(`favorites.${name}: exists (skip)`);
       continue;
     }
+    // eslint-disable-next-line no-query-in-loop/noQueryInLoop -- one-off sync; bounded list, not a hot path
     await db.execute(`ALTER TABLE favorites ADD COLUMN ${name} ${def}`);
     console.log(`favorites.${name}: added`);
   }

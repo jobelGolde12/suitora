@@ -1,0 +1,48 @@
+# Alertmanager routing for Suitora (Pillar 04, Action Item 7).
+#
+# Routes alerts to on-call (critical) and a lower-priority channel (warning).
+# Webhook/email receivers below are placeholders — set the values in your
+# deployment (e.g. via environment substitution or a mounted secrets file).
+
+global:
+  resolve_timeout: 5m
+  # pagerduty/opsgenie/email defaults can be configured here if used.
+
+route:
+  receiver: "default"
+  group_by: ["alertname", "service"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers:
+        - severity = "critical"
+      receiver: "oncall-critical"
+      continue: true
+    - matchers:
+        - severity = "warning"
+      receiver: "ops-warning"
+
+receivers:
+  - name: "default"
+    # Slack webhook placeholder — replace with a real incoming webhook URL.
+    webhook_configs:
+      - url: "https://hooks.slack.com/services/T00000000/B00000000/XXXX"
+        send_resolved: true
+
+  - name: "oncall-critical"
+    # Critical alerts page the on-call rotation and must be acknowledged
+    # within 5 minutes per the incident SLA (see docs/runbooks.md).
+    webhook_configs:
+      - url: "https://hooks.slack.com/services/T00000000/B00000000/YYYY"
+        send_resolved: true
+
+  - name: "ops-warning"
+    webhook_configs:
+      - url: "https://hooks.slack.com/services/T00000000/B00000000/ZZZZ"
+        send_resolved: true
+
+inhibit_rules:
+  - source_matchers: ["severity = critical"]
+    target_matchers: ["severity = warning"]
+    equal: ["alertname", "service"]

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
+import { Sparkles, AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import {
   PageContainer,
@@ -19,31 +19,34 @@ import type { TrendItem } from "@/types/trend";
 export default function TrendingPage() {
   const [items, setItems] = useState<TrendItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [category, setCategory] = useState("all");
 
-  useEffect(() => {
-    async function load() {
-      setIsLoading(true);
-      try {
-        const params = new URLSearchParams({ limit: "24" });
-        if (category && category !== "all") {
-          params.set("category", category);
-        }
-        const res = await fetch(`/api/trending?${params.toString()}`, {
-          credentials: "include",
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setItems(data.items || []);
-        }
-      } catch (err) {
-        console.error("Failed to load trending items:", err);
-      } finally {
-        setIsLoading(false);
+  const load = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(false);
+    try {
+      const params = new URLSearchParams({ limit: "24" });
+      if (category && category !== "all") {
+        params.set("category", category);
       }
+      const res = await fetch(`/api/trending?${params.toString()}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to load trending items");
+      const data = await res.json();
+      setItems(data.items || []);
+    } catch (err) {
+      console.error("Failed to load trending items:", err);
+      setLoadError(true);
+    } finally {
+      setIsLoading(false);
     }
-    load();
   }, [category]);
+
+  useEffect(() => {
+    void Promise.resolve().then(() => load());
+  }, [load]);
 
   return (
     <PageContainer>
@@ -60,7 +63,23 @@ export default function TrendingPage() {
         />
       </div>
 
-      {isLoading ? (
+      {loadError ? (
+        <EmptyState
+          icon={AlertCircle}
+          title="Couldn't load trending items"
+          description="Something went wrong while fetching the trending feed. Check your connection and try again."
+          action={
+            <Button
+              variant="editorial"
+              className="rounded-full px-6"
+              onClick={() => void load()}
+            >
+              <RefreshCw className="h-4 w-4" strokeWidth={1.5} />
+              Retry
+            </Button>
+          }
+        />
+      ) : isLoading ? (
         <TrendingGridSkeleton count={8} />
       ) : items.length === 0 ? (
         <EmptyState

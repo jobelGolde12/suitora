@@ -1,6 +1,7 @@
 "use client";
 
-import { Trophy, Calendar } from "lucide-react";
+import Link from "next/link";
+import { Trophy, Calendar, ArrowRight } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { ScoreCircle } from "@/components/ui/ScoreCircle";
 import { ScoreBar } from "@/components/dashboard";
@@ -91,6 +92,14 @@ export function ComparisonView({ analyses }: ComparisonViewProps) {
                 />
               </div>
             </div>
+
+            <Link
+              href={`/results/${analysis.id}`}
+              className="flex items-center justify-center gap-1.5 border-t border-border px-5 py-3 text-xs font-medium text-muted transition-colors duration-200 hover:text-accent hover:bg-surface/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+            >
+              View full analysis
+              <ArrowRight className="h-3.5 w-3.5" strokeWidth={1.5} />
+            </Link>
           </Card>
         );
       })}

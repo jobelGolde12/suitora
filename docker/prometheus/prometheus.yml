@@ -1,0 +1,27 @@
+# Prometheus scrape + alert configuration for Suitora (Pillar 04, A6/A7).
+#
+# Prometheus scrapes the web tier directly on the internal Docker network
+# (NOT through nginx) so /metrics never needs to be public. Alert rules are
+# loaded from ./alerts.yml; alerts fan out through Alertmanager
+# (see ../alertmanager/alertmanager.yml).
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    environment: "production"
+    service: "suitora"
+
+rule_files:
+  - "alerts.yml"
+
+scrape_configs:
+  - job_name: "suitora-web"
+    metrics_path: /metrics
+    static_configs:
+      # All web replicas publish their metrics on the same registry.
+      - targets: ["web:3000"]
+
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]

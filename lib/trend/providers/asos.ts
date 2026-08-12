@@ -9,6 +9,7 @@
  */
 
 import type { RawProviderProduct } from "@/types/trend";
+import { getLogger } from "@/lib/logger";
 
 const ASOS_API_BASE = "https://www.asos.com/api/product/search/v2";
 const RESULTS_PER_QUERY = 20;
@@ -190,7 +191,7 @@ async function fetchAsosSearch(
     clearTimeout(timeout);
 
     if (!res.ok) {
-      console.warn(`[asos] HTTP ${res.status} for query: ${query}`);
+      getLogger().warn({ status: res.status, query }, "ASOS search HTTP error");
       return null;
     }
 
@@ -198,11 +199,9 @@ async function fetchAsosSearch(
   } catch (err) {
     clearTimeout(timeout);
     if (err instanceof Error && err.name === "AbortError") {
-      console.warn(`[asos] Timeout for query: ${query}`);
+      getLogger().warn({ query }, "ASOS search timed out");
     } else {
-      console.warn(
-        `[asos] Fetch error: ${err instanceof Error ? err.message : "unknown"}`
-      );
+      getLogger().warn({ err }, "ASOS fetch error");
     }
     return null;
   }
@@ -235,7 +234,7 @@ export async function fetchAsosProducts(
   const allProducts: RawProviderProduct[] = [];
   const queries = SEARCH_QUERIES.slice(0, maxQueries);
 
-  console.log(`[asos] Querying ${queries.length} searches: ${queries.join(", ")}`);
+  getLogger().info({ queries: queries.join(", ") }, "ASOS queries started");
 
   for (const query of queries) {
     const response = await fetchAsosSearch(query);
@@ -265,7 +264,7 @@ export async function fetchAsosProducts(
       });
 
       allProducts.push(...products);
-      console.log(`[asos] "${query}": ${products.length} products`);
+      getLogger().info({ query, count: products.length }, "ASOS query results");
     }
 
     // Delay between requests
@@ -282,6 +281,6 @@ export async function fetchAsosProducts(
     return true;
   });
 
-  console.log(`[asos] total: ${unique.length} unique products`);
+  getLogger().info({ count: unique.length }, "ASOS unique products");
   return unique;
 }

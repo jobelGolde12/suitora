@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiError } from "@/lib/api/response";
+import { withApiRoute, type RouteParams } from "@/lib/api/route";
 import { getTrendItemById, listTrendItems } from "@/lib/db/queries";
 import { rowToTrendItem } from "@/lib/trend/normalize";
 import { rankTrendItems } from "@/lib/trend/ranking";
@@ -8,11 +9,9 @@ import { rankTrendItems } from "@/lib/trend/ranking";
  * GET /api/trending/[id]
  * Returns a single TrendItem plus similar items in the same category.
  */
-export async function GET(
-  _request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
-  try {
+export const GET = withApiRoute(
+  "/api/trending/[id]",
+  async (_request: NextRequest, context: { params: RouteParams<{ id: string }> }) => {
     const { id } = await context.params;
     if (!id) {
       return apiError("Missing id", 400);
@@ -35,8 +34,5 @@ export async function GET(
     ).slice(0, 4);
 
     return NextResponse.json({ item, similar });
-  } catch (err) {
-    console.error("Error in GET /api/trending/[id]:", err);
-    return apiError("Failed to load trending item", 500);
   }
-}
+);
