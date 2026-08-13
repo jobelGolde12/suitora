@@ -5,12 +5,23 @@ import { db } from "@/drizzle";
 import * as schema from "@/drizzle/schema";
 import { sendPasswordResetEmail } from "@/lib/email";
 
+/** True while Next.js is compiling (collecting page data), not at runtime. */
+function isBuildPhase(): boolean {
+  return process.env.NEXT_PHASE === "phase-production-build";
+}
+
 function getSecret(): string {
   const secret = process.env.BETTER_AUTH_SECRET;
   if (!secret) {
-    throw new Error(
-      "BETTER_AUTH_SECRET is required. Set it in your environment variables."
-    );
+    // Better Auth enforces the secret at runtime, so never block the build
+    // when the env var is only missing in the CI/build environment.
+    if (!isBuildPhase()) {
+      throw new Error(
+        "BETTER_AUTH_SECRET is required. Set it in your environment variables."
+      );
+    }
+    // Never used at runtime — production requests throw before signing cookies.
+    return "build-phase-placeholder-secret-not-for-runtime-0000";
   }
   return secret;
 }
