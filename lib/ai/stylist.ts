@@ -1,14 +1,18 @@
 /**
  * AI Stylist — context-aware fashion chat.
  *
- * Uses NVIDIA chat completions (OpenAI-compatible endpoint) when
- * NVIDIA_API_KEY is configured, falling back to OpenAI when OPENAI_API_KEY is
- * set, and to a helpful rule-based reply otherwise (mirroring the vision
- * pipeline's mock fallback so the feature always works).
+ * Uses OpenAI-compatible chat-completion endpoints (Groq, NVIDIA, OpenAI).
+ * All configured providers are raced in parallel and the first real reply
+ * wins; the rule-based mock is only a last resort so the feature always works.
  *
- * Provider selection (STYLIST_PROVIDER=auto|nvidia|openai|mock):
+ * Provider selection (STYLIST_PROVIDER=auto|groq|openai|nvidia|mock):
  *   - explicit value wins
- *   - otherwise NVIDIA is preferred when a key exists, then OpenAI, then mock
+ *   - otherwise every configured provider is raced: Groq, then OpenAI, then
+ *     NVIDIA (Groq is first because it is fast and has a generous free tier)
+ *
+ * Circuit breaker: a provider that fails (timeout, auth error, exhausted
+ * quota) is skipped for a short cooldown, so a dead endpoint never stalls the
+ * chat twice in a row.
  */
 
 import type { SkinTone, StyleTag, FitPreference } from "@/types";
@@ -65,73 +69,93 @@ export interface StylistContext {
   topStyleTypes?: string[];
 }
 
-export type StylistProvider = "auto" | "openai" | "nvidia" | "mock";
+export type StylistProvider = "auto" | "groq" | "openai" | "nvidia" | "mock";
 
 const OPENAI_API_URL = "https://api.openai.com/v1";
 const OPENAI_MODEL = "gpt-4o";
 const NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1";
 const NVIDIA_MODEL = "meta/llama-3.3-70b-instruct";
-const FETCH_TIMEOUT_MS = 30_000;
-const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+const GROQ_API_URL = "https://api.groq.com/openai/v1";
+const GROQ_MODEL = "llama-3.3-70b-versatile";
+
+// Providers are raced in parallel — the first real reply wins. Groq first
+// (fast + free tier), OpenAI second, NVIDIA last.
+const PROVIDER_RACE_ORDER: StylistProvider[] = ["groq", "openai", "nvidia"];
+// Per-attempt ceiling for a single provider HTTP call. The stylist is prompted
+// to reply in 2–5 sentences, so generations are short — 4s comfortably covers
+// them while keeping failover from a hung endpoint fast.
+const FETCH_TIMEOUT_MS = 4_000;
+// Hard failures (timeout, network, auth) mean the provider is effectively dead
+// for a while — skip it for 5 minutes so every message doesn't pay the same
+// timeout again.
+const HARD_FAILURE_COOLDOWN_MS = 5 * 60_000;
+// Transient failures (5xx, rate-limit 429) usually recover quickly — skip for
+// only 30 seconds so a healthy provider isn't starved for minutes.
+const TRANSIENT_FAILURE_COOLDOWN_MS = 30_000;
+
+// ── Circuit breaker ────────────────────────────────────────────────
+const providerCooldownUntil = new Map<string, number>();
+
+/** Reset the circuit-breaker state (used in tests). */
+export function resetStylistProviderHealth(): void {
+  providerCooldownUntil.clear();
+}
+
+function isProviderAvailable(provider: StylistProvider): boolean {
+  const until = providerCooldownUntil.get(provider);
+  return until === undefined || Date.now() >= until;
+}
+
+function markProviderUnavailable(provider: StylistProvider, cooldownMs: number): void {
+  providerCooldownUntil.set(provider, Date.now() + cooldownMs);
+}
 
 /**
  * Resolve which chat provider should answer stylist messages.
- * `auto` (default) prefers NVIDIA, then OpenAI, then the rule-based mock.
+ * `auto` (default) races Groq, then OpenAI, then NVIDIA, then the rule-based
+ * mock.
  */
 export function resolveStylistProvider(): StylistProvider {
   const forced = process.env.STYLIST_PROVIDER?.trim().toLowerCase();
-  if (forced === "openai" || forced === "nvidia" || forced === "mock") {
+  if (forced === "groq" || forced === "openai" || forced === "nvidia" || forced === "mock") {
     return forced;
   }
-  if (process.env.NVIDIA_API_KEY) return "nvidia";
+  if (process.env.GROQ_API_KEY) return "groq";
   if (process.env.OPENAI_API_KEY) return "openai";
+  if (process.env.NVIDIA_API_KEY) return "nvidia";
   return "mock";
 }
 
-async function fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
-  let lastError: unknown;
-
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-
-    try {
-      const response = await fetch(url, { ...init, signal: controller.signal });
-      if (response.ok || !RETRYABLE_STATUS.has(response.status)) return response;
-      lastError = new Error(`Chat API status ${response.status}`);
-    } catch (err) {
-      lastError = err;
-    } finally {
-      clearTimeout(timeout);
-    }
-
-    if (attempt < 2) {
-      await new Promise((resolve) =>
-        setTimeout(resolve, 1_000 * 2 ** attempt + Math.random() * 500)
-      );
-    }
+function isProviderConfigured(provider: StylistProvider): boolean {
+  switch (provider) {
+    case "groq":
+      return !!process.env.GROQ_API_KEY;
+    case "openai":
+      return !!process.env.OPENAI_API_KEY;
+    case "nvidia":
+      return !!process.env.NVIDIA_API_KEY;
+    default:
+      return false;
   }
-
-  throw lastError instanceof Error ? lastError : new Error("Chat API request failed");
 }
 
 interface ChatProviderConfig {
-  name: "openai" | "nvidia";
+  name: "groq" | "openai" | "nvidia";
   apiKey: string;
   baseUrl: string;
   model: string;
 }
 
-function getProviderConfig(provider: StylistProvider): ChatProviderConfig | null {
+function getProviderConfig(provider: StylistProvider): ChatProviderConfig {
   switch (provider) {
-    case "nvidia": {
-      const apiKey = process.env.NVIDIA_API_KEY;
-      if (!apiKey) throw new Error("NVIDIA_API_KEY is not configured");
+    case "groq": {
+      const apiKey = process.env.GROQ_API_KEY;
+      if (!apiKey) throw new Error("GROQ_API_KEY is not configured");
       return {
-        name: "nvidia",
+        name: "groq",
         apiKey,
-        baseUrl: (process.env.NVIDIA_BASE_URL || NVIDIA_API_URL).replace(/\/+$/, ""),
-        model: process.env.NVIDIA_MODEL || NVIDIA_MODEL,
+        baseUrl: (process.env.GROQ_BASE_URL || GROQ_API_URL).replace(/\/+$/, ""),
+        model: process.env.GROQ_MODEL || GROQ_MODEL,
       };
     }
     case "openai": {
@@ -144,8 +168,18 @@ function getProviderConfig(provider: StylistProvider): ChatProviderConfig | null
         model: process.env.OPENAI_MODEL || OPENAI_MODEL,
       };
     }
+    case "nvidia": {
+      const apiKey = process.env.NVIDIA_API_KEY;
+      if (!apiKey) throw new Error("NVIDIA_API_KEY is not configured");
+      return {
+        name: "nvidia",
+        apiKey,
+        baseUrl: (process.env.NVIDIA_BASE_URL || NVIDIA_API_URL).replace(/\/+$/, ""),
+        model: process.env.NVIDIA_MODEL || NVIDIA_MODEL,
+      };
+    }
     default:
-      return null;
+      throw new Error(`Unknown stylist provider: ${provider}`);
   }
 }
 
@@ -237,27 +271,65 @@ export function buildSystemPrompt(context: StylistContext): string {
   return lines.join("\n\n");
 }
 
+/**
+ * Categorize a provider failure so the circuit breaker can pick the right
+ * cooldown: hard failures (timeout, network, auth) get a long cooldown,
+ * transient ones (5xx, 429) get a short one.
+ */
+function failureCooldownMs(provider: ChatProviderConfig, err: unknown): number {
+  const message = err instanceof Error ? err.message : String(err);
+  // Timeout / network abort → the endpoint is unreachable; treat as hard.
+  if (message.includes("aborted") || message.includes("fetch failed")) {
+    return HARD_FAILURE_COOLDOWN_MS;
+  }
+  if (message.includes(`${provider.name} API error: 5`)) {
+    return TRANSIENT_FAILURE_COOLDOWN_MS;
+  }
+  // Auth (401/403) and quota (429 credit exhaustion) won't recover on their own.
+  if (message.includes(`${provider.name} API error: 4`)) {
+    return HARD_FAILURE_COOLDOWN_MS;
+  }
+  return HARD_FAILURE_COOLDOWN_MS;
+}
+
+/**
+ * Timeout-aware chat completion call. The external signal lets the race abort
+ * losers as soon as a winner answers; the internal timer guarantees the call
+ * never outlives the per-attempt budget. Both are always cleaned up.
+ */
 async function callChatCompletion(
   provider: ChatProviderConfig,
   messages: StylistMessageInput[],
-  context: StylistContext
+  context: StylistContext,
+  externalSignal: AbortSignal
 ): Promise<string> {
-  const response = await fetchWithRetry(`${provider.baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${provider.apiKey}`,
-    },
-    body: JSON.stringify({
-      model: provider.model,
-      messages: [
-        { role: "system", content: buildSystemPrompt(context) },
-        ...messages.map((m) => ({ role: m.role, content: m.content })),
-      ],
-      max_tokens: 500,
-      temperature: 0.7,
-    }),
-  });
+  const timeoutController = new AbortController();
+  const timeout = setTimeout(() => timeoutController.abort(), FETCH_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(`${provider.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${provider.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: provider.model,
+        messages: [
+          { role: "system", content: buildSystemPrompt(context) },
+          ...messages.map((m) => ({ role: m.role, content: m.content })),
+        ],
+        max_tokens: 500,
+        temperature: 0.7,
+      }),
+      signal: AbortSignal.any([externalSignal, timeoutController.signal]),
+    });
+  } catch (err) {
+    throw new Error(`${provider.name} request failed: ${(err as Error).message}`);
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     const error = await response.text();
@@ -346,23 +418,99 @@ function mockStylistReply(
   return `${greeting}here's a thought based on${recent || " your profile"}: keep the hero piece simple and let one statement detail (color, texture, or silhouette) carry the look${trend}. Tell me what you're styling for and I'll get more specific.`;
 }
 
+type ProviderAttempt = {
+  provider: StylistProvider;
+  run: (signal: AbortSignal) => Promise<string>;
+};
+
 /**
- * Generate a stylist reply for the conversation. Routes to the configured chat
- * provider (NVIDIA → OpenAI → mock) and falls back to rule-based advice when
- * the provider is unavailable or fails.
+ * Race provider attempts in parallel. Resolves with the first real reply and
+ * aborts the losers; rejects only when every attempt has failed.
+ */
+async function raceProviders(attempts: ProviderAttempt[]): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const controllers = new Map<StylistProvider, AbortController>();
+    let pending = attempts.length;
+    let settled = false;
+
+    if (attempts.length === 0) {
+      reject(new Error("No stylist providers to race"));
+      return;
+    }
+
+    for (const attempt of attempts) {
+      const controller = new AbortController();
+      controllers.set(attempt.provider, controller);
+
+      attempt
+        .run(controller.signal)
+        .then((content) => {
+          if (settled) return;
+          settled = true;
+          // Free the losers so a hung endpoint doesn't keep a socket open.
+          for (const c of controllers.values()) c.abort();
+          resolve(content);
+        })
+        .catch((err) => {
+          if (settled) return; // aborted because another provider already won
+          // Hard failures get a long cooldown, transient ones a short one.
+          const providerConfig = getProviderConfig(attempt.provider);
+          markProviderUnavailable(attempt.provider, failureCooldownMs(providerConfig, err));
+          getLogger().warn(
+            { err, provider: attempt.provider },
+            "Stylist provider failed"
+          );
+          pending -= 1;
+          if (pending === 0) {
+            settled = true;
+            reject(new Error("All stylist providers failed"));
+          }
+        });
+    }
+  });
+}
+
+/**
+ * Generate a stylist reply for the conversation. Races every configured chat
+ * provider in parallel (Groq → OpenAI → NVIDIA) and falls back to rule-based
+ * advice when all providers are unavailable or fail.
  */
 export async function generateStylistReply(params: {
   messages: StylistMessageInput[];
   context: StylistContext;
 }): Promise<string> {
-  const provider = resolveStylistProvider();
+  // An explicit STYLIST_PROVIDER wins; otherwise race every configured provider
+  // that is not in a cooldown.
+  const forced = process.env.STYLIST_PROVIDER?.trim().toLowerCase();
+  const candidates: StylistProvider[] = forced
+    ? [forced as StylistProvider]
+    : PROVIDER_RACE_ORDER.filter((p) => isProviderConfigured(p) && isProviderAvailable(p));
+
+  const attempts: ProviderAttempt[] = [];
+  for (const provider of candidates) {
+    let config: ChatProviderConfig;
+    try {
+      config = getProviderConfig(provider);
+    } catch (err) {
+      getLogger().warn({ err, provider }, "Stylist provider misconfigured — skipping");
+      continue;
+    }
+    attempts.push({
+      provider,
+      run: (signal) => callChatCompletion(config, params.messages, params.context, signal),
+    });
+  }
+
+  if (attempts.length === 0) {
+    // No configured & healthy provider — reply instantly with rules.
+    getLogger().info({}, "No healthy stylist providers — using rule-based reply");
+    return mockStylistReply(params.messages, params.context);
+  }
 
   try {
-    const config = getProviderConfig(provider);
-    if (!config) return mockStylistReply(params.messages, params.context);
-    return await callChatCompletion(config, params.messages, params.context);
+    return await raceProviders(attempts);
   } catch (err) {
-    getLogger().warn({ err, provider }, "Stylist reply failed — falling back to mock");
+    getLogger().warn({ err }, "All stylist providers failed — falling back to rule-based reply");
     return mockStylistReply(params.messages, params.context);
   }
 }

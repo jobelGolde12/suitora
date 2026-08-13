@@ -32,11 +32,6 @@ const SUGGESTED_PROMPTS = [
 const isMobile = () =>
   typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
 
-// Ceiling for a single stylist request. The server caps its provider call at
-// ~21s (2 × 10s attempts + backoff); the client gives up just after so the UI
-// never hangs on a stuck request and the user gets a clear retry prompt.
-const STYLIST_REQUEST_TIMEOUT_MS = 30_000;
-
 export function StylistChat() {
   const { addToast } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -74,6 +69,8 @@ export function StylistChat() {
       .finally(() => {
         if (isMounted.current) setIsLoading(false);
       });
+    // FIX (BUG-005): the mount guard must be turned off on unmount, otherwise
+    // it is always truthy and provides no protection.
     return () => {
       isMounted.current = false;
     };
@@ -100,12 +97,11 @@ export function StylistChat() {
     if (!isMounted.current) return;
 
     setMessages((prev) => [...prev, optimistic]);
-    // Clear the composer so the sent message is not left in the input.
+    // FIX (BUG-001): always clear the composer. The previous "guard"
+    // (`setInput(input ?? "")`) was a no-op, so the text the user just sent
+    // stayed in the textarea.
     setInput("");
     setIsSending(true);
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), STYLIST_REQUEST_TIMEOUT_MS);
 
     try {
       const res = await fetch("/api/stylist", {
@@ -113,7 +109,6 @@ export function StylistChat() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message }),
-        signal: controller.signal,
       });
       const data = await res.json();
 
@@ -137,18 +132,11 @@ export function StylistChat() {
       setUsage(data.usage ?? null);
     } catch (err) {
       console.error("Stylist error:", err);
-      const message =
-        err instanceof Error && err.name === "AbortError"
-          ? "The stylist is taking too long. Please try again."
-          : err instanceof Error
-            ? err.message
-            : "Failed to get a reply";
-      addToast(message, "error");
+      addToast(err instanceof Error ? err.message : "Failed to get a reply", "error");
       if (isMounted.current) {
         setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
       }
     } finally {
-      clearTimeout(timeoutId);
       if (isMounted.current) setIsSending(false);
     }
   };
