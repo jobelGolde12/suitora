@@ -8,6 +8,11 @@ import { z } from "zod";
 
 // Re-export the full profile form schema so API routes share one source of truth.
 export { updateProfileSchema as updateProfileBodySchema } from "@/lib/utils/validation";
+import { MAX_IMAGE_URL_LENGTH } from "@/lib/utils/validation";
+
+// JSON bodies carrying image URLs (multi-MB data URLs in dev) need a matching
+// size cap; two image URLs plus JSON overhead is the worst case.
+export const MAX_IMAGE_BODY_SIZE = 2 * MAX_IMAGE_URL_LENGTH + 1024 * 1024;
 
 export const analysisCategoryEnum = z.enum([
   "top", "bottom", "dress", "outerwear", "shoes", "accessory",
@@ -20,8 +25,8 @@ export const createAnalysisSchema = z.object({
     .url("A valid product URL is required")
     .max(2048)
     .optional(),
-  productImageUpload: z.string().max(4096).optional(),
-  userImageUrl: z.string().max(4096).optional(),
+  productImageUpload: z.string().max(MAX_IMAGE_URL_LENGTH).optional(),
+  userImageUrl: z.string().max(MAX_IMAGE_URL_LENGTH).optional(),
   category: analysisCategoryEnum.optional(),
 });
 
@@ -64,7 +69,7 @@ export const selfImageBodySchema = z.object({
   selfImageUrl: z
     .string()
     .min(1, "selfImageUrl is required")
-    .max(4096, "selfImageUrl is too long"),
+    .max(MAX_IMAGE_URL_LENGTH, "selfImageUrl is too long"),
 });
 
 // /api/wardrobe/folders
@@ -107,7 +112,7 @@ export const favoriteOutfitSchema = z.object({
           trendItemId: z.string().max(128).optional(),
           category: z.string().min(1).max(64),
           itemName: z.string().min(1).max(200),
-          itemImageUrl: z.string().max(4096),
+          itemImageUrl: z.string().max(MAX_IMAGE_URL_LENGTH),
           individualScore: z.number(),
           role: outfitItemRoleEnum,
         })
@@ -122,7 +127,7 @@ export const favoriteOutfitSchema = z.object({
     seasonTags: z.array(z.string().max(32)).max(20).optional(),
     occasionTags: z.array(z.string().max(32)).max(20).optional(),
     stylingTips: z.array(z.string().max(500)).max(20).optional(),
-    generatedImageUrl: z.string().max(4096).optional(),
+    generatedImageUrl: z.string().max(MAX_IMAGE_URL_LENGTH).optional(),
     createdAt: z.string().max(64).optional(),
   }),
 });

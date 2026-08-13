@@ -3,6 +3,11 @@ import { z } from "zod";
 export const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 export const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
+// Dev mode (no storage provider) stores images as base64 data URLs, which
+// inflate a MAX_FILE_SIZE upload to ~7M characters. Cloudinary URLs are far
+// shorter; this cap covers both representations.
+export const MAX_IMAGE_URL_LENGTH = 8 * 1024 * 1024;
+
 export const imageFileSchema = z
   .instanceof(File)
   .refine((file) => file.size > 0, "The file appears to be empty")

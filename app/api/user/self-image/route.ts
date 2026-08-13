@@ -7,7 +7,7 @@ import { apiError, apiOk, apiRateLimitError } from "@/lib/api/response";
 import { withApiRoute, withUserId } from "@/lib/api/route";
 import { parseBody } from "@/lib/api/request";
 import { enforceRateLimit, uploadRateLimiter } from "@/lib/rate-limit";
-import { selfImageBodySchema } from "@/lib/validation";
+import { selfImageBodySchema, MAX_IMAGE_BODY_SIZE } from "@/lib/validation";
 
 export const GET = withApiRoute("/api/user/self-image", async () => {
   const user = await requireUser();
@@ -40,7 +40,9 @@ export const POST = withApiRoute("/api/user/self-image", async (req: Request) =>
     );
   }
 
-  const parsed = await parseBody(selfImageBodySchema, req);
+  const parsed = await parseBody(selfImageBodySchema, req, {
+    limit: MAX_IMAGE_BODY_SIZE,
+  });
   if (parsed.error) return parsed.error;
   const { selfImageUrl } = parsed.data;
 

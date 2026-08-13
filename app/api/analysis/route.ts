@@ -8,7 +8,7 @@ import { apiError, apiOk, apiRateLimitError } from "@/lib/api/response";
 import { withApiRoute, withUserId } from "@/lib/api/route";
 import { getLogger } from "@/lib/logger";
 import { parseBody, validateQuery } from "@/lib/api/request";
-import { createAnalysisSchema, analysisQuerySchema } from "@/lib/validation";
+import { createAnalysisSchema, analysisQuerySchema, MAX_IMAGE_BODY_SIZE } from "@/lib/validation";
 import { assertSafeHttpUrl } from "@/lib/security/ssrf";
 import { analysisRateLimiter, enforceRateLimit } from "@/lib/rate-limit";
 import { extractProductFromUrlCached } from "@/lib/ai/product-extraction";
@@ -33,7 +33,9 @@ export const POST = withApiRoute("/api/analysis", async (req: Request) => {
     );
   }
 
-  const parsed = await parseBody(createAnalysisSchema, req);
+  const parsed = await parseBody(createAnalysisSchema, req, {
+    limit: MAX_IMAGE_BODY_SIZE,
+  });
   if (parsed.error) return parsed.error;
   const { productUrl, productImageUpload, userImageUrl, category } = parsed.data;
 

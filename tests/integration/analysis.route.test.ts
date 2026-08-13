@@ -129,6 +129,18 @@ describe("/api/analysis", () => {
       expect(body.analysisId).toMatch(/^analysis_/);
     });
 
+    it("accepts large data-URL image references (dev fallback)", async () => {
+      const dataUrl = `data:image/jpeg;base64,${"a".repeat(1024 * 1024)}`;
+      const res = await callRoute(
+        POST,
+        jsonRequest("http://localhost/api/analysis", "POST", {
+          productImageUpload: dataUrl,
+          userImageUrl: dataUrl,
+        })
+      );
+      expect(res.status).toBe(200);
+    });
+
     it("returns 400 when URL extraction fails", async () => {
       extractProductFromUrlCachedMock.mockRejectedValue(new Error("provider down"));
       const res = await callRoute(
