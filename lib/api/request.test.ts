@@ -43,6 +43,48 @@ describe("parseBody", () => {
     expect(body.code).toBe("VALIDATION");
     expect(body.error).toContain("Invalid JSON body");
   });
+
+  it("rejects bodies larger than the limit with 413", async () => {
+    const huge = JSON.stringify({ name: "a".repeat(2 * 1024 * 1024) });
+    const req = new Request("http://localhost/api/x", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: huge,
+    });
+    const result = await parseBody(schema, req);
+    expect(result.data).toBeUndefined();
+    expect(result.error).toBeDefined();
+    expect(result.error!.status).toBe(413);
+    const body = await result.error!.json();
+    expect(body.code).toBe("PAYLOAD_TOO_LARGE");
+  });
+
+  it("rejects chunked bodies that exceed the limit once read", async () => {
+    const huge = JSON.stringify({ name: "a".repeat(2 * 1024 * 1024) });
+    const req = new Request("http://localhost/api/x", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: huge,
+    });
+    // Drop the content-length header so the guard must cap the stream itself.
+    Reflect.deleteProperty(req.headers, "content-length");
+    const result = await parseBody(schema, req);
+    expect(result.data).toBeUndefined();
+    expect(result.error).toBeDefined();
+    expect(result.error!.status).toBe(413);
+  });
+
+  it("accepts a body just under the limit", async () => {
+    const body = JSON.stringify({ name: "ok".repeat(10_000) });
+    const req = new Request("http://localhost/api/x", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+    const result = await parseBody(schema, req);
+    expect(result.error).toBeUndefined();
+    expect(result.data).toEqual({ name: "ok".repeat(10_000) });
+  });
 });
 
 describe("validateQuery", () => {
