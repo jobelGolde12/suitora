@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "start:prod": "npm run build && node scripts/start-standalone.mjs",
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix",
     "lint:md": "markdownlint-cli2 \"README.md\" \"CONTRIBUTING.md\" \"ARCHITECTURE.md\" \"SECURITY.md\" \"docs/README.md\" \"docs/runbooks.md\" \"docs/runbooks/**\" \"runbooks/**/*.md\"",

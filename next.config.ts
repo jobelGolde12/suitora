@@ -41,17 +41,9 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
-      // Well-known immutable assets served from the CDN edge. The max-age tells
-      // any CDN (Vercel Edge, nginx, Cloudflare) to cache build artifacts long-term.
-      {
-        source: "/_next/static/(.*)",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=31536000, immutable",
-          },
-        ],
-      },
+      // Note: no explicit Cache-Control for /_next/static — Next.js already
+      // serves build artifacts with "public, max-age=31536000, immutable",
+      // and overriding it breaks development-mode asset serving.
       {
         source: "/(.*)",
         headers: [
