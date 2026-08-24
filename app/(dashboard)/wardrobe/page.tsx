@@ -93,7 +93,8 @@ export default function WardrobePage() {
     if (isRemoving) return;
     setIsRemoving(true);
     // Optimistic update
-    const prev = allItems;
+    const removedIndex = allItems.findIndex((i) => i.analysisId === item.analysisId);
+    if (removedIndex === -1) return;
     setItems(allItems.filter((i) => i.analysisId !== item.analysisId));
     try {
       const res = await fetch("/api/favorites", {
@@ -110,7 +111,15 @@ export default function WardrobePage() {
       addToast("Removed from wardrobe", "success");
     } catch (err) {
       console.error(err);
-      setItems(prev); // Rollback
+      // Rollback: re-insert the item at its original position without
+      // clobbering mutations that succeeded in the meantime.
+      setItems((cur) => {
+        const base = cur ?? allItems;
+        if (base.some((i) => i.analysisId === item.analysisId)) return base;
+        const next = [...base];
+        next.splice(removedIndex, 0, item);
+        return next;
+      });
       addToast("Failed to update wardrobe", "error");
     } finally {
       setIsRemoving(false);

@@ -44,6 +44,8 @@ export default function FavoritesPage() {
   const [editing, setEditing] = useState<FavoriteAnalysis | null>(null);
   // Local state for optimistic updates after mutations
   const [favorites, setFavorites] = useState<FavoriteAnalysis[] | null>(null);
+  // Folders created inside the modal before SWR revalidation picks them up
+  const [localFolders, setLocalFolders] = useState<WardrobeFolderOption[] | null>(null);
 
   const { data: favData, isLoading: favLoading } = useSWR<
     { favorites: FavoriteItem[] }
@@ -59,7 +61,8 @@ export default function FavoritesPage() {
     dedupingInterval: 60_000,
   });
 
-  const folders = folderData?.folders ?? [];
+  const swrFolders = useMemo(() => folderData?.folders ?? [], [folderData]);
+  const folders = localFolders ?? swrFolders;
 
   // Derive favorites from SWR data (or use local state for optimistic updates)
   const allFavorites: FavoriteAnalysis[] = useMemo(() => {
@@ -90,7 +93,8 @@ export default function FavoritesPage() {
 
   const handleRemove = async (id: string) => {
     // Optimistic update
-    const prev = allFavorites;
+    const removedIndex = allFavorites.findIndex((f) => f.id === id);
+    if (removedIndex === -1) return;
     setFavorites(allFavorites.filter((f) => f.id !== id));
     try {
       const res = await fetch(`/api/favorites?analysisId=${id}`, {
@@ -104,7 +108,15 @@ export default function FavoritesPage() {
       }
     } catch (err) {
       console.error(err);
-      setFavorites(prev); // Rollback
+      // Rollback: re-insert the item at its original position without
+      // clobbering mutations that succeeded in the meantime.
+      setFavorites((cur) => {
+        const base = cur ?? allFavorites;
+        if (base.some((f) => f.id === id)) return base;
+        const next = [...base];
+        next.splice(removedIndex, 0, allFavorites[removedIndex]);
+        return next;
+      });
       addToast("Failed to remove favorite", "error");
     }
   };
@@ -117,7 +129,6 @@ export default function FavoritesPage() {
 
     const next = false;
     // Optimistic update
-    const prev = allFavorites;
     setFavorites(
       allFavorites.map((f) =>
         f.id === analysis.id
@@ -145,7 +156,19 @@ export default function FavoritesPage() {
       addToast("Removed from wardrobe", "success");
     } catch (err) {
       console.error(err);
-      setFavorites(prev); // Rollback
+      // Rollback only the affected item so concurrent mutations survive.
+      setFavorites((cur) =>
+        (cur ?? allFavorites).map((f) =>
+          f.id === analysis.id
+            ? {
+                ...f,
+                inWardrobe: analysis.inWardrobe,
+                wardrobeFolder: analysis.wardrobeFolder,
+                wardrobeFolderName: analysis.wardrobeFolderName,
+              }
+            : f
+        )
+      );
       addToast("Failed to update wardrobe", "error");
     }
   };
@@ -402,7 +425,7 @@ export default function FavoritesPage() {
         initialFolderId={editing?.wardrobeFolder}
         initialTags={editing?.wardrobeTags ?? []}
         folders={folders}
-        onFoldersChange={() => {}}
+        onFoldersChange={(newFolders) => setLocalFolders(newFolders)}
         onSaved={(data) => {
           if (!editing) return;
           setFavorites((prev) =>

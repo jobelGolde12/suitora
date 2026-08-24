@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { Sparkles, AlertCircle } from "lucide-react";
+import { Sparkles, AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import {
   PageContainer,
@@ -30,6 +30,7 @@ export default function TrendingPage() {
     data,
     isLoading,
     error,
+    mutate,
   } = useSWR<{ items: TrendItem[] }>(
     `/api/trending?${params.toString()}`,
     fetcher,
@@ -64,11 +65,21 @@ export default function TrendingPage() {
           title="Couldn't load trending items"
           description="Something went wrong while fetching the trending feed. Check your connection and try again."
           action={
-            <Link href="/upload">
-              <Button variant="editorial" className="rounded-full px-6">
-                Analyze your own item
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button
+                variant="editorial"
+                className="rounded-full px-6"
+                onClick={() => void mutate()}
+              >
+                <RefreshCw className="h-4 w-4" strokeWidth={1.5} />
+                Retry
               </Button>
-            </Link>
+              <Link href="/upload">
+                <Button variant="secondary" className="rounded-full px-6">
+                  Analyze your own item
+                </Button>
+              </Link>
+            </div>
           }
         />
       ) : isLoading ? (

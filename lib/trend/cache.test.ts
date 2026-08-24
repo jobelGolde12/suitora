@@ -4,7 +4,7 @@ const { cacheGet, cacheSet, redisMock } = vi.hoisted(() => ({
 	cacheGet: vi.fn(),
 	cacheSet: vi.fn(),
 	redisMock: {
-		keys: vi.fn(),
+		scanStream: vi.fn(),
 		del: vi.fn(),
 	},
 }));
@@ -16,6 +16,15 @@ vi.mock("@/lib/cache", () => ({
 	flushAll: vi.fn(),
 	getRedisClient: () => redisMock,
 }));
+
+// Emulates an ioredis scanStream: an async iterable of key batches.
+function scanBatches(...batches: string[][]): AsyncIterable<string[]> {
+	return (async function* () {
+		for (const batch of batches) {
+			yield batch;
+		}
+	})();
+}
 
 import { getCached, setCached, invalidateTrendCache, buildTrendCacheKey } from "./cache";
 
@@ -66,27 +75,43 @@ describe("setCached", () => {
 
 describe("invalidateTrendCache", () => {
 	beforeEach(() => {
-		redisMock.keys.mockReset();
+		redisMock.scanStream.mockReset();
 		redisMock.del.mockReset();
 	});
 
-	it("deletes keys matching the prefix", async () => {
-		redisMock.keys.mockResolvedValueOnce(["trending:a", "trending:b"]);
+	it("deletes keys matching the prefix via SCAN batches", async () => {
+		redisMock.scanStream.mockReturnValueOnce(
+			scanBatches(["trending:a", "trending:b"])
+		);
 		await invalidateTrendCache();
-		expect(redisMock.keys).toHaveBeenCalledWith("trending:*");
+		expect(redisMock.scanStream).toHaveBeenCalledWith({ match: "trending:*" });
 		expect(redisMock.del).toHaveBeenCalledWith(["trending:a", "trending:b"]);
 	});
 
 	it("skips deletion when no keys match", async () => {
-		redisMock.keys.mockResolvedValueOnce([]);
+		redisMock.scanStream.mockReturnValueOnce(scanBatches([]));
 		await invalidateTrendCache();
 		expect(redisMock.del).not.toHaveBeenCalled();
 	});
 
+	it("deletes each batch produced by the cursor", async () => {
+		redisMock.scanStream.mockReturnValueOnce(
+			scanBatches(["trending:1"], ["trending:2"])
+		);
+		await invalidateTrendCache();
+		expect(redisMock.del).toHaveBeenCalledTimes(2);
+		expect(redisMock.del).toHaveBeenNthCalledWith(1, ["trending:1"]);
+		expect(redisMock.del).toHaveBeenNthCalledWith(2, ["trending:2"]);
+	});
+
 	it("uses a custom prefix when provided", async () => {
-		redisMock.keys.mockResolvedValueOnce(["trending:custom:1"]);
+		redisMock.scanStream.mockReturnValueOnce(
+			scanBatches(["trending:custom:1"])
+		);
 		await invalidateTrendCache("trending:custom:");
-		expect(redisMock.keys).toHaveBeenCalledWith("trending:custom:*");
+		expect(redisMock.scanStream).toHaveBeenCalledWith({
+			match: "trending:custom:*",
+		});
 		expect(redisMock.del).toHaveBeenCalledWith(["trending:custom:1"]);
 	});
 });

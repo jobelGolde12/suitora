@@ -107,6 +107,8 @@ export default function ResultsPage() {
   const [inWardrobe, setInWardrobe] = useState(false);
   const [wearWithItems, setWearWithItems] = useState<TrendOutfitItem[]>([]);
   const [selectedView, setSelectedView] = useState<"tryon" | "original">("tryon");
+  // Set when try-on polling hit its safety cap while still "processing"
+  const [pollTimedOut, setPollTimedOut] = useState(false);
 
   // Fetch the user's saved profile so manual measurements take precedence
   // over the AI estimates from this analysis.
@@ -149,9 +151,12 @@ export default function ResultsPage() {
         if (status === "processing" && pollCount < MAX_POLLS) {
           pollCount += 1;
           if (!intervalId) intervalId = setInterval(loadData, 3000);
-        } else if (intervalId) {
-          clearInterval(intervalId);
-          intervalId = null;
+        } else {
+          if (intervalId) {
+            clearInterval(intervalId);
+            intervalId = null;
+          }
+          if (status === "processing") setPollTimedOut(true);
         }
 
         // 3. Check favorite status via lightweight check endpoint (once only)
@@ -393,7 +398,11 @@ export default function ResultsPage() {
               {tryOnGenerating ? (
                 <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-surface">
                   <Loader2 className="h-6 w-6 text-accent animate-spin" strokeWidth={1.5} />
-                  <p className="text-sm text-muted font-light">Generating preview…</p>
+                  <p className="text-sm text-muted font-light max-w-[16rem] text-center">
+                    {pollTimedOut
+                      ? "This is taking longer than expected. It may still complete — check back shortly."
+                      : "Generating preview…"}
+                  </p>
                 </div>
               ) : selectedView === "tryon" && result.generatedImage ? (
                 // eslint-disable-next-line @next/next/no-img-element

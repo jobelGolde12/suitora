@@ -1,4 +1,4 @@
-import { get, set } from "@/lib/cache";
+import { get, set, getRedisClient } from "@/lib/cache";
 
 /**
  * Redis-backed cache for trending API responses.
@@ -17,11 +17,14 @@ export async function setCached<T>(key: string, data: T, ttlSeconds: number = DE
 
 export async function invalidateTrendCache(prefix = "trending:"): Promise<void> {
   try {
-    const client = (await import("@/lib/cache")).getRedisClient();
+    const client = getRedisClient();
     if (!client) return;
-    const keys = await client.keys(`${prefix}*`);
-    if (keys.length > 0) {
-      await client.del(keys);
+    // SCAN instead of KEYS so invalidation never blocks the Redis event loop.
+    const batches = client.scanStream({ match: `${prefix}*` });
+    for await (const keys of batches) {
+      if (keys.length > 0) {
+        await client.del(keys);
+      }
     }
   } catch {
     // Cache invalidation failure is non-fatal.
