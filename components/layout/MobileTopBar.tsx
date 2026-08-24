@@ -16,7 +16,7 @@ export function MobileTopBar() {
         <Link
           href="/dashboard"
           aria-label="Suitora home"
-          className="flex items-center gap-2.5 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex items-center gap-2.5 rounded-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border border-accent/30 bg-accent/10">
             <Image
@@ -36,7 +36,7 @@ export function MobileTopBar() {
           aria-label="Favorites"
           aria-current={isFavorites ? "page" : undefined}
           className={cn(
-            "flex h-11 w-11 items-center justify-center rounded-full text-muted",
+            "flex h-11 w-11 items-center justify-center rounded-full text-muted cursor-pointer",
             "transition-colors duration-200 hover:bg-surface hover:text-foreground",
             "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           )}

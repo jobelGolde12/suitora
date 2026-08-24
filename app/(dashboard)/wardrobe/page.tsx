@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
+import useSWR from "swr";
 import { motion } from "framer-motion";
 import { FolderOpen, Heart, Pencil, Settings2, Shirt, Trash2, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -24,7 +25,9 @@ import {
 } from "@/components/wardrobe/ItemFolderModal";
 import { cn } from "@/lib/utils/cn";
 import { formatRelativeTime, formatScore, getScoreColor } from "@/lib/utils/format";
-import type { AnalysisResult } from "@/types";
+import { extractCategory } from "@/lib/utils/analysis";
+import { fetcher } from "@/lib/utils/fetcher";
+import type { AnalysisResult, FavoriteItem } from "@/types";
 
 interface WardrobeItem {
   id: string;
@@ -37,70 +40,61 @@ interface WardrobeItem {
   analysis: AnalysisResult & { category?: string | null };
 }
 
-function extractCategory(analysis: AnalysisResult): string | null {
-  if (!analysis.compatibilityMetadata) return null;
-  try {
-    const meta = analysis.compatibilityMetadata as {
-      itemProfile?: { category?: string };
-    } | null;
-    return meta?.itemProfile?.category ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export default function WardrobePage() {
   const { addToast } = useToast();
-  const [items, setItems] = useState<WardrobeItem[]>([]);
-  const [folders, setFolders] = useState<WardrobeFolderOption[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [activeFolder, setActiveFolder] = useState<"all" | "none" | string>("all");
   const [editing, setEditing] = useState<WardrobeItem | null>(null);
   const [itemToRemove, setItemToRemove] = useState<WardrobeItem | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
   const [isFolderManagerOpen, setIsFolderManagerOpen] = useState(false);
-  const [hasFavorites, setHasFavorites] = useState(true);
+  // Local state for optimistic updates after mutations
+  const [items, setItems] = useState<WardrobeItem[] | null>(null);
+  const [localFolders, setLocalFolders] = useState<WardrobeFolderOption[] | null>(null);
 
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/wardrobe", { credentials: "include" }),
-      fetch("/api/favorites", { credentials: "include" }),
-    ])
-      .then(async ([wardrobeRes, favoritesRes]) => {
-        const wardrobeData = wardrobeRes.ok ? await wardrobeRes.json() : null;
-        const favoritesData = favoritesRes.ok ? await favoritesRes.json() : null;
+  const { data: wardrobeData, isLoading: wardrobeLoading } = useSWR<
+    { items: WardrobeItem[]; folders: WardrobeFolderOption[] }
+  >("/api/wardrobe", fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 30_000,
+  });
 
-        setHasFavorites((favoritesData?.favorites?.length ?? 0) > 0);
-        setFolders(wardrobeData?.folders ?? []);
-        setItems(
-          ((wardrobeData?.items ?? []) as WardrobeItem[]).map((item) => ({
-            ...item,
-            analysis: {
-              ...item.analysis,
-              category: extractCategory(item.analysis),
-            },
-          }))
-        );
-      })
-      .catch((err) => {
-        console.error("Failed to load wardrobe:", err);
-        addToast("Failed to load wardrobe", "error");
-      })
-      .finally(() => setIsLoading(false));
-  }, [addToast]);
+  const { data: favData } = useSWR<
+    { favorites: FavoriteItem[] }
+  >("/api/favorites", fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60_000,
+  });
+
+  // Derive items from SWR data (or use local state for optimistic updates)
+  const allItems: WardrobeItem[] = useMemo(() => {
+    if (items) return items;
+    if (!wardrobeData) return [];
+    return (wardrobeData.items ?? []).map((item: WardrobeItem) => ({
+      ...item,
+      analysis: {
+        ...item.analysis,
+        category: extractCategory(item.analysis),
+      },
+    }));
+  }, [wardrobeData, items]);
+
+  const folders = localFolders ?? wardrobeData?.folders ?? [];
+  const hasFavorites = (favData?.favorites?.length ?? 0) > 0;
 
   const filtered = useMemo(() => {
-    if (activeFolder === "all") return items;
+    if (activeFolder === "all") return allItems;
     if (activeFolder === "none") {
-      return items.filter((i) => !i.wardrobeFolder);
+      return allItems.filter((i) => !i.wardrobeFolder);
     }
-    return items.filter((i) => i.wardrobeFolder === activeFolder);
-  }, [items, activeFolder]);
+    return allItems.filter((i) => i.wardrobeFolder === activeFolder);
+  }, [allItems, activeFolder]);
 
   const handleRemoveFromWardrobe = async (item: WardrobeItem) => {
     if (isRemoving) return;
     setIsRemoving(true);
-    setItems((prev) => prev.filter((i) => i.analysisId !== item.analysisId));
+    // Optimistic update
+    const prev = allItems;
+    setItems(allItems.filter((i) => i.analysisId !== item.analysisId));
     try {
       const res = await fetch("/api/favorites", {
         method: "PATCH",
@@ -116,7 +110,7 @@ export default function WardrobePage() {
       addToast("Removed from wardrobe", "success");
     } catch (err) {
       console.error(err);
-      setItems((prev) => [...prev, item]);
+      setItems(prev); // Rollback
       addToast("Failed to update wardrobe", "error");
     } finally {
       setIsRemoving(false);
@@ -126,7 +120,7 @@ export default function WardrobePage() {
 
   const handleFolderRenamed = (id: string, name: string) => {
     setItems((prev) =>
-      prev.map((i) =>
+      (prev ?? allItems).map((i) =>
         i.wardrobeFolder === id ? { ...i, wardrobeFolderName: name } : i
       )
     );
@@ -135,7 +129,7 @@ export default function WardrobePage() {
   const handleFolderDeleted = (id: string) => {
     setActiveFolder((current) => (current === id ? "all" : current));
     setItems((prev) =>
-      prev.map((i) =>
+      (prev ?? allItems).map((i) =>
         i.wardrobeFolder === id
           ? { ...i, wardrobeFolder: null, wardrobeFolderName: null }
           : i
@@ -143,7 +137,7 @@ export default function WardrobePage() {
     );
   };
 
-  if (isLoading) {
+  if (wardrobeLoading) {
     return <FavoritesSkeleton />;
   }
 
@@ -152,7 +146,7 @@ export default function WardrobePage() {
       <PageHeader
         label="Closet"
         title="Wardrobe"
-        description={`${items.length} item${items.length === 1 ? "" : "s"} organized for outfit ideas.`}
+        description={`${allItems.length} item${allItems.length === 1 ? "" : "s"} organized for outfit ideas.`}
         action={
           <Link href="/favorites">
             <Button variant="editorial" className="rounded-full px-6">
@@ -162,9 +156,9 @@ export default function WardrobePage() {
         }
       />
 
-      <OutfitSuggestions wardrobeCount={items.length} />
+      <OutfitSuggestions wardrobeCount={allItems.length} />
 
-      {items.length > 0 && (
+      {allItems.length > 0 && (
         <div className="mb-8 flex flex-wrap gap-2">
           <button
             type="button"
@@ -176,7 +170,7 @@ export default function WardrobePage() {
                 : "border-border text-muted hover:text-foreground"
             )}
           >
-            All ({items.length})
+            All ({allItems.length})
           </button>
           <button
             type="button"
@@ -188,7 +182,7 @@ export default function WardrobePage() {
                 : "border-border text-muted hover:text-foreground"
             )}
           >
-            Unfiled ({items.filter((i) => !i.wardrobeFolder).length})
+            Unfiled ({allItems.filter((i) => !i.wardrobeFolder).length})
           </button>
           {folders.map((folder) => (
             <button
@@ -218,7 +212,7 @@ export default function WardrobePage() {
         </div>
       )}
 
-      {items.length === 0 ? (
+      {allItems.length === 0 ? (
         <EmptyState
           icon={!hasFavorites ? Heart : Shirt}
           title={!hasFavorites ? "No favorites yet" : "Wardrobe is empty"}
@@ -367,11 +361,11 @@ export default function WardrobePage() {
         initialFolderId={editing?.wardrobeFolder}
         initialTags={editing?.wardrobeTags ?? []}
         folders={folders}
-        onFoldersChange={setFolders}
+        onFoldersChange={(newFolders) => setLocalFolders(newFolders)}
         onSaved={(data) => {
           if (!editing) return;
           setItems((prev) =>
-            prev.map((i) =>
+            (prev ?? allItems).map((i) =>
               i.analysisId === editing.analysisId
                 ? {
                     ...i,
@@ -383,8 +377,8 @@ export default function WardrobePage() {
                 : i
             )
           );
-          setFolders((prev) =>
-            prev.map((f) => {
+          setLocalFolders((prev) =>
+            (prev ?? folders).map((f) => {
               const wasIn = editing.wardrobeFolder === f.id;
               const nowIn = data.wardrobeFolder === f.id;
               if (wasIn === nowIn) return f;
@@ -402,7 +396,7 @@ export default function WardrobePage() {
         isOpen={isFolderManagerOpen}
         onClose={() => setIsFolderManagerOpen(false)}
         folders={folders}
-        onFoldersChange={setFolders}
+        onFoldersChange={(newFolders) => setLocalFolders(newFolders)}
         onFolderRenamed={handleFolderRenamed}
         onFolderDeleted={handleFolderDeleted}
       />

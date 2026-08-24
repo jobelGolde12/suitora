@@ -24,9 +24,9 @@ export function EmptyState({
       )}
     >
       <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full border border-border bg-surface">
-        <Icon className="h-6 w-6 text-muted" strokeWidth={1.5} />
+        <Icon className="h-6 w-6 text-muted" strokeWidth={1.5} aria-hidden="true" />
       </div>
-      <p className="font-heading text-xl font-medium tracking-tight">{title}</p>
+      <h3 className="font-heading text-xl font-medium tracking-tight">{title}</h3>
       <p className="text-sm text-muted font-light mt-2 max-w-sm mx-auto leading-relaxed">
         {description}
       </p>

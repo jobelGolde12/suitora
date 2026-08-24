@@ -31,7 +31,7 @@ export function TrendingCard({ item, delay = 0, className }: TrendingCardProps) 
       <Link
         href={`/trending/${item.id}`}
         className={cn(
-          "group block overflow-hidden rounded-2xl border border-border bg-card shadow-card",
+          "group block overflow-hidden rounded-2xl border border-border bg-card shadow-card cursor-pointer",
           "editorial-card-hover",
           className
         )}

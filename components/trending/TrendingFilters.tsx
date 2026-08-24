@@ -30,7 +30,7 @@ export function TrendingFilters({
             type="button"
             onClick={() => onCategoryChange(key)}
             className={cn(
-              "rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors duration-200",
+              "rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors duration-200 cursor-pointer",
               "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               isActive
                 ? "border-foreground/20 bg-foreground text-background"
@@ -53,7 +53,7 @@ export function TrendingFilters({
           if (e.target.value) onCategoryChange(e.target.value);
         }}
         className={cn(
-          "rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted",
+          "rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted cursor-pointer",
           "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           CATEGORY_FILTER_MORE.includes(activeCategory as never) &&
             "border-foreground/20 text-foreground"

@@ -70,7 +70,7 @@ export function Navbar() {
             <Link
               key={link.href}
               href={link.href}
-              className="text-sm text-muted hover:text-foreground transition-colors duration-300 relative group"
+              className="text-sm text-muted hover:text-foreground transition-colors duration-300 relative group cursor-pointer"
             >
               {link.label}
               <span className="absolute -bottom-1 left-0 w-0 h-px bg-accent transition-all duration-300 group-hover:w-full" />
@@ -120,7 +120,7 @@ export function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="block text-base text-muted hover:text-foreground transition-colors py-2 font-light"
+                className="block text-base text-muted hover:text-foreground transition-colors py-2 font-light cursor-pointer"
               >
                 {link.label}
               </Link>

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
+import useSWR from "swr";
 import { motion } from "framer-motion";
 import { Heart, Pencil, Shirt, Trash2, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -23,6 +24,8 @@ import {
 } from "@/components/wardrobe/ItemFolderModal";
 import { cn } from "@/lib/utils/cn";
 import { formatRelativeTime, formatScore, getScoreColor } from "@/lib/utils/format";
+import { extractCategory } from "@/lib/utils/analysis";
+import { fetcher } from "@/lib/utils/fetcher";
 import type { AnalysisResult, FavoriteItem } from "@/types";
 
 type FavoriteAnalysis = AnalysisResult & {
@@ -34,84 +37,74 @@ type FavoriteAnalysis = AnalysisResult & {
   wardrobeFolderName?: string | null;
 };
 
-function extractCategory(analysis: AnalysisResult): string | null {
-  if (!analysis.compatibilityMetadata) return null;
-  try {
-    const meta = analysis.compatibilityMetadata as {
-      itemProfile?: { category?: string };
-    } | null;
-    return meta?.itemProfile?.category ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export default function FavoritesPage() {
   const { addToast } = useToast();
-  const [favorites, setFavorites] = useState<FavoriteAnalysis[]>([]);
-  const [folders, setFolders] = useState<WardrobeFolderOption[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState("all");
   const [view, setView] = useState<"all" | "wardrobe">("all");
   const [editing, setEditing] = useState<FavoriteAnalysis | null>(null);
+  // Local state for optimistic updates after mutations
+  const [favorites, setFavorites] = useState<FavoriteAnalysis[] | null>(null);
 
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/favorites", { credentials: "include" }),
-      fetch("/api/wardrobe/folders", { credentials: "include" }),
-    ])
-      .then(async ([favRes, folderRes]) => {
-        const favData = favRes.ok ? await favRes.json() : null;
-        const folderData = folderRes.ok ? await folderRes.json() : null;
-        const folderList = (folderData?.folders ?? []) as WardrobeFolderOption[];
-        setFolders(folderList);
-        const nameById = new Map(folderList.map((f) => [f.id, f.name]));
+  const { data: favData, isLoading: favLoading } = useSWR<
+    { favorites: FavoriteItem[] }
+  >("/api/favorites", fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 30_000,
+  });
 
-        const favorited = ((favData?.favorites ?? []) as FavoriteItem[]).map(
-          (fav) => ({
-            ...fav.analysis,
-            isFavorite: true,
-            category: extractCategory(fav.analysis),
-            inWardrobe: fav.inWardrobe,
-            wardrobeTags: fav.wardrobeTags,
-            wardrobeFolder: fav.wardrobeFolder,
-            wardrobeFolderName: fav.wardrobeFolder
-              ? (nameById.get(fav.wardrobeFolder) ?? null)
-              : null,
-          })
-        );
-        setFavorites(favorited);
-      })
-      .catch((err) => {
-        console.error("Failed to load favorites:", err);
-        addToast("Failed to load favorites", "error");
-      })
-      .finally(() => setIsLoading(false));
-  }, [addToast]);
+  const { data: folderData } = useSWR<
+    { folders: WardrobeFolderOption[] }
+  >("/api/wardrobe/folders", fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60_000,
+  });
+
+  const folders = folderData?.folders ?? [];
+
+  // Derive favorites from SWR data (or use local state for optimistic updates)
+  const allFavorites: FavoriteAnalysis[] = useMemo(() => {
+    if (favorites) return favorites; // Use optimistic local state
+    if (!favData) return [];
+    const nameById = new Map(folders.map((f) => [f.id, f.name]));
+    return (favData.favorites ?? []).map((fav) => ({
+      ...fav.analysis,
+      isFavorite: true,
+      category: extractCategory(fav.analysis),
+      inWardrobe: fav.inWardrobe,
+      wardrobeTags: fav.wardrobeTags,
+      wardrobeFolder: fav.wardrobeFolder,
+      wardrobeFolderName: fav.wardrobeFolder
+        ? (nameById.get(fav.wardrobeFolder) ?? null)
+        : null,
+    }));
+  }, [favData, folders, favorites]);
 
   const filteredFavorites = useMemo(() => {
-    return favorites.filter((f) => {
+    return allFavorites.filter((f) => {
       const matchesCategory =
         activeCategory === "all" || f.category === activeCategory;
       const matchesView = view === "all" || f.inWardrobe;
       return matchesCategory && matchesView;
     });
-  }, [favorites, activeCategory, view]);
+  }, [allFavorites, activeCategory, view]);
 
   const handleRemove = async (id: string) => {
+    // Optimistic update
+    const prev = allFavorites;
+    setFavorites(allFavorites.filter((f) => f.id !== id));
     try {
       const res = await fetch(`/api/favorites?analysisId=${id}`, {
         method: "DELETE",
         credentials: "include",
       });
       if (res.ok) {
-        setFavorites((prev) => prev.filter((f) => f.id !== id));
         addToast("Removed from favorites", "success");
       } else {
         throw new Error("Failed to remove favorite");
       }
     } catch (err) {
       console.error(err);
+      setFavorites(prev); // Rollback
       addToast("Failed to remove favorite", "error");
     }
   };
@@ -123,8 +116,10 @@ export default function FavoritesPage() {
     }
 
     const next = false;
-    setFavorites((prev) =>
-      prev.map((f) =>
+    // Optimistic update
+    const prev = allFavorites;
+    setFavorites(
+      allFavorites.map((f) =>
         f.id === analysis.id
           ? {
               ...f,
@@ -150,23 +145,12 @@ export default function FavoritesPage() {
       addToast("Removed from wardrobe", "success");
     } catch (err) {
       console.error(err);
-      setFavorites((prev) =>
-        prev.map((f) =>
-          f.id === analysis.id
-            ? {
-                ...f,
-                inWardrobe: true,
-                wardrobeFolder: analysis.wardrobeFolder,
-                wardrobeFolderName: analysis.wardrobeFolderName,
-              }
-            : f
-        )
-      );
+      setFavorites(prev); // Rollback
       addToast("Failed to update wardrobe", "error");
     }
   };
 
-  if (isLoading) {
+  if (favLoading) {
     return <FavoritesSkeleton />;
   }
 
@@ -175,7 +159,7 @@ export default function FavoritesPage() {
       <PageHeader
         label="Saved"
         title="Favorites"
-        description={`Analyses you've saved for later (${favorites.length} items).`}
+        description={`Analyses you've saved for later (${allFavorites.length} items).`}
         action={
           <div className="flex flex-wrap gap-2">
             <Link href="/wardrobe">
@@ -193,10 +177,10 @@ export default function FavoritesPage() {
       />
 
       <OutfitSuggestions
-        wardrobeCount={favorites.filter((f) => f.inWardrobe).length}
+        wardrobeCount={allFavorites.filter((f) => f.inWardrobe).length}
       />
 
-      {favorites.length > 0 && (
+      {allFavorites.length > 0 && (
         <div className="mb-8 space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div className="inline-flex rounded-full border border-border bg-surface p-0.5">
@@ -211,7 +195,7 @@ export default function FavoritesPage() {
                   type="button"
                   onClick={() => setView(opt.value)}
                   className={cn(
-                    "rounded-full px-4 py-1.5 text-xs font-medium transition-colors",
+                    "rounded-full px-4 py-1.5 text-xs font-medium transition-colors cursor-pointer",
                     view === opt.value
                       ? "bg-foreground text-background"
                       : "text-muted hover:text-foreground"
@@ -229,7 +213,7 @@ export default function FavoritesPage() {
         </div>
       )}
 
-      {favorites.length === 0 ? (
+      {allFavorites.length === 0 ? (
         <EmptyState
           icon={Heart}
           title="No favorites yet"
@@ -307,63 +291,60 @@ export default function FavoritesPage() {
                     <CategoryBadge category={analysis.category} />
                   </div>
                 )}
-                {analysis.inWardrobe && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setEditing(analysis);
-                    }}
-                    className="absolute bottom-3 right-3 rounded-full bg-accent/90 text-background border border-accent px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.15em] hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    aria-label="Edit wardrobe folder and tags"
-                  >
-                    In Wardrobe
-                  </button>
-                )}
-                {analysis.inWardrobe && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setEditing(analysis);
-                    }}
-                    className="absolute top-3 right-[6.5rem] h-9 w-9 rounded-full border border-border bg-card/90 text-foreground flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-accent/10 hover:text-accent"
-                    aria-label="Edit folder and tags"
-                  >
-                    <Pencil className="h-4 w-4" strokeWidth={1.5} />
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    void handleToggleWardrobe(analysis);
-                  }}
-                  className={cn(
-                    "absolute top-3 right-14 h-9 w-9 rounded-full border bg-card/90 text-foreground flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    analysis.inWardrobe
-                      ? "border-accent text-accent"
-                      : "border-border hover:bg-accent/10 hover:text-accent"
+                {/* Action buttons row — visible on hover, positioned top-right */}
+                <div className="absolute top-3 right-3 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
+                  {analysis.inWardrobe && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setEditing(analysis);
+                      }}
+                      className="h-8 w-8 rounded-full border border-border bg-card/90 text-foreground flex items-center justify-center transition-colors cursor-pointer hover:bg-accent/10 hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label="Edit folder and tags"
+                    >
+                      <Pencil className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    </button>
                   )}
-                  aria-label={
-                    analysis.inWardrobe
-                      ? "Remove from wardrobe"
-                      : "Add to wardrobe"
-                  }
-                >
-                  <Shirt className="h-4 w-4" strokeWidth={1.5} />
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    void handleRemove(analysis.id);
-                  }}
-                  className="absolute top-3 right-3 h-9 w-9 rounded-full bg-card/90 border border-border text-foreground flex items-center justify-center hover:bg-error/10 hover:text-error transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  aria-label="Remove from favorites"
-                >
-                  <Trash2 className="h-4 w-4" strokeWidth={1.5} />
-                </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      void handleToggleWardrobe(analysis);
+                    }}
+                    className={cn(
+                      "h-8 w-8 rounded-full border bg-card/90 text-foreground flex items-center justify-center transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      analysis.inWardrobe
+                        ? "border-accent text-accent"
+                        : "border-border hover:bg-accent/10 hover:text-accent"
+                    )}
+                    aria-label={
+                      analysis.inWardrobe
+                        ? "Remove from wardrobe"
+                        : "Add to wardrobe"
+                    }
+                  >
+                    <Shirt className="h-3.5 w-3.5" strokeWidth={1.5} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      void handleRemove(analysis.id);
+                    }}
+                    className="h-8 w-8 rounded-full bg-card/90 border border-border text-foreground flex items-center justify-center transition-colors cursor-pointer hover:bg-error/10 hover:text-error focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-label="Remove from favorites"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+                  </button>
+                </div>
+                {analysis.inWardrobe && (
+                  <div className="absolute bottom-3 right-3">
+                    <span className="rounded-full bg-accent/90 text-background border border-accent px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.15em]">
+                      In Wardrobe
+                    </span>
+                  </div>
+                )}
               </div>
 
               <Link href={`/results/${analysis.id}`}>
@@ -421,11 +402,11 @@ export default function FavoritesPage() {
         initialFolderId={editing?.wardrobeFolder}
         initialTags={editing?.wardrobeTags ?? []}
         folders={folders}
-        onFoldersChange={setFolders}
+        onFoldersChange={() => {}}
         onSaved={(data) => {
           if (!editing) return;
           setFavorites((prev) =>
-            prev.map((f) =>
+            (prev ?? allFavorites).map((f) =>
               f.id === editing.id
                 ? {
                     ...f,

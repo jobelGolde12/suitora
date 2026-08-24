@@ -55,24 +55,22 @@ describe("GET /api/dashboard/stats", () => {
   });
 
   it("marks favorited analyses and orders the score trend oldest-first", async () => {
-    queriesMock.getAnalysesByUserId.mockImplementation((_userId: string, limit: number) =>
-      Promise.resolve(
-        limit === 10
-          ? [
-              // newest first (as the query returns them)
-              { id: "a2", overallScore: 90, createdAt: "2026-01-03" },
-              { id: "a1", overallScore: 40, createdAt: "2026-01-01" },
-            ]
-          : [{ id: "a2", overallScore: 90, createdAt: "2026-01-03" }]
-      )
-    );
+    // After consolidation, getAnalysesByUserId is called once with limit=10.
+    // Recent analyses are the first 5 items from that single result set.
+    queriesMock.getAnalysesByUserId.mockResolvedValue([
+      // newest first (as the query returns them)
+      { id: "a2", overallScore: 90, createdAt: "2026-01-03" },
+      { id: "a1", overallScore: 40, createdAt: "2026-01-01" },
+    ]);
     queriesMock.getFavoriteAnalysisIds.mockResolvedValue(new Set(["a2"]));
 
     const res = await callRoute(GET, jsonRequest("http://localhost/api/dashboard/stats", "GET"));
     const body = await res.json();
 
-    expect(body.recentAnalyses).toHaveLength(1);
+    // recentAnalyses is slice(0,5) of the single query result
+    expect(body.recentAnalyses).toHaveLength(2);
     expect(body.recentAnalyses[0]).toMatchObject({ id: "a2", isFavorite: true });
+    expect(body.recentAnalyses[1]).toMatchObject({ id: "a1", isFavorite: false });
     expect(body.scoreTrend).toEqual([40, 90]);
     expect(body.trendDates).toEqual(["2026-01-01", "2026-01-03"]);
     expect(body.bestScore).toBe(90);

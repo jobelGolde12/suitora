@@ -162,7 +162,7 @@ export default function HistoryPage() {
               key={sort}
               onClick={() => setSortBy(sort)}
               className={cn(
-                "border px-3.5 py-1.5 text-xs font-medium rounded-full transition-all duration-200",
+                "border px-3.5 py-1.5 text-xs font-medium rounded-full transition-all duration-200 cursor-pointer",
                 "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 sortBy === sort
                   ? "bg-foreground text-background border-transparent"
@@ -239,7 +239,7 @@ export default function HistoryPage() {
                       e.preventDefault();
                       toggleFavorite(analysis.id);
                     }}
-                    className="h-9 w-9 rounded-full bg-card/90 border border-border text-foreground flex items-center justify-center hover:bg-surface transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="h-9 w-9 rounded-full bg-card/90 border border-border text-foreground flex items-center justify-center transition-colors cursor-pointer hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     aria-label={analysis.isFavorite ? "Remove from favorites" : "Add to favorites"}
                   >
                     <Heart
@@ -253,7 +253,7 @@ export default function HistoryPage() {
                       e.preventDefault();
                       handleDelete(analysis.id);
                     }}
-                    className="h-9 w-9 rounded-full bg-card/90 border border-border text-foreground flex items-center justify-center hover:bg-error/10 hover:text-error transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="h-9 w-9 rounded-full bg-card/90 border border-border text-foreground flex items-center justify-center transition-colors cursor-pointer hover:bg-error/10 hover:text-error focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     aria-label="Delete analysis"
                   >
                     <Trash2 className="h-4 w-4" strokeWidth={1.5} />

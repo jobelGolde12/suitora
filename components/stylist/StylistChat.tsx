@@ -204,7 +204,7 @@ export function StylistChat() {
                   type="button"
                   onClick={() => void handleSend(prompt)}
                   disabled={isSending}
-                  className="rounded-full border border-border bg-card px-4 py-2 text-xs text-muted transition-colors duration-200 hover:border-accent/40 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                  className="rounded-full border border-border bg-card px-4 py-2 text-xs text-muted transition-colors duration-200 hover:border-accent/40 hover:text-foreground cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                 >
                   {prompt}
                 </button>
@@ -252,7 +252,7 @@ export function StylistChat() {
                         type="button"
                         onClick={() => void handleSend(chip)}
                         disabled={isSending}
-                        className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted transition-colors hover:border-accent/40 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                        className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted transition-colors hover:border-accent/40 hover:text-foreground cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                       >
                         {chip}
                       </button>

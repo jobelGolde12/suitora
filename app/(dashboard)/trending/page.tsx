@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { Sparkles, AlertCircle, RefreshCw } from "lucide-react";
+import useSWR from "swr";
+import { Sparkles, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import {
   PageContainer,
@@ -14,39 +15,33 @@ import {
   TrendingGrid,
   TrendingGridSkeleton,
 } from "@/components/trending";
+import { fetcher } from "@/lib/utils/fetcher";
 import type { TrendItem } from "@/types/trend";
 
 export default function TrendingPage() {
-  const [items, setItems] = useState<TrendItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
   const [category, setCategory] = useState("all");
 
-  const load = useCallback(async () => {
-    setIsLoading(true);
-    setLoadError(false);
-    try {
-      const params = new URLSearchParams({ limit: "24" });
-      if (category && category !== "all") {
-        params.set("category", category);
-      }
-      const res = await fetch(`/api/trending?${params.toString()}`, {
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to load trending items");
-      const data = await res.json();
-      setItems(data.items || []);
-    } catch (err) {
-      console.error("Failed to load trending items:", err);
-      setLoadError(true);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [category]);
+  const params = new URLSearchParams({ limit: "24" });
+  if (category && category !== "all") {
+    params.set("category", category);
+  }
 
-  useEffect(() => {
-    void Promise.resolve().then(() => load());
-  }, [load]);
+  const {
+    data,
+    isLoading,
+    error,
+  } = useSWR<{ items: TrendItem[] }>(
+    `/api/trending?${params.toString()}`,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 30_000,
+    }
+  );
+
+  const items = data?.items ?? [];
+  const loadError = !!error;
 
   return (
     <PageContainer>
@@ -69,14 +64,11 @@ export default function TrendingPage() {
           title="Couldn't load trending items"
           description="Something went wrong while fetching the trending feed. Check your connection and try again."
           action={
-            <Button
-              variant="editorial"
-              className="rounded-full px-6"
-              onClick={() => void load()}
-            >
-              <RefreshCw className="h-4 w-4" strokeWidth={1.5} />
-              Retry
-            </Button>
+            <Link href="/upload">
+              <Button variant="editorial" className="rounded-full px-6">
+                Analyze your own item
+              </Button>
+            </Link>
           }
         />
       ) : isLoading ? (

@@ -32,16 +32,9 @@ import {
 import { OutfitSuggestions } from "@/components/wardrobe/OutfitSuggestions";
 import { TrendingCollection } from "@/components/trending";
 import { getCurrentSeason } from "@/lib/season";
+import { fetcher } from "@/lib/utils/fetcher";
 import type { AnalysisResult, DashboardStats } from "@/types";
 import type { TrendItem } from "@/types/trend";
-
-const fetcher = (url: string) =>
-  fetch(url, { credentials: "include" }).then((res) => {
-    if (!res.ok) {
-      throw new Error("Failed to fetch");
-    }
-    return res.json();
-  });
 
 export default function DashboardPage() {
   const {

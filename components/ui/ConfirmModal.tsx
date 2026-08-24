@@ -41,6 +41,7 @@ export function ConfirmModal({
           aria-modal="true"
           role="dialog"
           aria-labelledby={titleId}
+          aria-describedby={`${titleId}-desc`}
           onClick={onClose}
         >
           <motion.div
@@ -58,7 +59,7 @@ export function ConfirmModal({
               >
                 {title}
               </h3>
-              <p className="text-sm text-muted mt-2 font-light leading-relaxed">
+              <p id={`${titleId}-desc`} className="text-sm text-muted mt-2 font-light leading-relaxed">
                 {description}
               </p>
             </div>

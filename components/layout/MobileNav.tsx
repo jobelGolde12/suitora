@@ -39,7 +39,7 @@ function TabLink({
       href={href}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "relative flex h-16 flex-col items-center justify-center gap-1 text-muted",
+        "relative flex h-16 flex-col items-center justify-center gap-1 text-muted cursor-pointer",
         "transition-colors duration-200 hover:text-foreground",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
         active && "text-accent"

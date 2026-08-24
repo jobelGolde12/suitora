@@ -18,33 +18,31 @@ export const GET = withApiRoute("/api/dashboard/stats", async () => {
 
   const userId = user.id;
 
-  // Fetch independent queries in parallel — reduces worst-case latency to
-  // the slowest single query instead of the sum of all query times.
-  const [stats, recent, favoriteAnalysisIds, trendAnalyses] =
-    await Promise.all([
-      getDashboardStats(userId),
-      getAnalysesByUserId(userId, 5),
-      getFavoriteAnalysisIds(userId), // lightweight: only returns favorited analysis IDs
-      getAnalysesByUserId(userId, 10),
-    ]);
+  // Fetch independent queries in parallel — use a single analyses query
+  // (limit 10) for both recent (first 5) and score trend (all 10) data.
+  const [stats, analyses, favoriteAnalysisIds] = await Promise.all([
+    getDashboardStats(userId),
+    getAnalysesByUserId(userId, 10),
+    getFavoriteAnalysisIds(userId),
+  ]);
 
-  const recentAnalysesWithFavorite = recent.map((item) => ({
+  const recentAnalysesWithFavorite = analyses.slice(0, 5).map((item) => ({
     ...toAnalysisResult(item),
     isFavorite: favoriteAnalysisIds.has(item.id),
   }));
 
   // Score trend: use overallScore of the recent 10 analyses in ascending
   // chronological order.
-  const scoreTrend = trendAnalyses
+  const scoreTrend = analyses
     .map((a) => a.overallScore)
     .reverse(); // oldest first
 
   const bestScore =
-    trendAnalyses.length > 0
-      ? Math.max(...trendAnalyses.map((a) => a.overallScore))
+    analyses.length > 0
+      ? Math.max(...analyses.map((a) => a.overallScore))
       : null;
 
-  const trendDates = trendAnalyses
+  const trendDates = analyses
     .map((a) => a.createdAt)
     .reverse(); // aligns with scoreTrend
 

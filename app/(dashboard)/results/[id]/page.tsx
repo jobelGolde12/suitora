@@ -43,7 +43,6 @@ import type {
   SkinTone,
   FaceShape,
   StyleType,
-  FavoriteItem,
   UserProfile,
   FitPreference,
 } from "@/types";
@@ -124,6 +123,9 @@ export default function ResultsPage() {
     if (!id) return;
 
     let intervalId: ReturnType<typeof setInterval> | null = null;
+    let pollCount = 0;
+    const MAX_POLLS = 20; // Safety cap: stop after ~60s of polling
+    let favoritesChecked = false;
 
     async function loadData() {
       try {
@@ -144,24 +146,25 @@ export default function ResultsPage() {
 
         // 2. Start/stop polling based on the try-on state.
         const status = data.analysis?.tryOnStatus;
-        if (status === "processing") {
+        if (status === "processing" && pollCount < MAX_POLLS) {
+          pollCount += 1;
           if (!intervalId) intervalId = setInterval(loadData, 3000);
         } else if (intervalId) {
           clearInterval(intervalId);
           intervalId = null;
         }
 
-        // 3. Get favorites to see if this one is favorited / in wardrobe
-        const favsRes = await fetch("/api/favorites", {
-          credentials: "include",
-        });
-        if (favsRes.ok) {
-          const favsData = await favsRes.json();
-          const fav = (favsData.favorites as FavoriteItem[] | undefined)?.find(
-            (f) => f.analysisId === id
-          );
-          setIsFavorited(!!fav);
-          setInWardrobe(!!fav?.inWardrobe);
+        // 3. Check favorite status via lightweight check endpoint (once only)
+        if (!favoritesChecked) {
+          favoritesChecked = true;
+          const favsRes = await fetch(`/api/favorites/check?analysisId=${id}`, {
+            credentials: "include",
+          });
+          if (favsRes.ok) {
+            const favsData = await favsRes.json();
+            setIsFavorited(!!favsData.isFavorited);
+            setInWardrobe(!!favsData.inWardrobe);
+          }
         }
       } catch (err) {
         console.error("Error loading results:", err);

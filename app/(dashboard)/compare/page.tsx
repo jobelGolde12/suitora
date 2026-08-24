@@ -157,7 +157,7 @@ export default function ComparePage() {
                     variants={fadeInUp}
                     custom={i + 2}
                     className={cn(
-                      "relative rounded-2xl border bg-card overflow-hidden text-left transition-all duration-200",
+                      "relative rounded-2xl border bg-card overflow-hidden text-left transition-all duration-200 cursor-pointer",
                       "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       isSelected
                         ? "border-accent ring-2 ring-accent/40 shadow-soft"

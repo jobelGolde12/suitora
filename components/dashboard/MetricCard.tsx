@@ -32,7 +32,7 @@ export function MetricCard({
       whileHover={{ y: -2 }}
       transition={{ type: "spring", stiffness: 200, damping: 22 }}
       className={cn(
-        "rounded-2xl border border-border bg-card p-6 shadow-card editorial-card-hover",
+        "rounded-2xl border border-border bg-card p-6 shadow-card editorial-card-hover cursor-pointer",
         className
       )}
     >

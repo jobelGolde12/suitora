@@ -34,11 +34,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
           className={cn(
-            "h-12 w-full rounded-lg border bg-background px-4 text-sm text-foreground placeholder:text-muted transition-all duration-200",
-            "focus:outline-none focus:ring-1 focus:ring-accent/40 focus:border-accent",
-            "hover:border-muted",
+            "h-12 w-full rounded-xl border bg-background px-4 text-sm text-foreground placeholder:text-muted/70 transition-all duration-200",
+            "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:border-accent",
+            "hover:border-muted/80",
             error
-              ? "border-error focus:ring-error/30 focus:border-error"
+              ? "border-error focus-visible:ring-error/30 focus-visible:border-error"
               : "border-border",
             className
           )}

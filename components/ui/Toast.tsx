@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils/cn";
+import { Check, X, Info, AlertTriangle } from "lucide-react";
 
 type ToastType = "success" | "error" | "info" | "warning";
 
@@ -45,17 +46,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     warning: "bg-warning/10 border-warning/30 text-warning",
   };
 
-  const icons: Record<ToastType, string> = {
-    success: "✓",
-    error: "✕",
-    info: "ℹ",
-    warning: "⚠",
+  const icons: Record<ToastType, ReactNode> = {
+    success: <Check className="h-4 w-4" strokeWidth={2} />,
+    error: <X className="h-4 w-4" strokeWidth={2} />,
+    info: <Info className="h-4 w-4" strokeWidth={2} />,
+    warning: <AlertTriangle className="h-4 w-4" strokeWidth={2} />,
   };
 
   return (
     <ToastContext.Provider value={{ addToast }}>
       {children}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 max-w-sm">
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 max-w-sm" role="status" aria-live="polite">
         {toasts.map((toast) => (
           <div
             key={toast.id}
@@ -64,8 +65,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               typeStyles[toast.type]
             )}
             onClick={() => removeToast(toast.id)}
+            role="alert"
           >
-            <span className="text-lg">{icons[toast.type]}</span>
+            <span className="flex-shrink-0">{icons[toast.type]}</span>
             <p className="text-sm font-medium">{toast.message}</p>
           </div>
         ))}
